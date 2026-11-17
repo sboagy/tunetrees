@@ -6,6 +6,7 @@ import {
 import { drizzle } from "drizzle-orm/sql-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codegenConfig from "../../../oosync.codegen.config.json";
+import { persistDb } from "../db/client-sqlite";
 import {
   getLatestPracticeRecord,
   getPracticeHistory,
@@ -16,6 +17,7 @@ import {
   goalUserSettings,
   practiceRecord,
   repertoireTune,
+  tableTransientData,
 } from "../db/schema";
 import {
   normalizePracticeTimestamp,
@@ -28,6 +30,7 @@ import {
   prepareGoalPracticePreview,
 } from "./preview";
 import { readGoalPracticeContext, resolveGoalReference } from "./resolve";
+import { stageGoalPracticeEvaluation } from "./staging";
 
 vi.mock("../db/client-sqlite", () => ({ persistDb: vi.fn() }));
 
@@ -117,7 +120,11 @@ beforeEach(async () => {
       .run();
   }
 });
-afterEach(() => raw.close());
+afterEach(() => {
+  raw.close();
+  vi.restoreAllMocks();
+  vi.mocked(persistDb).mockReset();
+});
 
 describe("owner-scoped goal practice context", () => {
   it("rejects another user's repertoire before reading practice data", () => {
@@ -267,6 +274,227 @@ describe("owner-scoped goal practice context", () => {
     expect(context().goalTuneCount).toBe(2);
     raw.run("UPDATE tune SET deleted=1 WHERE id='second'");
     expect(context().goalTuneCount).toBe(1);
+  });
+});
+
+describe("goal preview staging", () => {
+  const input = () => ({
+    userId: "owner",
+    repertoireId: "rep",
+    tuneId: "tune",
+    evaluationId: "good",
+    practiced: new Date(stamp),
+  });
+  const draft = () => db.select().from(tableTransientData).get();
+  // Perform a real intervening SQLite mutation while calculation is awaiting crypto.
+  function duringCalculation(action: () => void) {
+    const digest = crypto.subtle.digest.bind(crypto.subtle);
+    vi.spyOn(crypto.subtle, "digest").mockImplementationOnce(
+      (algorithm, data) => {
+        action();
+        return digest(algorithm, data);
+      }
+    );
+  }
+
+  it("stores a complete checked first preview without changing history or queue", async () => {
+    const result = await stageGoalPracticeEvaluation(db, input(), () => true);
+    expect(result.status).toBe("staged");
+    expect(draft()).toMatchObject({
+      goalId: recall.id,
+      goal: "recall",
+      schedulerId: "builtin:fsrs6",
+      schedulerVersion: 1,
+      practiced: "2026-11-16T12:00:00.000Z",
+      predecessorRecordId: null,
+      predecessorFingerprint: null,
+      calculationConfigHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      practiceRecordId: expect.stringMatching(/^[a-f0-9-]{36}$/),
+    });
+    expect(JSON.parse(draft()?.schedulerState ?? "{}")).toHaveProperty(
+      "stability"
+    );
+    expect(db.select().from(practiceRecord).all()).toEqual([]);
+    expect(
+      raw.exec("SELECT count(*) FROM daily_practice_queue")[0].values
+    ).toEqual([[0]]);
+    expect(persistDb).toHaveBeenCalledOnce();
+  });
+
+  it("retains the event ID and notes when the pending evaluation changes", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    raw.run("UPDATE table_transient_data SET note_private='Keep my note'");
+    const before = draft();
+    await stageGoalPracticeEvaluation(
+      db,
+      { ...input(), evaluationId: "hard" },
+      () => true
+    );
+    expect(draft()).toMatchObject({
+      practiceRecordId: before?.practiceRecordId,
+      evaluationId: "hard",
+      notePrivate: "Keep my note",
+      syncVersion: (before?.syncVersion ?? 0) + 1,
+    });
+  });
+
+  it("replaces FSRS projections with ladder state and retains fractional due times", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    const initial = getBuiltInGoals().find(
+      (row) => row.name === "initial_learn"
+    );
+    expect(initial).toBeDefined();
+    assign(initial?.id ?? "missing", "initial_learn");
+    const evaluationId = initial?.config.evaluations[0].id ?? "missing";
+    await stageGoalPracticeEvaluation(
+      db,
+      { ...input(), evaluationId },
+      () => true
+    );
+    expect(draft()).toMatchObject({
+      schedulerId: "builtin:interval-ladder",
+      quality: null,
+      difficulty: null,
+      stability: null,
+      repetitions: null,
+      state: null,
+      intervalDays: 0.1,
+      due: "2026-11-16T14:24:00.000Z",
+    });
+  });
+
+  it("rejects a predecessor arriving during calculation", async () => {
+    duringCalculation(() => event("arrived"));
+    expect(await stageGoalPracticeEvaluation(db, input(), () => true)).toEqual({
+      status: "stale",
+    });
+    expect(draft()).toBeUndefined();
+    expect(persistDb).not.toHaveBeenCalled();
+  });
+
+  it("rejects changed predecessor content even when its ID is unchanged", async () => {
+    event("existing", "2026-11-15T12:00:00Z");
+    duringCalculation(() => raw.run("UPDATE practice_record SET stability=99"));
+    expect(await stageGoalPracticeEvaluation(db, input(), () => true)).toEqual({
+      status: "stale",
+    });
+    expect(draft()).toBeUndefined();
+  });
+
+  it("rejects a goal switch during calculation", async () => {
+    duringCalculation(() => assign(fluencyId, "fluency"));
+    expect(await stageGoalPracticeEvaluation(db, input(), () => true)).toEqual({
+      status: "stale",
+    });
+    expect(draft()).toBeUndefined();
+  });
+
+  it("leaves an existing preview intact when its replacement becomes stale", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    const before = draft();
+    duringCalculation(() => event("arrived"));
+    expect(await stageGoalPracticeEvaluation(db, input(), () => true)).toEqual({
+      status: "stale",
+    });
+    expect(draft()).toEqual(before);
+  });
+
+  it("rolls back a failed staged write without losing the existing preview", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    const before = draft();
+    raw.run(
+      "CREATE TRIGGER reject_staging AFTER UPDATE ON table_transient_data BEGIN SELECT RAISE(ABORT, 'staging rejected'); END"
+    );
+    await expect(
+      stageGoalPracticeEvaluation(
+        db,
+        { ...input(), evaluationId: "hard" },
+        () => true
+      )
+    ).rejects.toThrow();
+    expect(draft()).toEqual(before);
+    expect(persistDb).toHaveBeenCalledOnce();
+  });
+
+  it("rejects settings changed during calculation", async () => {
+    duringCalculation(() => {
+      db.insert(goalUserSettings)
+        .values({
+          userId: "owner",
+          goalId: recall.id,
+          overrides: '{"displayName":"Changed"}',
+          lastModifiedAt: stamp,
+        })
+        .run();
+    });
+    expect(await stageGoalPracticeEvaluation(db, input(), () => true)).toEqual({
+      status: "stale",
+    });
+    expect(draft()).toBeUndefined();
+  });
+
+  it("rechecks repertoire ownership after calculation", async () => {
+    duringCalculation(() =>
+      raw.run(
+        "UPDATE repertoire SET user_ref='other' WHERE repertoire_id='rep'"
+      )
+    );
+    await expect(
+      stageGoalPracticeEvaluation(db, input(), () => true)
+    ).rejects.toThrow(/unavailable/);
+    expect(draft()).toBeUndefined();
+  });
+
+  it("does not overwrite an intervening staged edit", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    duringCalculation(() =>
+      raw.run("UPDATE table_transient_data SET note_private='New note'")
+    );
+    expect(
+      await stageGoalPracticeEvaluation(
+        db,
+        { ...input(), evaluationId: "hard" },
+        () => true
+      )
+    ).toEqual({ status: "superseded" });
+    expect(draft()).toMatchObject({
+      notePrivate: "New note",
+      evaluationId: "good",
+    });
+  });
+
+  it("does not recreate a draft cleared during calculation", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    duringCalculation(() => raw.run("DELETE FROM table_transient_data"));
+    expect(await stageGoalPracticeEvaluation(db, input(), () => true)).toEqual({
+      status: "superseded",
+    });
+    expect(draft()).toBeUndefined();
+  });
+
+  it("does not write after the caller's request or authentication lifetime expires", async () => {
+    let current = true;
+    duringCalculation(() => {
+      current = false;
+    });
+    expect(
+      await stageGoalPracticeEvaluation(db, input(), () => current)
+    ).toEqual({ status: "superseded" });
+    expect(draft()).toBeUndefined();
+    expect(persistDb).not.toHaveBeenCalled();
+  });
+
+  it("reports a persistence failure and retains the same recoverable draft ID", async () => {
+    vi.mocked(persistDb).mockRejectedValueOnce(
+      new Error("storage unavailable")
+    );
+    await expect(
+      stageGoalPracticeEvaluation(db, input(), () => true)
+    ).rejects.toThrow("storage unavailable");
+    const failed = draft();
+    expect(failed?.practiceRecordId).toBeTruthy();
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    expect(draft()?.practiceRecordId).toBe(failed?.practiceRecordId);
   });
 });
 

@@ -1,15 +1,12 @@
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import { calculateGoalPractice } from "./calculate";
-import { hashCanonicalJson } from "./config";
+import { canonicalJson, hashCanonicalJson } from "./config";
 import { readGoalPracticeContext } from "./resolve";
 
 type Context = ReturnType<typeof readGoalPracticeContext>;
 /** Scheduling inputs only: sync bookkeeping and compatibility projections cannot stale new JSON. */
-export async function practiceContextFingerprints(
-  context: Context,
-  evaluationId: string
-) {
+function practiceContextInputs(context: Context, evaluationId: string) {
   const previous = context.predecessor;
   let state: unknown = null;
   if (previous) {
@@ -34,8 +31,8 @@ export async function practiceContextFingerprints(
                 : JSON.parse(previous.schedulerState),
           };
   }
-  const predecessorFingerprint = previous
-    ? await hashCanonicalJson({
+  const predecessor = previous
+    ? {
         id: previous.id,
         goalId: previous.goalId,
         practiced:
@@ -47,27 +44,46 @@ export async function practiceContextFingerprints(
             ? null
             : normalizePracticeTimestamp(previous.due),
         state,
-      })
+      }
     : null;
-  const calculationConfigHash = await hashCanonicalJson(
-    {
-      version: 1,
-      evaluationId,
-      userId: context.userId,
-      repertoireId: context.repertoireId,
-      tuneId: context.tuneId,
-      goalId: context.goalId,
-      goalKey: context.goalKey,
-      displayName: context.displayName,
-      config: context.config,
-      goalTuneCount: context.goalTuneCount,
-    },
-    128 * 1024
+  const configuration = {
+    version: 1,
+    evaluationId,
+    userId: context.userId,
+    repertoireId: context.repertoireId,
+    tuneId: context.tuneId,
+    goalId: context.goalId,
+    goalKey: context.goalKey,
+    displayName: context.displayName,
+    config: context.config,
+    goalTuneCount: context.goalTuneCount,
+  };
+  return { predecessor, configuration };
+}
+
+/** Same inputs as the durable hashes, compared synchronously inside a write transaction. */
+export function practiceContextKey(context: Context, evaluationId: string) {
+  const { predecessor, configuration } = practiceContextInputs(
+    context,
+    evaluationId
+  );
+  return canonicalJson({ predecessor, configuration }, 256 * 1024);
+}
+
+export async function practiceContextFingerprints(
+  context: Context,
+  evaluationId: string
+) {
+  const { predecessor, configuration } = practiceContextInputs(
+    context,
+    evaluationId
   );
   return {
-    predecessorRecordId: previous?.id ?? null,
-    predecessorFingerprint,
-    calculationConfigHash,
+    predecessorRecordId: context.predecessor?.id ?? null,
+    predecessorFingerprint: predecessor
+      ? await hashCanonicalJson(predecessor)
+      : null,
+    calculationConfigHash: await hashCanonicalJson(configuration, 128 * 1024),
   };
 }
 
@@ -101,6 +117,8 @@ export async function prepareGoalPracticePreview(
   return {
     ...result,
     ...(await practiceContextFingerprints(context, input.evaluationId)),
+    contextKey: practiceContextKey(context, input.evaluationId),
+    goalKey: context.goalKey,
     notices: context.notices,
   };
 }

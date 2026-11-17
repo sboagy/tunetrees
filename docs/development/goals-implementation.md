@@ -203,6 +203,51 @@ non-mutating preview calculation and fingerprint sensitivity. All 1,127 unit tes
 typechecking, formatting, lint and seed checks pass. No schema change or deployment
 is involved. Transactional staging/Submit and browser E2E remain subsequent work.
 
+## Checkpoint 3c: guarded preview staging
+
+Checkpoint 3c implements the new-format staged writer in `goals/staging.ts` without
+activating it in the practice UI. It persists goal/evaluation snapshots, authoritative
+scheduler JSON, fractional intervals, predecessor/config hashes and a prospective
+event UUID. Editing a pending evaluation retains its UUID and notes; replacing an
+FSRS preview with a ladder clears incompatible typed projections. No practice event,
+repertoire due date or queue row is changed.
+
+Async calculations finish before a synchronous SQLite transaction rechecks ownership,
+effective calculation inputs, caller request lifetime and the original staged row.
+`preview.ts` projects the inputs once for both durable hashes and the synchronous
+comparison; there is no async hash inside the transaction. Stale inputs leave the
+old draft intact and return `stale`; expired requests or intervening draft edits
+return `superseded`. The caller must handle those outcomes and recheck its lifetime
+after persistence before displaying results. A persistence error is propagated, with
+the same prospective event ID retained in the in-memory draft for recovery.
+
+SQLite WASM tests cover initial staging, pending edits, fractional ladder results,
+concurrent history/settings/goal changes, ownership loss, cancellation, newer draft
+edits, persistence failure and transactional rollback. This does not satisfy the
+Submit-time stale-preview/atomic event-and-queue commit requirements below. The old
+staging service remains active until the complete new workflow is ready.
+
+Validation: all 1,142 unit tests pass, including 14 new staging cases against SQLite
+WASM. Typechecking, lint, formatting and diff checks pass. Browser E2E has not been
+rerun for this checkpoint; the active UI is unchanged. No schema/codegen changes.
+Local CodeRabbit review completed across all five changed/new files with zero findings.
+
+### Rollover refresh follow-up
+
+The completed-queue E2E failure exposed an existing completion/persistence race:
+Refresh hid its button and advanced the selected date before IndexedDB saving
+finished, allowing an immediate reload to restore yesterday's completed queue.
+Refresh now advances the selected date only after successful generation/persistence
+and metadata refresh. Both toolbars keep the button visible and disabled for the
+entire operation, even if sync updates the queue date meanwhile. Failures show an
+error and allow retry.
+
+Final validation includes all 1,144 unit tests (two new toolbar completion regressions),
+typecheck, lint, formatting and diff checks. The reported E2E scenario passed six
+runs: three each on desktop Chromium and Mobile Chrome. This is focused E2E coverage,
+not a full-suite rerun. The SQL-editor parser adjustment also passed the 35 focused
+resolver/staging tests. No schema or generated artifacts changed.
+
 ## Remaining checkpoints
 
 1. Align remaining repertoire-wide SQL consumers and views with canonical history order; initialize legacy

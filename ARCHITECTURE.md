@@ -412,6 +412,17 @@ preview fingerprints with unchanged digest bytes.
 writing. These fingerprints are preparation for, not a substitute for, atomic Submit
 validation. Repertoire-wide SQL consumers and views still require alignment at activation.
 
+`goals/staging.ts` adds the new-format staging boundary, still disconnected from the
+legacy UI/Submit path. It calculates asynchronously, then rechecks the caller lifetime,
+owner-scoped context and original draft in one synchronous SQLite transaction before
+upserting. The synchronous comparison and durable fingerprints share the same input
+projection in `preview.ts`. A changed context returns `stale`; a superseded request
+or changed draft returns `superseded`, without writes. Successful staging preserves
+notes and the pending event UUID, writes complete JSON/compatibility projections and
+persists SQLite. Persistence failures remain visible to the caller with the draft
+retained in memory. This is a staging-time guard, not the pending atomic Submit check;
+UI activation must wait for that check, cutover conversion and query/view alignment.
+
 Goal storage now adds nullable display/description/default-config fields and a
 composite `(user_id, goal_id)` settings table. Configurations/overrides use bounded
 JSON TEXT. Generated Worker rules bind camelCase ownership properties; Postgres

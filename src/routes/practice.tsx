@@ -324,8 +324,6 @@ const PracticePage: Component = () => {
       return;
     }
 
-    clearManualAndSetToday();
-
     try {
       await generateOrGetPracticeQueue(
         db,
@@ -336,17 +334,22 @@ const PracticePage: Component = () => {
         "per_day",
         true
       );
+      await refreshQueueWindowState();
     } catch (error) {
       console.warn(
         "[PracticePage] Failed to regenerate queue during refresh:",
         error
       );
+      toast.error("Could not refresh the practice queue. Please try again.");
+      return;
     }
 
+    // Generation awaits IndexedDB persistence. Keep the rollover button visible
+    // and busy until that completes so hiding it means a reload is safe.
+    clearManualAndSetToday();
     console.log(
       `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()}`
     );
-    await refreshQueueWindowState();
     incrementPracticeListStagedChanged();
   };
 

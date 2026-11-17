@@ -1,0 +1,103 @@
+import { and, eq, sql } from "drizzle-orm";
+import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
+import { tableTransientData } from "../db/schema";
+import { practiceContextKey, prepareGoalPracticePreview } from "./preview";
+import { readGoalPracticeContext } from "./resolve";
+
+type StageInput = Parameters<typeof prepareGoalPracticePreview>[1];
+
+function draftWhere(input: StageInput) {
+  return and(
+    eq(tableTransientData.userId, input.userId),
+    eq(tableTransientData.repertoireId, input.repertoireId),
+    eq(tableTransientData.tuneId, input.tuneId)
+  );
+}
+
+/**
+ * New-format staging boundary; deliberately not connected to the legacy Submit UI.
+ * isCurrent must cover the caller's auth/database lifetime and evaluation request.
+ * All async calculations finish before the synchronous recheck/write transaction.
+ */
+export async function stageGoalPracticeEvaluation(
+  db: SqliteDatabase,
+  requested: StageInput,
+  isCurrent: () => boolean
+) {
+  // Capture mutable caller inputs before any await (including the Date object).
+  const input = { ...requested, practiced: new Date(requested.practiced) };
+  if (!isCurrent()) return { status: "superseded" as const };
+  const where = draftWhere(input);
+  const initialDraft = db.select().from(tableTransientData).where(where).get();
+  const initialDraftKey = JSON.stringify(initialDraft ?? null);
+  const preview = await prepareGoalPracticePreview(db, input);
+
+  const result = db.transaction((tx) => {
+    if (!isCurrent()) return { status: "superseded" as const };
+    const current = readGoalPracticeContext(
+      db,
+      input.userId,
+      input.repertoireId,
+      input.tuneId
+    );
+    if (practiceContextKey(current, input.evaluationId) !== preview.contextKey)
+      return { status: "stale" as const };
+    const draft = tx.select().from(tableTransientData).where(where).get();
+    // A cancellation, note edit, or newer staged evaluation wins over this request.
+    if (JSON.stringify(draft ?? null) !== initialDraftKey)
+      return { status: "superseded" as const };
+    const values = {
+      goal: preview.goalKey,
+      goalId: preview.goalId,
+      evaluationId: preview.evaluationId,
+      evaluationSnapshot: preview.evaluationSnapshot,
+      schedulerId: preview.schedulerId,
+      schedulerVersion: preview.schedulerVersion,
+      schedulerState: preview.schedulerState,
+      intervalDays: preview.intervalDays,
+      practiced: preview.practiced,
+      due: preview.due,
+      predecessorRecordId: preview.predecessorRecordId,
+      predecessorFingerprint: preview.predecessorFingerprint,
+      calculationConfigHash: preview.calculationConfigHash,
+      practiceRecordId: draft?.practiceRecordId ?? crypto.randomUUID(),
+      // Clear incompatible typed projections rather than leaving an earlier FSRS preview.
+      quality: preview.compatibility.quality,
+      easiness: preview.compatibility.easiness,
+      difficulty: preview.compatibility.difficulty,
+      stability: preview.compatibility.stability,
+      interval: preview.compatibility.interval,
+      step: preview.compatibility.step,
+      repetitions: preview.compatibility.repetitions,
+      state: preview.compatibility.state,
+      technique: preview.compatibility.technique,
+      recallEval: preview.evaluationId,
+      backupPracticed: null,
+      lastModifiedAt: new Date().toISOString(),
+    };
+    const stored = tx
+      .insert(tableTransientData)
+      .values({
+        userId: input.userId,
+        tuneId: input.tuneId,
+        repertoireId: input.repertoireId,
+        ...values,
+      })
+      .onConflictDoUpdate({
+        target: [
+          tableTransientData.tuneId,
+          tableTransientData.userId,
+          tableTransientData.repertoireId,
+        ],
+        set: {
+          ...values,
+          syncVersion: sql.raw(`${tableTransientData.syncVersion.name} + 1`),
+        },
+      })
+      .returning()
+      .get();
+    return { status: "staged" as const, draft: stored, preview };
+  });
+  if (result.status === "staged") await persistDb();
+  return result;
+}

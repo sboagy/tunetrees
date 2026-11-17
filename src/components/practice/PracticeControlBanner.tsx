@@ -284,7 +284,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             </Show>
           </button>
 
-          <Show when={props.rolloverPending}>
+          <Show when={props.rolloverPending || isRefreshingQueue()}>
             <button
               type="button"
               data-testid="date-rollover-refresh-button"
@@ -527,7 +527,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 <span>Add More</span>
               </button>
 
-              <Show when={props.rolloverPending}>
+              <Show when={props.rolloverPending || isRefreshingQueue()}>
                 <button
                   type="button"
                   data-testid="date-rollover-refresh-button"
