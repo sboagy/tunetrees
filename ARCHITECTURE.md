@@ -394,8 +394,8 @@ projections, never a fallback for malformed new JSON. Common timestamps and
 fractional durations stay outside scheduler state. Legacy learning progress that
 was not stored is initialized to zero with an explicit decoder limitation.
 The existing FSRS service reads its legacy ladder fallback intervals from this
-source. The new calculators are not connected to staging until atomic predecessor/config
-checks and selected-scheduler activation land.
+source. The new calculators feed the guarded staging and Submit boundaries below;
+selected-scheduler activation in the UI remains pending.
 
 `resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
 active tune assignments, visible goal definitions, personal overrides and history.
@@ -410,7 +410,16 @@ them. Canonical JSON hashing lives once in `goals/config.ts` and serves ladders 
 preview fingerprints with unchanged digest bytes.
 `preview.ts` calculates from that snapshot and fingerprints its relevant inputs without
 writing. These fingerprints are preparation for, not a substitute for, atomic Submit
-validation. Repertoire-wide SQL consumers and views still require alignment at activation.
+validation. `db/practice-history-sql.ts` supplies canonical SQLite ordering for
+repertoire-wide limited history, queue candidate selection and local practice views.
+It converts whole seconds to UTC separately from the six-digit fraction to avoid
+SQLite millisecond rounding. Analysis selects the latest event before filtering
+stability or due dates, so older eligible events cannot stand in for newer events.
+Analysis scopes history to the requested repertoire before ranking. Queue candidate
+generation rejects malformed non-null timestamps; display queries rank them as
+missing. Shared fixtures compare JavaScript, SQLite WASM and Postgres ordering. The main
+Postgres practice view already uses the corresponding timestamp/modified/ID order;
+its schema and the sync contract remain unchanged.
 
 `goals/staging.ts` adds the new-format staging boundary, still disconnected from the
 legacy UI/Submit path. It calculates asynchronously, then rechecks the caller lifetime,
@@ -420,8 +429,8 @@ projection in `preview.ts`. A changed context returns `stale`; a superseded requ
 or changed draft returns `superseded`, without writes. Successful staging preserves
 notes and the pending event UUID, writes complete JSON/compatibility projections and
 persists SQLite. Persistence failures remain visible to the caller with the draft
-retained in memory. This is a staging-time guard, not the pending atomic Submit check;
-UI activation must wait for that check, cutover conversion and query/view alignment.
+retained in memory. Submit performs its own atomic recheck; UI activation must
+wait for cutover conversion and the remaining scheduler/UI integration.
 
 Goal storage now adds nullable display/description/default-config fields and a
 composite `(user_id, goal_id)` settings table. Configurations/overrides use bounded
@@ -450,7 +459,7 @@ rechecks ownership, queue and draft snapshots before atomically writing events,
 current due dates, queue completion/display links and draft removal. Stale previews
 require review; event identity/time conflicts fail explicitly. Identical completed
 retries flush persistence without reapplying schedules or queue counters. Cutover
-conversion, query/view alignment and selected-scheduler UI activation remain pending.
+conversion and selected-scheduler UI activation remain pending.
 
 This domain logic is independent of oosync. oosync moves the rows; TuneTrees services decide what those rows mean.
 

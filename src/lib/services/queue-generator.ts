@@ -25,6 +25,10 @@
 
 import { and, eq, lt, sql } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
+import {
+  assertValidPracticeHistory,
+  practiceHistoryOrderSql,
+} from "../db/practice-history-sql";
 import { dailyPracticeQueue, repertoireTune } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
 import { generateId } from "../utils/uuid";
@@ -170,6 +174,7 @@ async function getQueueGenerationCandidates(
   sitdownDate: Date,
   delinquencyWindowDays: number
 ): Promise<QueueGenerationCandidate[]> {
+  assertValidPracticeHistory(db, repertoireId);
   const windowStart = new Date(sitdownDate);
   windowStart.setDate(windowStart.getDate() - delinquencyWindowDays);
   const windowEnd = new Date(sitdownDate);
@@ -184,7 +189,7 @@ async function getQueueGenerationCandidates(
         FROM practice_record pr
         WHERE pr.tune_ref = rt.tune_ref
           AND pr.repertoire_ref = rt.repertoire_ref
-        ORDER BY pr.practiced DESC
+        ORDER BY ${sql.raw(practiceHistoryOrderSql())}
         LIMIT 1
       ) as latestDue
     FROM repertoire_tune rt
@@ -294,6 +299,14 @@ export async function generateDailyPracticeQueue(
     }
   }
 
+  // Validate/read candidates before changing the existing queue
+  const dueTunes = await getQueueGenerationCandidates(
+    db,
+    repertoireId,
+    sitdownDate,
+    delinquencyWindowDays
+  );
+
   // Deactivate existing queue if regenerating
   if (forceRegen) {
     await db
@@ -307,14 +320,6 @@ export async function generateDailyPracticeQueue(
         )
       );
   }
-
-  // Get due tunes
-  const dueTunes = await getQueueGenerationCandidates(
-    db,
-    repertoireId,
-    sitdownDate,
-    delinquencyWindowDays
-  );
 
   // Build queue entries
   const queueEntries: NewDailyPracticeQueue[] = [];

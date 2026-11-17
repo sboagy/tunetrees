@@ -1,5 +1,3 @@
-import type { PracticeRecord } from "../db/types";
-
 /** UTC, six-digit fractions match Postgres precision without SQLite date rounding. */
 export function normalizePracticeTimestamp(value: string): string {
   const text = value
@@ -40,7 +38,11 @@ function orderTimestamp(
 
 /** Canonical order: practiced DESC NULLS LAST, modified DESC NULLS LAST, ID DESC. */
 export function orderPracticeHistory<
-  T extends Pick<PracticeRecord, "id" | "practiced" | "lastModifiedAt">,
+  T extends {
+    id: string;
+    practiced: string | null;
+    lastModifiedAt: string | null;
+  },
 >(
   records: readonly T[],
   invalid: InvalidPracticeTimestampPolicy = "reject"

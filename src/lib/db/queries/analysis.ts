@@ -8,9 +8,30 @@
  * @module lib/db/queries/analysis
  */
 
-import { and, desc, eq, isNotNull, lt, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  sql,
+} from "drizzle-orm";
 import type { SqliteDatabase } from "../client-sqlite";
+import { latestPracticeRecordIdsForRepertoire } from "../practice-history-sql";
 import { practiceRecord, repertoireTune, tune } from "../schema";
+
+function latestPracticeFilter(repertoireId: string) {
+  // Unlike a query-builder subquery, a raw SQL expression needs its own parentheses.
+  const subquery = sql.join([
+    sql.raw("("),
+    latestPracticeRecordIdsForRepertoire(repertoireId),
+    sql.raw(")"),
+  ]);
+  return inArray(practiceRecord.id, subquery);
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,21 +103,25 @@ export async function getPracticeHistory(
   cutoff.setDate(cutoff.getDate() - 365);
   const cutoffIso = cutoff.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
+  // This is an expression, not a standalone SQL statement for the editor parser.
+  const practiceDay = sql
+    .join([sql.raw("date("), practiceRecord.practiced, sql.raw(")")])
+    .mapWith(String);
   const rows = await db
     .select({
-      day: sql<string>`date(${practiceRecord.practiced})`.as("day"),
-      count: sql<number>`count(*)`.as("count"),
+      day: practiceDay.as("day"),
+      count: count().as("count"),
     })
     .from(practiceRecord)
     .where(
       and(
         eq(practiceRecord.repertoireRef, repertoireId),
         isNotNull(practiceRecord.practiced),
-        sql`date(${practiceRecord.practiced}) >= ${cutoffIso}`
+        gte(practiceDay, cutoffIso)
       )
     )
-    .groupBy(sql`date(${practiceRecord.practiced})`)
-    .orderBy(sql`date(${practiceRecord.practiced})`);
+    .groupBy(practiceDay)
+    .orderBy(practiceDay);
 
   return rows.map((r) => ({ day: r.day, count: r.count }));
 }
@@ -118,7 +143,7 @@ export async function getStalenessData(
 ): Promise<StalenessBucket[]> {
   const today = new Date().toISOString().slice(0, 10);
 
-  // Latest practice record per tune (with stability and a due date in the past)
+  // Select the latest event first, then keep eligible overdue records.
   const rows = await db
     .select({
       tuneRef: practiceRecord.tuneRef,
@@ -131,23 +156,12 @@ export async function getStalenessData(
     .where(
       and(
         eq(practiceRecord.repertoireRef, repertoireId),
+        latestPracticeFilter(repertoireId),
         isNotNull(practiceRecord.stability),
         isNotNull(practiceRecord.due),
         lt(practiceRecord.due, today)
       )
-    )
-    .orderBy(desc(practiceRecord.practiced));
-
-  // Keep only the most recent record per tune
-  const latestByTune = new Map<
-    string,
-    { title: string | null; due: string | null }
-  >();
-  for (const row of rows) {
-    if (!latestByTune.has(row.tuneRef)) {
-      latestByTune.set(row.tuneRef, { title: row.title, due: row.due });
-    }
-  }
+    );
 
   // Build buckets
   const todayMs = Date.parse(today);
@@ -159,7 +173,7 @@ export async function getStalenessData(
     { label: "> 90 days", count: 0, tunes: [] },
   ];
 
-  for (const [, { title, due }] of latestByTune) {
+  for (const { title, due } of rows) {
     if (!due) continue;
     const dueMs = Date.parse(due.slice(0, 10));
     const daysOverdue = Math.floor((todayMs - dueMs) / 86_400_000);
@@ -192,7 +206,7 @@ export async function getStalenessData(
  * Compute a 60-day forward-looking average retention curve using the FSRS
  * R(t,S) = 0.9^(t/S) formula.
  *
- * Uses the most recent practice record with a valid stability value per tune.
+ * Uses each tune’s most recent event only when that event has valid stability.
  *
  * @param db          - SQLite database instance
  * @param repertoireId - Repertoire UUID
@@ -201,7 +215,7 @@ export async function getFsrsRetentionCurve(
   db: SqliteDatabase,
   repertoireId: string
 ): Promise<RetentionPoint[]> {
-  // Get latest stability per tune
+  // Select the latest event first; a newer non-FSRS event must not revive old stability.
   const rows = await db
     .select({
       tuneRef: practiceRecord.tuneRef,
@@ -212,20 +226,15 @@ export async function getFsrsRetentionCurve(
     .where(
       and(
         eq(practiceRecord.repertoireRef, repertoireId),
+        latestPracticeFilter(repertoireId),
         isNotNull(practiceRecord.stability)
       )
-    )
-    .orderBy(desc(practiceRecord.practiced));
+    );
 
-  // Keep only the most recent record per tune
-  const latestByTune = new Map<string, number>();
-  for (const row of rows) {
-    if (!latestByTune.has(row.tuneRef) && row.stability != null) {
-      latestByTune.set(row.tuneRef, row.stability);
-    }
-  }
-
-  const stabilities = Array.from(latestByTune.values()).filter((s) => s > 0);
+  // SQL has already selected one latest event per tune, before stability filtering.
+  const stabilities = rows.flatMap((row) =>
+    row.stability !== null && row.stability > 0 ? [row.stability] : []
+  );
 
   if (stabilities.length === 0) {
     // No data: return empty curve so the UI can render its empty state.
@@ -261,7 +270,7 @@ export async function getRepertoireCoverage(
   const rows = await db
     .select({
       type: tune.type,
-      count: sql<number>`count(*)`.as("count"),
+      count: count().as("count"),
     })
     .from(repertoireTune)
     .innerJoin(tune, eq(tune.id, repertoireTune.tuneRef))
@@ -272,7 +281,7 @@ export async function getRepertoireCoverage(
       )
     )
     .groupBy(tune.type)
-    .orderBy(desc(sql`count(*)`));
+    .orderBy(desc(count()));
 
   return rows.map((r) => ({
     type: r.type ?? "Unknown",

@@ -18,6 +18,10 @@
  */
 
 import type { BrowserSqliteDatabase as SqliteDatabase } from "oosync/runtime/browser-sqlite";
+import {
+  latestPracticeRecordsSql,
+  practiceHistoryOrderSql,
+} from "./practice-history-sql";
 
 /**
  * View 1: Repertoire with Instrument Information
@@ -42,25 +46,6 @@ SELECT
 FROM
   repertoire p
   JOIN instrument i ON p.instrument_ref = i.id
-`;
-
-const LATEST_PRACTICE_RECORD_SUBQUERY = /* sql */ `
-  SELECT *
-  FROM (
-    SELECT
-      pr.*,
-      ROW_NUMBER() OVER (
-        PARTITION BY pr.tune_ref, pr.repertoire_ref
-        ORDER BY
-          CASE WHEN pr.practiced IS NULL THEN 1 ELSE 0 END ASC,
-          pr.practiced DESC,
-          CASE WHEN pr.last_modified_at IS NULL THEN 1 ELSE 0 END ASC,
-          pr.last_modified_at DESC,
-          pr.id DESC
-      ) AS row_num
-    FROM practice_record pr
-  ) latest_pr
-  WHERE latest_pr.row_num = 1
 `;
 
 /**
@@ -136,7 +121,7 @@ FROM
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
   LEFT JOIN (
-${LATEST_PRACTICE_RECORD_SUBQUERY}
+${latestPracticeRecordsSql}
   ) practice_record ON practice_record.tune_ref = tune.id
     AND practice_record.repertoire_ref = repertoire_tune.repertoire_ref
 `;
@@ -241,7 +226,7 @@ FROM
     AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
   LEFT JOIN instrument ON instrument.id = repertoire.instrument_ref
   LEFT JOIN (
-${LATEST_PRACTICE_RECORD_SUBQUERY}
+${latestPracticeRecordsSql}
   ) pr ON pr.tune_ref = tune.id
     AND pr.repertoire_ref = repertoire_tune.repertoire_ref
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
@@ -401,7 +386,7 @@ FROM
     AND tune_override.user_ref = p.user_ref
   LEFT JOIN instrument i ON i.id = p.instrument_ref
 ORDER BY
-  pr.practiced DESC
+  ${practiceHistoryOrderSql()}
 `;
 
 /**

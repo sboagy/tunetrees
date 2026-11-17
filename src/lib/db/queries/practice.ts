@@ -16,11 +16,12 @@
  * @module lib/db/queries/practice
  */
 
-import { and, desc, eq, getTableColumns, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { orderPracticeHistory } from "../../utils/practice-history";
 import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
+import { practiceHistoryOrderSql } from "../practice-history-sql";
 import {
   practiceRecord,
   prefsSchedulingOptions,
@@ -631,7 +632,7 @@ export async function getPracticeRecords(
       eq(repertoire.repertoireId, practiceRecord.repertoireRef)
     )
     .where(eq(practiceRecord.repertoireRef, repertoireId))
-    .orderBy(desc(practiceRecord.practiced))
+    .orderBy(sql.raw(practiceHistoryOrderSql("practice_record")))
     .limit(limit);
 
   // Convert null to undefined for repertoireName to match interface

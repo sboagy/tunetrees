@@ -285,10 +285,60 @@ explicit exposure per selected queue row; Practice again reopening, per-goal que
 allocation, legacy conversion and UI integration remain subsequent work. There are
 no schema/generated-artifact changes or deployment actions in this checkpoint.
 
+## Checkpoint 3e: canonical SQL history selection
+
+`db/practice-history-sql.ts` shares timestamp normalization/order and latest-row
+selection across the limited repertoire history query, queue candidate subquery,
+SQLite joined/staged/readable practice views and analysis queries. UTC whole seconds
+and microsecond fractions are handled separately; SQLite date rounding cannot turn
+`.999999` into the following second. SQL limits and per-tune selection remain in the
+database rather than transferring entire repertoire histories into JavaScript.
+
+Analysis now selects the latest event before filtering stability or overdue dates.
+This prevents an old overdue event from surviving a newer future-due review, and
+prevents old FSRS stability resurfacing after a newer event without stability.
+The retention formula and compatibility-column projections are unchanged; goal-aware
+metrics and authoritative JSON presentation remain part of the later UI work.
+
+Shared fixtures cover UTC offsets, legacy timestamp forms, microseconds, missing
+values and deterministic modification/ID ties. `npx tsx scripts/test-practice-history-order.mjs`
+checks the same expected order against local Postgres without writing schema or
+fixtures. SQLite view integration tests cover both joined and staged consumers.
+The existing Postgres practice-list view already has the canonical tie-breakers.
+
+Compatibility: local view columns and common scheduling meanings are unchanged;
+there is no server migration, generated artifact or sync metadata change. Old
+browser/Worker bundles remain compatible during deployment. This checkpoint changes
+active read selection, but does not activate the new goal staging/Submit workflow.
+
+CodeRabbit follow-up: analysis now filters repertoire before ranking; the legacy
+queue candidate reader explicitly rejects malformed non-null timestamps before
+selection. Display queries retain their as-missing policy. Analysis comments now
+state that the latest event is selected first. The parity script uses the documented
+`tsx` runner and the declared `postgres` dependency; its tied text fixture IDs are
+lowercase with identical structure (production IDs are UUIDs), so the review's
+mixed-case/punctuation collation concern does not apply to this fixture.
+
+A SQLite WASM benchmark with 50,000 UTC history events across ten repertoires
+measured joined/staged view counts at roughly 340–350 ms after adding the UTC fast
+path, compared with roughly 820 ms for the general parser and 140 ms for old raw
+ordering. Analysis over one repertoire's 5,000 events took about 40 ms. These are
+local synthetic measurements, not mobile performance guarantees; full-history view
+ranking still costs more than incorrect raw-string ordering. No persisted timestamp
+columns or indexes were added.
+
+Validation: **1,185 unit tests passed**, plus typecheck, lint, formatting, script
+Biome checks and diff checks. The focused Playwright run passed **15 tests** across
+desktop Chromium and Mobile Chrome (analysis charts and scheduling interval order,
+plus setup); this is not a full-suite E2E run. The read-only local Postgres parity
+check passed. The final legacy-generator guard-order adjustment is covered by a
+SQLite regression proving a rejected regeneration leaves the existing queue active.
+
+
+
 ## Remaining checkpoints
 
-1. Align remaining repertoire-wide SQL consumers and views with canonical history order; initialize legacy
-   goal definitions/preferences at cutover; selected-scheduler activation, plugin
+1. Initialize legacy goal definitions/preferences at cutover; selected-scheduler activation, plugin
    contracts and UI integration of the staged-preview/atomic Submit boundaries.
 2. Per-goal queue allocation across generation, Refresh and manual additions,
    retained work accounting and displayed-event links.
@@ -339,12 +389,11 @@ These changes do not activate the new scheduler or change schema contracts.
   resolver, `getLatestPracticeRecord` and `getPracticeRecordsForTune`.
   `getPracticeHistory` applies the same ordering to its enriched rows, before limiting;
   Practice History charts and streaks use its reverse for chronological display.
-- Remaining SQL consumers are explicitly tracked for the query/view integration step:
-  `getPracticeRecords` in `queries/practice.ts` (repertoire-wide limit), analysis
-  projections in `queries/analysis.ts`, the queue-generator latest-record subquery,
-  and SQLite/Postgres practice views. Do not load every repertoire event into JS just
-  to reuse a sorter. Align their SQL ordering and add cross-engine parity fixtures
-  before activating the new goal scheduling/queue path.
+- `db/practice-history-sql.ts` now supplies canonical SQL selection for
+  `getPracticeRecords`, analysis, the queue-generator latest-record subquery and
+  SQLite practice views. Cross-engine fixtures cover the ordering contract; the
+  Postgres practice-list view already has the required order. Goal-aware analysis
+  projections/metrics remain part of scheduler/UI integration.
 - Queue window/date-only utilities and scheduled-override second-precision comparisons
   have separate contracts; they are not interchangeable with event ordering. OAuth
   PKCE hashes raw verifier bytes to base64url, not canonical JSON to hexadecimal.
@@ -358,3 +407,16 @@ Local CodeRabbit review identified inconsistent timestamp parsing in chart label
 Chart labels and table dates now use the shared UTC normalizer, retaining damaged-date
 fallbacks. All seven history utility tests pass with `TZ=America/Los_Angeles`, including
 the offset-free timestamp regression; typechecking, lint and formatting also pass.
+
+### Catalog refresh follow-up (SCHEDULING-008)
+
+The reported mobile timeout occurred while clicking New in the Add Tune dialog,
+before interval assertions. A background catalog refresh unmounted the toolbar
+that owns the dialog. The catalog now retains that toolbar once data has loaded,
+preserving open dialogs and unsaved input during subsequent refreshes. A route
+regression test holds a refresh pending and verifies that dialog state survives.
+No E2E timeout or interval assertion was relaxed.
+
+Validation: all 1,186 unit tests, typecheck, lint, formatting and diff checks passed.
+SCHEDULING-008 passed four focused runs (twice desktop Chromium and twice Mobile
+Chrome), plus auth setup, using the existing servers. This is not a full E2E rerun.

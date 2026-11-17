@@ -8,8 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codegenConfig from "../../../oosync.codegen.config.json";
 import { persistDb } from "../db/client-sqlite";
 import {
+  getFsrsRetentionCurve,
+  getStalenessData,
+} from "../db/queries/analysis";
+import {
   getLatestPracticeRecord,
   getPracticeHistory,
+  getPracticeRecords,
 } from "../db/queries/practice";
 import { getPracticeRecordsForTune } from "../db/queries/practice-records";
 import {
@@ -20,6 +25,10 @@ import {
   repertoireTune,
   tableTransientData,
 } from "../db/schema";
+import {
+  computeSchedulingWindows,
+  generateDailyPracticeQueue,
+} from "../services/queue-generator";
 import {
   normalizePracticeTimestamp,
   orderPracticeHistory,
@@ -920,5 +929,63 @@ describe("atomic goal practice submission", () => {
     );
     expect(events()).toEqual([]);
     expect(drafts()).toHaveLength(1);
+  });
+});
+
+describe("repertoire history SQL consumers", () => {
+  it("preserves the existing queue when malformed history blocks regeneration", async () => {
+    event("damaged", "not-a-date");
+    const windows = computeSchedulingWindows(new Date(stamp), 7, 0);
+    db.insert(dailyPracticeQueue)
+      .values({
+        id: "preserved",
+        userRef: "owner",
+        repertoireRef: "rep",
+        tuneRef: "tune",
+        windowStartUtc: windows.startTs,
+        windowEndUtc: windows.endTs,
+        bucket: 1,
+        orderIndex: 0,
+        snapshotCoalescedTs: stamp,
+        generatedAt: stamp,
+        lastModifiedAt: stamp,
+      })
+      .run();
+    await expect(
+      generateDailyPracticeQueue(db, "owner", "rep", new Date(stamp), {
+        forceRegen: true,
+      })
+    ).rejects.toThrow("Invalid practice timestamp");
+    expect(db.select().from(dailyPracticeQueue).get()).toMatchObject({
+      id: "preserved",
+      active: 1,
+    });
+  });
+
+  it("limits enriched history only after normalized timestamp and ID ordering", async () => {
+    event("earlier", "2026-11-16T13:00:00.999998+01:00");
+    event("latest", "2026-11-16T07:00:00.999999-05:00");
+    const records = await getPracticeRecords(db, "rep", 1);
+    expect(records.map((row) => row.id)).toEqual(["latest"]);
+  });
+
+  it("does not show an older overdue record when the latest review is scheduled in the future", async () => {
+    event("older", "2026-11-15T12:00:00Z");
+    event("latest", "2026-11-16T12:00:00Z");
+    raw.run(
+      "UPDATE practice_record SET due = CASE id WHEN 'older' THEN '2000-01-01' ELSE '2999-01-01' END"
+    );
+    expect(
+      (await getStalenessData(db, "rep")).map((bucket) => bucket.count)
+    ).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it("does not resurrect FSRS stability from an older goal after a ladder event", async () => {
+    event("older", "2026-11-15T12:00:00Z");
+    event("latest", "2026-11-16T12:00:00Z");
+    raw.run(
+      "UPDATE practice_record SET stability = NULL, goal = 'fluency' WHERE id='latest'"
+    );
+    expect(await getFsrsRetentionCurve(db, "rep")).toEqual([]);
   });
 });
