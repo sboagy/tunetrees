@@ -256,6 +256,57 @@ try {
         "again"
       );
     });
+    // Plans created while staging was empty must still fail if any draft arrives.
+    // Include sparse and note-only rows; absence of an evaluation is not consent
+    // to discard work. Everything, including the inserted draft, stays unchanged.
+    for (const draft of [
+      {},
+      { note_private: "Private pending note" },
+      { evaluation_id: "again", scheduler_id: "fsrs" },
+    ]) {
+      await rollbackCase(tx, async (sp) => {
+        await sp`INSERT INTO public.table_transient_data ${sp({
+          user_id: userId,
+          repertoire_id: repertoireId,
+          tune_id: tuneId,
+          ...draft,
+        })}`;
+        const snapshot = await readGoalCutoverSnapshot(sp);
+        assert.deepEqual(
+          [...snapshot.stagedWork],
+          [
+            {
+              user_id: userId,
+              repertoire_id: repertoireId,
+              tune_id: tuneId,
+            },
+          ]
+        );
+        const before = await sp`SELECT * FROM public.table_transient_data`;
+        const logs =
+          await sp`SELECT * FROM public.sync_change_log ORDER BY table_name`;
+        await assert.rejects(
+          applyGoalCutoverPlan(sp, plan),
+          /Pending staged work/
+        );
+        await assertUnconverted(sp);
+        assert.equal(
+          (
+            await sp`SELECT 1 FROM public.goal_user_settings WHERE user_id = ${userId}`
+          ).length,
+          0
+        );
+        assert.deepEqual(
+          await sp`SELECT * FROM public.table_transient_data`,
+          before
+        );
+        assert.deepEqual(
+          await sp`SELECT * FROM public.sync_change_log ORDER BY table_name`,
+          logs
+        );
+      });
+    }
+
     const wrongReference = structuredClone(plan);
     wrongReference.references.updates[0].goalId = recallId;
     await assert.rejects(
@@ -280,6 +331,15 @@ try {
       sql.begin(async (other) => {
         await other`SET LOCAL lock_timeout = '100ms'`;
         await other`UPDATE public.prefs_scheduling_options SET min_reviews_per_day = 6 WHERE user_id = ${userId}`;
+      }),
+      (error) => error.code === "55P03"
+    );
+    // The empty staging check is protected against concurrent draft insertion.
+    await assert.rejects(
+      sql.begin(async (other) => {
+        await other`SET LOCAL lock_timeout = '100ms'`;
+        await other`INSERT INTO public.table_transient_data (user_id, repertoire_id, tune_id)
+          VALUES (${userId}, ${repertoireId}, ${tuneId})`;
       }),
       (error) => error.code === "55P03"
     );

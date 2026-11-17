@@ -1,9 +1,9 @@
 import { camelizeKeys } from "oosync/sync/casing";
 import { getBuiltInGoals } from "../../src/lib/goals/builtins.ts";
 import { parseGoalConfig } from "../../src/lib/goals/config.ts";
+import { requireValue, same, uniqueEntries } from "./cutover-checks.mjs";
 import { prepareLegacyGoalDefinition } from "./goal-cutover/legacy-goals.ts";
 import { prepareLegacyRecallSettings } from "./goal-cutover/legacy-preferences.ts";
-import { requireValue, same, uniqueEntries } from "./cutover-checks.mjs";
 import {
   legacyPreferences,
   readGoalCutoverSnapshot,
@@ -101,8 +101,13 @@ async function applyLockedPlan(tx, plan) {
   await tx`LOCK TABLE public.goal, public.goal_user_settings,
     public.prefs_scheduling_options, public.prefs_spaced_repetition,
     public.user_profile, public.repertoire, public.repertoire_tune,
-    public.practice_record IN SHARE ROW EXCLUSIVE MODE`;
-  const { users, goals, references } = await readGoalCutoverSnapshot(tx);
+    public.practice_record, public.table_transient_data IN SHARE ROW EXCLUSIVE MODE`;
+  const { users, goals, references, stagedWork } =
+    await readGoalCutoverSnapshot(tx);
+  requireValue(
+    stagedWork.length === 0,
+    "Pending staged work blocks cutover; submit or explicitly discard drafts and synchronize all devices"
+  );
   const recallId = getBuiltInGoals().find((goal) => goal.name === "recall")?.id;
   requireValue(
     goals.some(

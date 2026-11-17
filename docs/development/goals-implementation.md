@@ -610,3 +610,24 @@ The four migration preparation modules (`legacy-preferences.ts`, `legacy-goals.t
 and the standard lint and format commands include the same directory. Existing
 unit-test discovery covers the relocated tests. Shared runtime rules remain in
 `src/lib/goals/`; browser code does not import the administrative modules.
+
+## Checkpoint 3j: server staged-work preflight
+
+The read-only audit now reports pending staging identities without note or
+scheduler payloads and refuses plan export while any staging row remains.
+The rollback rehearsal locks `table_transient_data` with the other cutover tables,
+then rechecks emptiness before any conversion writes. This rejects an old plan if
+new drafts arrived after preparation. Sparse, note-only and partially populated
+new-format drafts all block; no age, evaluation or repertoire filter guesses that
+work can be discarded. The scripts never clear or convert these drafts.
+
+Submit or explicitly discard pending work using a compatible app and synchronize
+every device before cutover. Server emptiness is not proof that device-local drafts,
+failed outbox entries or local-only media work are preserved. Existing device
+preflight/rebuild safeguards still apply; production integration remains pending.
+
+Validation: typecheck, lint, formatting and changed-script Biome checks passed.
+Real Postgres tests cover all three draft shapes, unchanged drafts/settings/history
+and sync logs after rejection, and a concurrent staging insert blocked by the
+rehearsal lock. The local read-only audit reports no server staging rows. All test
+writes roll back. No browser runtime or schema changes; no E2E rerun needed.

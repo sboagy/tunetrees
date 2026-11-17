@@ -56,5 +56,12 @@ export async function readGoalCutoverSnapshot(tx) {
       row,
     })),
   ];
-  return { users, goals, references };
+  // Even note-only or sparse rows can represent unsubmitted work. Do not infer
+  // safety from evaluation fields, age, repertoire deletion, or sync status.
+  // Read identities only: the preflight must not expose private draft content.
+  const stagedWork = await tx`
+    SELECT user_id, repertoire_id, tune_id FROM public.table_transient_data
+    ORDER BY user_id, repertoire_id, tune_id
+  `;
+  return { users, goals, references, stagedWork };
 }

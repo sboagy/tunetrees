@@ -436,7 +436,13 @@ remain unattributed and are reported. `goal-reference-transaction.mjs` revalidat
 owner, row content and namespace resolution before changing only `goal_id`. Comparing
 the complete returned row verifies that raw names, dates, scheduler data and sync
 timestamps remain intact. Repertoire ownership, assignments and history join the
-tables locked for the rehearsal. No guard or sync trigger is disabled.
+tables locked for the rehearsal. The server snapshot also inventories identities
+from `table_transient_data`; any row blocks audit plan export and the rehearsal,
+including sparse/note-only drafts. The rehearsal locks staging before rechecking it
+and before any writes, so an older empty-staging audit cannot authorize discarding
+new work. It never clears drafts. This server check does not certify device-local
+staging or outboxes; the per-device preflight and rebuild guard remain required.
+No guard or sync trigger is disabled.
 
 `resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
 active tune assignments, visible goal definitions, personal overrides and history.

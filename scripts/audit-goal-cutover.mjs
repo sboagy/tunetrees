@@ -51,6 +51,7 @@ function auditGoalDefinition(goal, builtins, result) {
 
 function hasBlockers(report) {
   return (
+    report.stagedWork.length ||
     report.invalidRecallPreferenceUserIds.length ||
     report.blockedLegacyGoalIds.length ||
     report.collidingCustomGoalIds.length ||
@@ -80,9 +81,13 @@ try {
     "isolation level repeatable read read only",
     async (tx) => {
       const builtins = getBuiltInGoals();
-      const { users, goals, references } = await readGoalCutoverSnapshot(tx);
+      const { users, goals, references, stagedWork } =
+        await readGoalCutoverSnapshot(tx);
       const result = {
         users: users.length,
+        stagedWork,
+        stagedWorkGuidance:
+          "Submit or explicitly discard pending drafts through a compatible app and synchronize all devices. An empty server table does not certify device-local work is safe.",
         recallSettingsReady: 0,
         existingRecallSettingsPreserved: 0,
         invalidRecallPreferenceUserIds: [],
