@@ -1,6 +1,7 @@
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
+import { offerGoalQueueSaveRecovery } from "@/lib/goals/queue-feedback";
 import { runGoalQueueCommand } from "@/lib/goals/queue-commands";
 import { getLatestActiveQueueWindow } from "@/lib/services/practice-queue";
 import { usePracticeQueueDate } from "@/routes/practice/usePracticeQueueDate";
@@ -19,6 +20,11 @@ vi.mock("@/lib/goals/queue-commands", () => ({
   })),
 }));
 
+vi.mock("@/lib/goals/queue-feedback", () => ({
+  offerGoalQueueSaveRecovery: vi.fn(),
+  reportGoalQueueNotices: vi.fn(),
+}));
+
 let dispose: () => void;
 beforeEach(() => {
   localStorage.clear();
@@ -29,18 +35,21 @@ afterEach(() => dispose());
 function setup(initialSync = false) {
   return createRoot((cleanup) => {
     dispose = cleanup;
-    const [localDb, setDb] = createSignal({} as SqliteDatabase);
+    const [localDb, setDb] = createSignal({
+      all: () => [{ one: 1 }],
+    } as unknown as SqliteDatabase);
     const [userId, setUser] = createSignal("user");
     const [currentRepertoireId, setRepertoire] = createSignal("rep");
+    const [syncVersion, setSyncVersion] = createSignal(1);
     const dates = usePracticeQueueDate({
       localDb,
       userId,
       currentRepertoireId,
       // Exercise navigation independently of the initial-sync resource.
       initialSyncComplete: () => initialSync,
-      remoteSyncDownCompletionVersion: () => 1,
+      remoteSyncDownCompletionVersion: syncVersion,
     });
-    return { dates, setDb, setUser, setRepertoire };
+    return { dates, setDb, setUser, setRepertoire, setSyncVersion };
   });
 }
 
@@ -185,4 +194,65 @@ it("does not turn a superseded automatic load into a readiness error", async () 
   await vi.waitFor(() => expect(dates.queueReady()).toBe(true));
   expect(dates.queueReady.error).toBeUndefined();
   expect(dates.queueDate()).toEqual(new Date("2020-01-02T12:00:00"));
+});
+
+it.each(["historical", "latest"] as const)(
+  "recovers readiness after a failed %s navigation and a successful sync refetch",
+  async (selection) => {
+    vi.mocked(getLatestActiveQueueWindow).mockResolvedValue({
+      windowStartUtc: "2020-01-03T00:00:00",
+      hasIncompleteRows: true,
+      rowCount: 1,
+    });
+    const { dates, setSyncVersion } = setup(true);
+    await vi.waitFor(() => expect(dates.queueReady()).toBe(true));
+    vi.mocked(runGoalQueueCommand).mockRejectedValueOnce(
+      new Error("Save failed")
+    );
+    const navigation =
+      selection === "historical"
+        ? dates.setManualDate(new Date("2020-01-02T12:00:00"))
+        : dates.selectLatestQueueDate();
+    await expect(navigation).rejects.toThrow("Save failed");
+
+    setSyncVersion(2);
+    await vi.waitFor(() => expect(dates.queueReady.state).toBe("ready"));
+    expect(dates.queueReady.error).toBeUndefined();
+    expect(dates.queueReady()).toBe(true);
+  }
+);
+
+it("recovers readiness through the save-only recovery callback", async () => {
+  vi.mocked(getLatestActiveQueueWindow).mockResolvedValue({
+    windowStartUtc: "2020-01-03T00:00:00",
+    hasIncompleteRows: true,
+    rowCount: 1,
+  });
+  const { dates } = setup(true);
+  await vi.waitFor(() => expect(dates.queueReady()).toBe(true));
+  vi.mocked(runGoalQueueCommand).mockRejectedValueOnce(
+    new Error("Save failed")
+  );
+  await expect(
+    dates.setManualDate(new Date("2020-01-02T12:00:00"))
+  ).rejects.toThrow("Save failed");
+  const onRecovered = vi.mocked(offerGoalQueueSaveRecovery).mock.calls[0][3];
+  await onRecovered(undefined);
+  expect(dates.queueReady.error).toBeUndefined();
+  expect(dates.queueReady()).toBe(true);
+});
+
+it("still exposes a failure from the current readiness load", async () => {
+  vi.mocked(getLatestActiveQueueWindow).mockResolvedValue({
+    windowStartUtc: "2020-01-03T00:00:00",
+    hasIncompleteRows: true,
+    rowCount: 1,
+  });
+  vi.mocked(runGoalQueueCommand).mockRejectedValueOnce(
+    new Error("Current load failed")
+  );
+  const { dates } = setup(true);
+  await vi.waitFor(() =>
+    expect(dates.queueReady.error?.message).toBe("Current load failed")
+  );
 });

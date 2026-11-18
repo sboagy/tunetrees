@@ -961,3 +961,27 @@ all 14 previously failing cases; it is not a fresh full-suite E2E run. No server
 were restarted.
 No commit/push or next-stage implementation has been performed in this follow-up;
 the separately identified CodeRabbit fixes remain pending.
+
+
+## CodeRabbit follow-up — queue recovery and dialog accessibility
+
+The developer subsequently confirmed the full local E2E suite passed. Those
+regression fixes were committed separately as `b80a8148` before this review batch.
+
+Addressed the three confirmed findings from the review of `742dae2b`:
+- Failed manual/Latest queue loads still reject to their callers, but readiness
+  refetches await a non-rejecting settlement promise. An old failure cannot poison
+  a successful sync or save-only recovery. Tests also retain current-load errors.
+- The queue-date selector now uses Kobalte's modal focus management, retaining
+  dragging, resizing, backdrop dismissal and Escape. Its external opener regains
+  focus on close; component tests cover initial focus, forward/backward Tab
+  containment, Escape, backdrop dismissal and restoration.
+- Settings navigation visibility assertions allow at least ten seconds.
+
+The two repertoire-date questions did not require changes: preferred windows
+already normalize to the SQL timestamp format, and refreshing an empty day clears
+the manual preference. Later explicit navigation intentionally takes precedence.
+
+Validation: all 1,345 unit tests (105 files), typecheck, lint, formatting and diff
+checks pass. The next full local E2E run remains with the developer after this batch is pushed.
+No servers were restarted and no next-stage feature work was started.

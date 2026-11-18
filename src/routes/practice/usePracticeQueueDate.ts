@@ -467,11 +467,14 @@ export function usePracticeQueueDate(
     const uid = props.userId();
     const rid = props.currentRepertoireId();
     if (db && uid && rid) {
+      const work = ensureDailyQueue(db, uid, rid, dateAtNoon);
       manualLoad = {
-        work: ensureDailyQueue(db, uid, rid, dateAtNoon),
+        // Refetches wait for settlement, but must not replay an earlier failure.
+        // The navigation caller still receives the original rejection below.
+        work: work.catch(() => undefined),
         isCurrent: captureQueueSelection(),
       };
-      if (manualLoad.isCurrent()) await manualLoad.work;
+      if (manualLoad.isCurrent()) await work;
       await syncQueueWindowState(db, uid, rid);
     }
   };
@@ -508,11 +511,14 @@ export function usePracticeQueueDate(
     const uid = props.userId();
     const rid = props.currentRepertoireId();
     if (db && uid && rid) {
+      const work = ensureDailyQueue(db, uid, rid, targetDate);
       manualLoad = {
-        work: ensureDailyQueue(db, uid, rid, targetDate),
+        // Refetches wait for settlement, but must not replay an earlier failure.
+        // The navigation caller still receives the original rejection below.
+        work: work.catch(() => undefined),
         isCurrent: captureQueueSelection(),
       };
-      if (manualLoad.isCurrent()) await manualLoad.work;
+      if (manualLoad.isCurrent()) await work;
       await syncQueueWindowState(db, uid, rid);
     }
   };

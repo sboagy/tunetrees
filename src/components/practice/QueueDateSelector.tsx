@@ -10,6 +10,7 @@
  * @module components/practice/QueueDateSelector
  */
 
+import { Dialog } from "@kobalte/core/dialog";
 import { Grip, X } from "lucide-solid";
 import {
   type Component,
@@ -19,7 +20,6 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
-import { Portal } from "solid-js/web";
 
 export interface QueueDateSelectorProps {
   isOpen: boolean;
@@ -56,7 +56,8 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   let resizeOriginOffsetX = 0;
   let resizeOriginOffsetY = 0;
   let measureFrame: number | undefined;
-  let dialogRef: HTMLDialogElement | undefined;
+  let dialogRef: HTMLDivElement | undefined;
+  let opener: HTMLElement | undefined;
   let resizeHandleRef: HTMLButtonElement | undefined;
 
   const today = new Date();
@@ -149,12 +150,6 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
       )
     ) {
       await props.onReset();
-      props.onClose();
-    }
-  };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
       props.onClose();
     }
   };
@@ -341,21 +336,30 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   });
 
   return (
-    <Show when={props.isOpen}>
-      <Portal>
+    <Dialog
+      open={props.isOpen}
+      onOpenChange={(open) => !open && props.onClose()}
+    >
+      <Dialog.Portal>
         <div class="fixed inset-0 flex items-center justify-center z-[100] pointer-events-none">
-          <button
-            type="button"
+          <Dialog.Overlay
             class="absolute inset-0 bg-black/50 pointer-events-auto"
-            aria-label="Close queue date selector"
-            onClick={props.onClose}
-            onKeyDown={handleKeyDown}
+            data-testid="queue-date-selector-backdrop"
           />
-          <dialog
+          <Dialog.Content
             ref={dialogRef}
-            onKeyDown={handleKeyDown}
+            onOpenAutoFocus={() => {
+              // This dialog is opened externally, without a Dialog.Trigger.
+              opener =
+                document.activeElement instanceof HTMLElement
+                  ? document.activeElement
+                  : undefined;
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              if (opener?.isConnected) opener.focus();
+            }}
             class="relative mx-4 flex flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800 pointer-events-auto"
-            aria-labelledby="queue-date-selector-title"
             style={{
               width:
                 dialogSize().width === null
@@ -376,12 +380,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
               onPointerDown={handleHeaderPointerDown}
               title="Drag to move dialog"
             >
-              <h2
-                id="queue-date-selector-title"
-                class="text-lg font-semibold text-gray-900 dark:text-gray-100"
-              >
+              <Dialog.Title class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Select Practice Queue
-              </h2>
+              </Dialog.Title>
               <button
                 type="button"
                 onClick={props.onClose}
@@ -395,10 +396,10 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
 
             {/* Content */}
             <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-              <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <Dialog.Description class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Choose a recent queue or jump to a specific date. Future dates
                 are preview only.
-              </p>
+              </Dialog.Description>
 
               <Show
                 when={props.recentQueueDates.length > 0}
@@ -533,9 +534,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
             >
               <Grip class="h-4 w-4" aria-hidden="true" />
             </button>
-          </dialog>
+          </Dialog.Content>
         </div>
-      </Portal>
-    </Show>
+      </Dialog.Portal>
+    </Dialog>
   );
 };

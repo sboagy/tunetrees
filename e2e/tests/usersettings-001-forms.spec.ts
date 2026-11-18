@@ -310,16 +310,16 @@ test.describe("USERSETTINGS-001: Navigation", () => {
 
   test("should display all settings navigation links", async ({ page }) => {
     await expect(page.getByTestId("settings-tab-goals")).toBeVisible({
-      timeout: 5000,
+      timeout: 10000,
     });
     await expect(
       page.getByTestId("settings-tab-spaced-repetition")
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId("settings-tab-account")).toBeVisible({
-      timeout: 5000,
+      timeout: 10000,
     });
     await expect(page.getByTestId("settings-tab-avatar")).toBeVisible({
-      timeout: 5000,
+      timeout: 10000,
     });
   });
 
@@ -341,18 +341,18 @@ test.describe("USERSETTINGS-001: Navigation", () => {
     await page.getByTestId("settings-tab-goals").click();
     await expect(
       page.getByRole("heading", { name: "Goals", level: 3 })
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 10000 });
 
     // Click Spaced Repetition
     await openSidebarAndClick("settings-tab-spaced-repetition");
     await expect(
       page.getByRole("heading", { name: "Spaced Repetition", level: 3 })
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 10000 });
 
     // Click Account
     await openSidebarAndClick("settings-tab-account");
     await expect(
       page.getByRole("heading", { name: "Account", level: 3 })
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 10000 });
   });
 });
