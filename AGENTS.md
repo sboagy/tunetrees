@@ -117,7 +117,7 @@ If no backward-compatible solution is obvious, do not quietly generate a destruc
 
 ## UI Principles (Pointers)
 
-- UI is table-centric and performance-oriented; see `src/AGENTS.md`.
+- Table-centric UI policy: `docs/design/tunetrees-design-system.md` V1/T1. Performance implementation constraints: `src/AGENTS.md`.
 - Before constructing, changing, or auditing UI, read `docs/design/tunetrees-design-system.md`. It is the sole repository authority for user-facing appearance, behavior, accessibility, responsive rules, and audit acceptance. Follow its rule IDs and §12 verification protocol; existing code is not an exception. Keep UI policy there and implementation constraints in `src/AGENTS.md`.
 - Do not introduce React patterns (no React hooks, no React-only libraries in app code paths).
 
