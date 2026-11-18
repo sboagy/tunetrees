@@ -756,6 +756,12 @@ export class TuneTreesPage {
     await this.page.waitForTimeout(1500);
 
     if (repertoire) {
+      // A fresh anonymous session must finish onboarding when a repertoire was
+      // requested. Initial sync can outlast the fixed delay above; do not mistake
+      // a not-yet-visible welcome panel for an already configured account.
+      await expect(this.onboardingWelcomeHeading).toBeVisible({
+        timeout: 30000,
+      });
       const completed =
         await this.completeOnboardingWithRepertoireConfig(repertoire);
       if (!completed) {

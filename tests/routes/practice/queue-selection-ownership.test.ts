@@ -1,8 +1,8 @@
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
-import { offerGoalQueueSaveRecovery } from "@/lib/goals/queue-feedback";
 import { runGoalQueueCommand } from "@/lib/goals/queue-commands";
+import { offerGoalQueueSaveRecovery } from "@/lib/goals/queue-feedback";
 import { getLatestActiveQueueWindow } from "@/lib/services/practice-queue";
 import { usePracticeQueueDate } from "@/routes/practice/usePracticeQueueDate";
 
