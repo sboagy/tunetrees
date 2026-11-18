@@ -28,7 +28,7 @@ export { type GoalReference, resolveGoalReference } from "./references";
 
 type GoalRow = typeof goal.$inferSelect;
 
-function defaultDefinition(row: GoalRow) {
+export function defaultGoalDefinition(row: GoalRow) {
   if (row.defaultConfig !== null)
     return parseGoalConfig(JSON.parse(row.defaultConfig));
   const builtin = getBuiltInGoals().find(
@@ -111,7 +111,7 @@ export function readGoalRepertoireSnapshot(
         {
           displayName: effective.displayName ?? effective.name,
           description: effective.description ?? "",
-          config: defaultDefinition(effective),
+          config: defaultGoalDefinition(effective),
         },
         personal ? JSON.parse(personal.overrides) : {}
       );

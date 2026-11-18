@@ -70,18 +70,28 @@ function colorForGoal(name: string): string {
 export const GoalBadge: Component<GoalBadgeProps> = (props) => {
   const { openUserSettings } = useUserSettingsDialog();
 
-  const displayName = () => props.value || "recall";
+  const goalKey = () => props.value || "recall";
+  const selected = () =>
+    props.goals?.().find((goal) => goal.name === goalKey());
+  const displayName = () =>
+    selected()?.displayName ??
+    (goalKey().startsWith("custom:") ? "Custom goal" : goalKey());
   const badgeClass = () =>
-    `inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-xs ${colorForGoal(displayName())}`;
+    `inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-xs ${colorForGoal(goalKey())}`;
 
   // Read-only variant
-  const Pill = () => <span class={badgeClass()}>{displayName()}</span>;
+  const Pill = () => (
+    <span class={badgeClass()} title={selected()?.description ?? undefined}>
+      {displayName()}
+    </span>
+  );
 
   // Editable variant: pill + tiny chevron, wrapped in DropdownMenu
   return (
     <Show when={props.onGoalChange} fallback={<Pill />}>
       <DropdownMenu>
         <DropdownMenu.Trigger
+          title={selected()?.description ?? undefined}
           class={`${badgeClass()} cursor-pointer hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
           onClick={(event) => event.stopPropagation()}
         >
@@ -95,11 +105,12 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
             <For each={props.goals?.() ?? []}>
               {(goal) => (
                 <DropdownMenu.Item
+                  data-testid={`goal-option-${goal.name}`}
                   class="relative flex cursor-pointer select-none items-center rounded-sm py-1 pl-7 pr-3 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 outline-none"
                   onSelect={() => props.onGoalChange!(goal.name)}
                 >
                   {/* Checkmark for current goal */}
-                  <Show when={goal.name === displayName()}>
+                  <Show when={goal.name === goalKey()}>
                     <span class="absolute left-2 top-1/2 -translate-y-1/2">
                       <Check class="w-3 h-3" />
                     </span>
@@ -107,7 +118,14 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
                   <span
                     class={`mr-2 inline-block w-2 h-2 rounded-full ${colorForGoal(goal.name).split(" ")[0]}`}
                   />
-                  {goal.name}
+                  <span>
+                    {goal.displayName ?? goal.name}
+                    <Show when={goal.description}>
+                      <span class="block max-w-xs text-xs text-muted-foreground">
+                        {goal.description}
+                      </span>
+                    </Show>
+                  </span>
                 </DropdownMenu.Item>
               )}
             </For>

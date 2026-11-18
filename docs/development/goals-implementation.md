@@ -806,3 +806,64 @@ formatting and diff checks pass. The real Postgres cutover transaction suite pas
 with the canonical seed fixture. The developer subsequently reported the full
 local E2E run passing before commit. No production migration was performed; the
 new queue API remains outside active UI callers.
+
+
+## Goal settings editor and persistence integration
+
+Replaced the legacy technique/interval-only Goals editor with per-goal editing of
+intent, display name, daily minimum/maximum (explicit Unlimited), automatic new
+introductions, recent-overdue window, scheduler, evaluation labels/descriptions/actions,
+interval ladders and advanced FSRS parameters. Shared validators enforce scheduler/action
+compatibility and fractional ladder intervals. Changing scheduler explicitly replaces
+choices with compatible defaults. Reset restores inherited defaults.
+
+The local settings service stores only personal differences, rejects stale editor
+snapshots, and keeps shared definitions unchanged. Custom creation uses a stable ID/key
+and supports exact retries. Replacement-on-delete updates owned assignments in one
+transaction, preserving due dates, practice history and queue allocation/display links.
+Pending practice or note-only drafts block deletion with explicit guidance. Failed
+persistence is visible; a persistence-only retry avoids repeating mutation. Retired the
+old unguarded goal CRUD exports after checking their consumers.
+
+Goal pickers now use personalized labels and intent descriptions while retaining stable
+assignment keys. Local settings saves and synchronized updates refresh picker resources.
+No schema, migration, generated artifact or Worker contract changes are needed: this is
+browser-local use of the existing additive columns, compatible with old deployed clients.
+
+**Integration boundary:** settings are editable, but new evaluation/staging/Submit and
+queue services are not yet activated in the practice UI. Do not release this intermediate
+state as a completed feature. Shared-calendar consolidation, removal of the old scheduling
+panels, evaluation effects and queue activation remain the coordinated next step. This
+batch does not claim that changing the new daily limits changes the legacy queue yet.
+
+Validation: **1,319 unit tests** pass, including 20 new SQLite settings and Solid editor regressions. Typecheck, repository lint/format checks and diff checks pass. The regressions cover
+personal overrides, reset, stable identities, owner isolation, stale editors, atomic
+replacement/rollback, pending-work preservation, persistence retry, focus retention,
+Unlimited, scheduler switching and invalid inputs. The existing Goals desktop/mobile
+E2E scenario now exercises the new controls and replacement workflow.
+
+Focused browser validation completed on November 18, 2026 using the running local
+servers: `goals-001-settings-and-badge.spec.ts` passed on desktop Chromium and Mobile
+Chrome (**4 scenario runs plus authentication setup; 5 passed**). The scenarios cover
+custom-goal creation/editing/replacement-on-delete and goal-badge assignment/settings
+navigation. The earlier 1Password authorization timeout is resolved. No dev/preview
+servers were restarted. This is focused coverage, not a full E2E-suite rerun.
+
+Local CodeRabbit reviewed all 15 changed/new files and returned seven findings.
+Addressed the attributed-draft deletion case with a regression: a draft still linked
+to goal A blocks deleting A even after the tune's current assignment moves to B.
+Legacy/malformed definitions now appear as unavailable entries without blocking other
+goals. Their conversion remains in the agreed admin migration; no parallel conversion
+editor was added. Also improved unknown custom-key display, removed a hard-coded E2E
+replacement ID, and asserted Unlimited starts unchecked. The suggested deletion
+assertion was already present; validation documentation was updated during the review.
+Disk-save recovery is offered only for persistence failures, and further editing is
+blocked until retry/reload so retry cannot discard newer form changes.
+
+Follow-up validation: corrected Sonar findings using Solid list iteration and
+associated form labels, restored readable dark-mode text in Goals/Plugins and
+shared outline buttons, and changed the Fluency test helper to select by stable
+goal key rather than editable menu text. All eight desktop/mobile Fluency scenarios
+pass (nine tests including authentication setup). The developer subsequently
+reported the full local E2E suite passing. Final repository lint, formatting,
+typecheck and diff checks pass. These follow-ups do not change scheduler behavior.

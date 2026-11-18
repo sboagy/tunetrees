@@ -161,6 +161,8 @@ export type SchedulingState =
  * Matches the shape returned by getGoals() but avoids a direct DB type import.
  */
 export interface IGoalOption {
+  displayName?: string | null;
+  description?: string | null;
   id: string;
   name: string;
 }

@@ -133,6 +133,8 @@ const PracticePage: Component = () => {
 
   const [goalsData] = createResource(
     () => {
+      repertoireListChanged?.();
+      remoteSyncDownCompletionVersion?.();
       const db = localDb();
       const uid = userId();
       return db && uid ? { db, uid } : null;

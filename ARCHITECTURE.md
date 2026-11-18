@@ -397,6 +397,17 @@ The existing FSRS service reads its legacy ladder fallback intervals from this
 source. The new calculators feed the guarded staging and Submit boundaries below;
 selected-scheduler activation in the UI remains pending.
 
+`goals/settings.ts` owns local configuration edits using the same default decoder
+and validation as practice. Built-in and private-goal edits write personal overrides;
+unchanged fields inherit defaults. Editor snapshots reject stale saves. Custom goals
+use stable `custom:<UUID>` keys independent of display names. Deletion requires a
+visible replacement, moves owned assignments atomically, and preserves due dates,
+history and frozen queue attribution; pending drafts block deletion. SQLite writes
+complete before persistence, so a failed disk save can be retried without repeating
+the mutation. The Goals editor exposes these definitions and grid pickers show
+personal labels/descriptions. Legacy queue/evaluation callers and global scheduling
+settings still require the coordinated activation described below.
+
 Administrative data-conversion code lives under `scripts/`, outside browser entry
 points. Shared defaults, validation and owner-scoped goal identity resolution stay
 in `src/lib/goals/` for reuse by runtime and administrative code. Migration-only

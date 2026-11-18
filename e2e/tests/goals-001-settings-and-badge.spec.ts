@@ -149,43 +149,55 @@ test.describe("GOALS-001: Goals settings", () => {
     const goalName = `e2e_goal_${test.info().workerIndex}_${Date.now()}`;
     const updatedGoalName = `${goalName}_updated`;
 
-    await page.getByRole("button", { name: /\+\s*Add Goal|Add Goal/i }).click();
-
-    await page.getByLabel("Name").fill(goalName);
-    await page.getByRole("radio", { name: /Base Intervals/i }).check();
-    await page.getByLabel(/Interval ladder/i).fill("[0.5, 1, 2, 3]");
-
-    await page.getByRole("button", { name: /^Add Goal$/ }).click();
+    await page.getByTestId("goal-add").click();
+    await page.getByTestId("goal-name").fill(goalName);
+    await page
+      .getByTestId("goal-description")
+      .fill("Build confidence at session tempo");
+    await page
+      .getByTestId("goal-scheduler")
+      .selectOption("builtin:interval-ladder");
+    await page.getByTestId("goal-intervals").fill("0.5, 1, 2, 3");
+    await page.getByTestId("goal-minimum").fill("0");
+    await page.getByTestId("goal-unlimited").check();
+    await page.getByTestId("goal-choice-label-0").fill("Start again slowly");
+    await page.getByTestId("goal-save").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     const createdRow = page
-      .locator("div", {
-        has: page.getByText(goalName, { exact: true }),
-      })
-      .filter({ hasText: "Base Intervals" })
-      .first();
-
+      .locator("section[data-testid^='goal-panel-']")
+      .filter({
+        has: page.getByRole("heading", { name: goalName, exact: true }),
+      });
     await expect(createdRow).toBeVisible({ timeout: 10000 });
-    await createdRow.getByRole("button", { name: "Edit" }).click();
-
-    const activeEditForm = page.locator("form").filter({
-      has: page.getByRole("button", { name: "Save" }),
-    });
-
-    await expect(activeEditForm).toBeVisible({ timeout: 5000 });
-    await activeEditForm.getByLabel("Name").fill(updatedGoalName);
-    await activeEditForm.getByRole("radio", { name: /FSRS/i }).check();
-    await activeEditForm.getByRole("button", { name: "Save" }).click();
+    await expect(createdRow).toContainText("Build confidence at session tempo");
+    await expect(createdRow).toContainText("Unlimited");
+    await createdRow.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
+      "Start again slowly"
+    );
+    await expect(page.getByTestId("goal-intervals")).toHaveValue(
+      "0.5, 1, 2, 3"
+    );
+    await page.getByTestId("goal-name").fill(updatedGoalName);
+    await page.getByTestId("goal-scheduler").selectOption("builtin:fsrs6");
+    await page.getByTestId("goal-save").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     const updatedRow = page
-      .locator("div", { has: page.getByText(updatedGoalName, { exact: true }) })
-      .first();
-
+      .locator("section[data-testid^='goal-panel-']")
+      .filter({
+        has: page.getByRole("heading", { name: updatedGoalName, exact: true }),
+      });
     await expect(updatedRow).toBeVisible({ timeout: 10000 });
-
+    await updatedRow.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByTestId("goal-delete").click();
+    await page
+      .getByTestId("goal-replacement")
+      .selectOption({ label: "Recall" });
     page.once("dialog", (dialog) => dialog.accept());
-    await updatedRow.getByRole("button", { name: "Delete" }).click();
+    await page.getByTestId("goal-confirm-delete").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect(page.getByText(updatedGoalName, { exact: true })).toHaveCount(
       0,
@@ -218,15 +230,15 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
 
     const goalTrigger = row.locator("button", { hasText: /recall/i }).first();
     await expect(goalTrigger).toBeVisible({ timeout: 10000 });
-    await clickGoalBadgeMenuItem(page, goalTrigger, "session_ready");
+    await clickGoalBadgeMenuItem(page, goalTrigger, /^Session ready/);
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    await expect(row.getByText("session_ready")).toBeVisible({
+    await expect(row.getByText("Session ready", { exact: true })).toBeVisible({
       timeout: 10000,
     });
 
     const updatedGoalTrigger = row
-      .locator("button", { hasText: /session_ready/i })
+      .locator("button", { hasText: /Session ready/i })
       .first();
     await clickGoalBadgeMenuItem(page, updatedGoalTrigger, /Edit Goals/i);
 

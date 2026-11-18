@@ -4573,9 +4573,8 @@ export class TuneTreesPage {
 
   async selectRowFluency(row: Locator) {
     await row.getByRole("button", { name: /recall/i }).click();
-    await this.page
-      .getByRole("menuitem", { name: "fluency", exact: true })
-      .click();
+    // Goal labels and descriptions are editable; select by the stable goal key.
+    await this.page.getByTestId("goal-option-fluency").click();
   }
 
   async setRowEvaluation(

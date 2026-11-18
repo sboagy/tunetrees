@@ -19,6 +19,7 @@ import { Menu, X } from "lucide-solid";
 import {
   type Component,
   createSignal,
+  For,
   lazy,
   Match,
   Show,
@@ -131,9 +132,7 @@ export const UserSettingsDialog: Component = () => {
         data-testid="settings-modal-wrapper"
       >
         <dialog
-          class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.key === "Escape" && e.stopPropagation()}
+          class="bg-white dark:bg-gray-800 text-foreground rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
           aria-labelledby="settings-dialog-title"
           data-testid="settings-modal"
         >
@@ -193,22 +192,24 @@ export const UserSettingsDialog: Component = () => {
               data-testid="settings-sidebar"
             >
               <nav class="flex flex-col space-y-1">
-                {sidebarNavItems.map((item) => (
-                  <button
-                    type="button"
-                    onClick={() => handleTabClick(item.tab)}
-                    class="px-3 py-2 text-sm rounded-md transition-colors text-left"
-                    classList={{
-                      "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium":
-                        currentTab() === item.tab,
-                      "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700":
-                        currentTab() !== item.tab,
-                    }}
-                    data-testid={`settings-tab-${item.tab}`}
-                  >
-                    {item.title}
-                  </button>
-                ))}
+                <For each={sidebarNavItems}>
+                  {(item) => (
+                    <button
+                      type="button"
+                      onClick={() => handleTabClick(item.tab)}
+                      class="px-3 py-2 text-sm rounded-md transition-colors text-left"
+                      classList={{
+                        "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium":
+                          currentTab() === item.tab,
+                        "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700":
+                          currentTab() !== item.tab,
+                      }}
+                      data-testid={`settings-tab-${item.tab}`}
+                    >
+                      {item.title}
+                    </button>
+                  )}
+                </For>
               </nav>
             </aside>
 

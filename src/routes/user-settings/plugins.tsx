@@ -515,7 +515,7 @@ const PluginsPage: Component = () => {
   };
 
   return (
-    <div class="space-y-6">
+    <div class="space-y-6 text-foreground [color-scheme:light] dark:[color-scheme:dark]">
       <div>
         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
           Plugins
@@ -634,65 +634,65 @@ const PluginsPage: Component = () => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-2">
                   <label
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    class="block space-y-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                     for="plugin-name"
                   >
-                    Name
+                    <span>Name</span>
+                    <input
+                      id="plugin-name"
+                      type="text"
+                      value={current().name}
+                      disabled={!isOwner()}
+                      onInput={(e) =>
+                        updateDraft({ name: e.currentTarget.value })
+                      }
+                      class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      data-testid="plugin-name-input"
+                    />
                   </label>
-                  <input
-                    id="plugin-name"
-                    type="text"
-                    value={current().name}
-                    disabled={!isOwner()}
-                    onInput={(e) =>
-                      updateDraft({ name: e.currentTarget.value })
-                    }
-                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    data-testid="plugin-name-input"
-                  />
                 </div>
                 <div class="space-y-2">
                   <label
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    class="block space-y-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                     for="plugin-version"
                   >
-                    Version
+                    <span>Version</span>
+                    <input
+                      id="plugin-version"
+                      type="number"
+                      min="1"
+                      value={current().version}
+                      disabled={!isOwner()}
+                      onInput={(e) =>
+                        updateDraft({
+                          version: Number.parseInt(e.currentTarget.value, 10),
+                        })
+                      }
+                      class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      data-testid="plugin-version-input"
+                    />
                   </label>
-                  <input
-                    id="plugin-version"
-                    type="number"
-                    min="1"
-                    value={current().version}
-                    disabled={!isOwner()}
-                    onInput={(e) =>
-                      updateDraft({
-                        version: Number.parseInt(e.currentTarget.value, 10),
-                      })
-                    }
-                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    data-testid="plugin-version-input"
-                  />
                 </div>
               </div>
 
               <div class="space-y-2">
                 <label
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  class="block space-y-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                   for="plugin-description"
                 >
-                  Description
+                  <span>Description</span>
+                  <textarea
+                    id="plugin-description"
+                    value={current().description}
+                    disabled={!isOwner()}
+                    onInput={(e) =>
+                      updateDraft({ description: e.currentTarget.value })
+                    }
+                    rows={3}
+                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    data-testid="plugin-description-input"
+                  />
                 </label>
-                <textarea
-                  id="plugin-description"
-                  value={current().description}
-                  disabled={!isOwner()}
-                  onInput={(e) =>
-                    updateDraft({ description: e.currentTarget.value })
-                  }
-                  rows={3}
-                  class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  data-testid="plugin-description-input"
-                />
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -774,19 +774,21 @@ const PluginsPage: Component = () => {
                     Goals
                   </div>
                   <div class="flex flex-wrap gap-3">
-                    {GOAL_OPTIONS.map((option) => (
-                      <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                        <input
-                          type="checkbox"
-                          checked={current().goals.includes(option.value)}
-                          disabled={!isOwner()}
-                          onChange={(e) =>
-                            updateGoals(option.value, e.currentTarget.checked)
-                          }
-                        />
-                        {option.label}
-                      </label>
-                    ))}
+                    <For each={GOAL_OPTIONS}>
+                      {(option) => (
+                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={current().goals.includes(option.value)}
+                            disabled={!isOwner()}
+                            onChange={(e) =>
+                              updateGoals(option.value, e.currentTarget.checked)
+                            }
+                          />
+                          {option.label}
+                        </label>
+                      )}
+                    </For>
                   </div>
                 </div>
               </Show>
@@ -829,63 +831,63 @@ const PluginsPage: Component = () => {
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div class="space-y-2">
                     <label
-                      class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      class="block space-y-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                       for="plugin-test-function"
                     >
-                      Function
+                      <span>Function</span>
+                      <select
+                        id="plugin-test-function"
+                        value={testFunction()}
+                        onChange={(e) =>
+                          setTestFunction(
+                            e.currentTarget.value as
+                              | "parseImport"
+                              | "processFirstReview"
+                              | "processReview"
+                          )
+                        }
+                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        data-testid="plugin-test-function"
+                      >
+                        <option value="parseImport">parseImport</option>
+                        <option value="processFirstReview">
+                          processFirstReview
+                        </option>
+                        <option value="processReview">processReview</option>
+                      </select>
                     </label>
-                    <select
-                      id="plugin-test-function"
-                      value={testFunction()}
-                      onChange={(e) =>
-                        setTestFunction(
-                          e.currentTarget.value as
-                            | "parseImport"
-                            | "processFirstReview"
-                            | "processReview"
-                        )
-                      }
-                      class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                      data-testid="plugin-test-function"
-                    >
-                      <option value="parseImport">parseImport</option>
-                      <option value="processFirstReview">
-                        processFirstReview
-                      </option>
-                      <option value="processReview">processReview</option>
-                    </select>
                   </div>
                   <div class="space-y-2">
                     <label
-                      class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      class="block space-y-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                       for="plugin-test-payload"
                     >
-                      Payload (JSON)
+                      <span>Payload (JSON)</span>
+                      <textarea
+                        id="plugin-test-payload"
+                        value={testPayload()}
+                        onInput={(e) => setTestPayload(e.currentTarget.value)}
+                        rows={6}
+                        class="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono"
+                        data-testid="plugin-test-payload"
+                      />
                     </label>
-                    <textarea
-                      id="plugin-test-payload"
-                      value={testPayload()}
-                      onInput={(e) => setTestPayload(e.currentTarget.value)}
-                      rows={6}
-                      class="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono"
-                      data-testid="plugin-test-payload"
-                    />
                   </div>
                   <div class="space-y-2">
                     <label
-                      class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      class="block space-y-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                       for="plugin-test-meta"
                     >
-                      Meta (JSON)
+                      <span>Meta (JSON)</span>
+                      <textarea
+                        id="plugin-test-meta"
+                        value={testMeta()}
+                        onInput={(e) => setTestMeta(e.currentTarget.value)}
+                        rows={6}
+                        class="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono"
+                        data-testid="plugin-test-meta"
+                      />
                     </label>
-                    <textarea
-                      id="plugin-test-meta"
-                      value={testMeta()}
-                      onInput={(e) => setTestMeta(e.currentTarget.value)}
-                      rows={6}
-                      class="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono"
-                      data-testid="plugin-test-meta"
-                    />
                   </div>
                 </div>
 
