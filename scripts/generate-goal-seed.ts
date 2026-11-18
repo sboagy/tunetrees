@@ -42,6 +42,9 @@ ON CONFLICT (id) DO UPDATE SET
 COMMIT;
 `;
 const currentSeed = "sql_scripts/seed_goal_configuration.sql";
+// Rhizome discovers supabase/seeds/*.sql; keep its post-baseline restore input
+// generated from the same defaults as migrations and staging restores.
+const localSeed = "supabase/seeds/seed_goal_configuration.sql";
 const currentMigration = "config/current-goal-seed.json";
 if (mode === "--check") {
   const reference: unknown = JSON.parse(readFileSync(currentMigration, "utf8"));
@@ -53,7 +56,11 @@ if (mode === "--check") {
   ) {
     throw new Error("Invalid current goal seed reference");
   }
-  for (const file of [destination ?? reference.migration, currentSeed]) {
+  for (const file of [
+    destination ?? reference.migration,
+    currentSeed,
+    localSeed,
+  ]) {
     if (readFileSync(file, "utf8") !== sql) {
       throw new Error(`Goal seed differs from developer defaults: ${file}`);
     }
@@ -62,6 +69,7 @@ if (mode === "--check") {
   if (mode === "--create") writeFileSync(destination, sql, { flag: "wx" });
   // Reusable trusted restore seed; versioned migration files remain immutable.
   writeFileSync(currentSeed, sql);
+  writeFileSync(localSeed, sql);
   if (mode === "--create") {
     writeFileSync(
       currentMigration,

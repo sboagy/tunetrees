@@ -985,3 +985,33 @@ the manual preference. Later explicit navigation intentionally takes precedence.
 Validation: all 1,345 unit tests (105 files), typecheck, lint, formatting and diff
 checks pass. The next full local E2E run remains with the developer after this batch is pushed.
 No servers were restarted and no next-stage feature work was started.
+
+## CI baseline seed correction
+
+Run 44411252996 at `561b87dd` failed eight Goals/settings cases across four
+browser shards; quality, unit and PWA jobs passed. CI traces showed built-ins
+rendered with legacy keys (`recall`, `session_ready`) and empty descriptions.
+The post-migration baseline restore had replaced the configured goal rows.
+Local databases retaining the migration's definitions did not exhibit this.
+
+The existing goal-seed generator now also emits
+`supabase/seeds/seed_goal_configuration.sql`, discovered after the baseline by
+Rhizome and explicitly ordered after it in Supabase's seed configuration.
+`goals:seed:check` checks this generated copy too. The database guard suite now
+checks the actual seeded built-ins before creating fixtures. Existing migrations,
+schema contracts, runtime code and E2E assertions are unchanged.
+
+Validation: typecheck, focused Biome checks, seed drift check and all 29 database
+guard tests pass. A rollback-only integration check reproduced missing legacy
+metadata, applied the generated seed twice, and verified every built-in's display
+name, description and full configuration against typed defaults. It left local
+data unchanged. Remote CI validation remains pending.
+
+CodeRabbit reviewed all six changed files and raised one ordering verification
+question. The failed CI run checked out Rhizome
+`94a21bf2963b11c86369a96b5ebf50dcc763748e`, matching the installed package.
+Its `db-push-local.sh` expands `supabase/seeds/*.sql` in filename order and
+executes that array in order. With this change the sequence is baseline, current
+goal configuration, then private test tunes. The actual CI checkout script was
+compared with the installed script; no Rhizome change is needed. Repo-wide lint
+and format checks also pass. No actionable CodeRabbit findings remain.

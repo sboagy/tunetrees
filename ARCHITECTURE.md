@@ -486,7 +486,10 @@ JSON TEXT. Generated Worker rules bind camelCase ownership properties; Postgres
 triggers protect goal ownership and settings visibility even for privileged Worker
 writes. Built-in definitions are seeded from the typed source; trusted migration
 and staging-restore transactions explicitly enable shared-goal writes. Staging
-refresh reapplies generated defaults after importing production rows. SQLite v28
+refresh reapplies generated defaults after importing production rows. Local/CI
+baseline restores likewise apply the generated goal seed afterward, via both
+Supabase seed configuration and Rhizome’s seed-directory discovery. The goal
+seed check keeps these restore inputs aligned with the typed defaults. SQLite v28
 uses the guarded rebuild/full-pull path. Legacy FSRS evaluation preferences remain active until the event/plugin UI
 integration checkpoint; daily allocation now reads per-goal settings. Goals owns
 daily settings and a shared read-only calendar summary. Old Scheduling Options

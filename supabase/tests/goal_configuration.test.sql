@@ -4,6 +4,18 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 SELECT no_plan();
 
+-- Check the actual post-seed database before fixture writes. A legacy baseline
+-- applied after migrations must not erase the current built-in definitions.
+SELECT is(
+  (SELECT count(*) FROM public.goal
+   WHERE private_for IS NULL AND NOT deleted
+     AND nullif(trim(display_name), '') IS NOT NULL
+     AND nullif(trim(description), '') IS NOT NULL
+     AND default_config IS NOT NULL),
+  5::bigint,
+  'All five built-in goals retain display metadata and configuration after seeding'
+);
+
 INSERT INTO public.user_profile(id) VALUES
   ('42600000-0000-0000-0000-000000000001'),
   ('42600000-0000-0000-0000-000000000002');
