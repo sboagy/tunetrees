@@ -1,5 +1,9 @@
 # Supabase Schema Promotion Runbook
 
+For the one-time #426 data conversion and device update, follow
+[Goals cutover](goals-cutover.md). It is a separate admin operation, not an automatic
+part of schema promotion.
+
 This document is the standing reference for TuneTrees schema changes moving from local development to staging and production.
 
 Use it when:

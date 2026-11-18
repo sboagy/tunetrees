@@ -89,12 +89,22 @@ async function validateRecallInsert(tx, entry, user, recallId) {
 
 /**
  * Apply definition/settings and goal-reference entries inside a caller-owned transaction.
- * The only CLI caller always rolls back. Locks protect both existing and absent
+ * The migration command commits only with --apply; rehearsal always rolls back.
+ * Locks protect both existing and absent
  * rows, including preference inserts and override tombstones, until completion.
  * A savepoint also guarantees batch rollback if the caller catches a failure.
  */
 export async function applyGoalCutoverPlan(tx, plan) {
   return tx.savepoint((sp) => applyLockedPlan(sp, plan));
+}
+
+export async function lockGoalCutoverTables(tx) {
+  await tx`SET LOCAL lock_timeout = '2s'`;
+  await tx`SET LOCAL statement_timeout = '15s'`;
+  await tx`LOCK TABLE public.goal, public.goal_user_settings,
+    public.prefs_scheduling_options, public.prefs_spaced_repetition,
+    public.user_profile, public.repertoire, public.repertoire_tune,
+    public.practice_record, public.table_transient_data, public.daily_practice_queue IN SHARE ROW EXCLUSIVE MODE`;
 }
 
 async function applyLockedPlan(tx, plan) {
@@ -104,12 +114,7 @@ async function applyLockedPlan(tx, plan) {
   );
   uniqueEntries(plan.goalUpdates, "id");
   uniqueEntries(plan.recallSettingsInserts, "userId");
-  await tx`SET LOCAL lock_timeout = '2s'`;
-  await tx`SET LOCAL statement_timeout = '15s'`;
-  await tx`LOCK TABLE public.goal, public.goal_user_settings,
-    public.prefs_scheduling_options, public.prefs_spaced_repetition,
-    public.user_profile, public.repertoire, public.repertoire_tune,
-    public.practice_record, public.table_transient_data, public.daily_practice_queue IN SHARE ROW EXCLUSIVE MODE`;
+  await lockGoalCutoverTables(tx);
   const { users, goals, references, stagedWork, queues } =
     await readGoalCutoverSnapshot(tx);
   requireValue(

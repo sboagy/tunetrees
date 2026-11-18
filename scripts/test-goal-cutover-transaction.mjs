@@ -1,4 +1,7 @@
-/** Real local Postgres tests. All fixture and conversion writes roll back. */
+/** Real local Postgres tests. All fixture and conversion writes roll back.
+ * Requires migrated/seeded, cutover-ready local data without pending drafts.
+ * CI supplies this before E2E; locally submit/discard drafts before running.
+ */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { camelizeKeys } from "oosync/sync/casing";
@@ -6,10 +9,15 @@ import postgres from "postgres";
 import { getBuiltInGoals } from "../src/lib/goals/builtins.ts";
 import { prepareGoalCutoverPlan } from "./lib/goal-cutover/cutover-plan.ts";
 import {
+  GoalCutoverBlocked,
+  prepareCompleteGoalCutover,
+} from "./lib/goal-cutover-preflight.mjs";
+import {
   legacyPreferences,
   readGoalCutoverSnapshot,
 } from "./lib/goal-cutover-snapshot.mjs";
 import { applyGoalCutoverPlan } from "./lib/goal-cutover-transaction.mjs";
+import { migrateGoals } from "./lib/goal-migration.mjs";
 import { writeReferenceUpdates } from "./lib/goal-reference-transaction.mjs";
 
 const sql = postgres(
@@ -81,6 +89,11 @@ async function rollbackCase(tx, test) {
 
 try {
   await sql.begin(async (tx) => {
+    // Fail explicitly on unsupported test setup, before inserting any fixture.
+    const baseline = prepareCompleteGoalCutover(
+      await readGoalCutoverSnapshot(tx)
+    );
+    const expectedGoalUpdates = baseline.plan.goalUpdates.length + 1;
     await tx`INSERT INTO public.user_profile (id) VALUES (${userId})`;
     await tx`INSERT INTO public.goal (id, name, private_for, default_technique, base_intervals, last_modified_at)
       VALUES (${goalId}, ${goalName}, ${userId}, 'base_interval', '[0.1,1,3]', ${stamp})`;
@@ -98,6 +111,70 @@ try {
       VALUES (${queueId}, ${userId}, ${repertoireId}, ${tuneId}, '2020-01-01', '2020-01-02',
         1, 0, ${stamp}, '2020-01-01', ${stamp}, ${stamp})`;
     const plan = await planFixture(tx);
+
+    // Exercise the operator command's complete transaction, including apply mode,
+    // inside an outer rollback scope so neither fixtures nor baseline data persist.
+    await rollbackCase(tx, async (sp) => {
+      const connection = { begin: (callback) => sp.savepoint(callback) };
+      const dryRun = await migrateGoals(connection);
+      assert.equal(dryRun.committed, false);
+      assert.equal(dryRun.goalsUpdated, expectedGoalUpdates);
+      await assertUnconverted(sp);
+      const applied = await migrateGoals(connection, { apply: true });
+      assert.equal(applied.committed, true);
+      assert.equal(applied.goalsUpdated, expectedGoalUpdates);
+      assert.equal(
+        (await sp`SELECT name FROM public.goal WHERE id = ${goalId}`)[0].name,
+        `custom:${goalId}`
+      );
+      const logs =
+        await sp`SELECT * FROM public.sync_change_log ORDER BY table_name`;
+      const retry = await migrateGoals(connection, { apply: true });
+      assert.equal(
+        retry.goalsUpdated +
+          retry.referencesUpdated +
+          retry.recallSettingsInserted +
+          retry.queueCompletionsUpdated,
+        0
+      );
+      assert.deepEqual(
+        await sp`SELECT * FROM public.sync_change_log ORDER BY table_name`,
+        logs
+      );
+    });
+    await assertUnconverted(tx);
+    await rollbackCase(tx, async (sp) => {
+      await sp`INSERT INTO public.table_transient_data (user_id, repertoire_id, tune_id, note_private)
+        VALUES (${userId}, ${repertoireId}, ${tuneId}, 'pending')`;
+      await assert.rejects(
+        migrateGoals(
+          { begin: (callback) => sp.savepoint(callback) },
+          { apply: true }
+        ),
+        (error) =>
+          error instanceof GoalCutoverBlocked &&
+          error.report.stagedWork.length > 0
+      );
+      await assertUnconverted(sp);
+    });
+    await rollbackCase(tx, async (sp) => {
+      await sp`ALTER TABLE public.daily_practice_queue ADD CONSTRAINT migration_apply_test_reject
+        CHECK (displayed_practice_record_id IS NULL) NOT VALID`;
+      await assert.rejects(
+        migrateGoals(
+          { begin: (callback) => sp.savepoint(callback) },
+          { apply: true }
+        ),
+        (error) => error.code === "23514"
+      );
+      await assertUnconverted(sp);
+      assert.equal(
+        (
+          await sp`SELECT 1 FROM public.goal_user_settings WHERE user_id = ${userId}`
+        ).length,
+        0
+      );
+    });
 
     await rollbackCase(tx, async (sp) => {
       const before =
@@ -249,6 +326,16 @@ try {
       // This partial event is permitted by the expanded schema. Neither the
       // planner nor an edited plan nor the SQL writer may attribute it as legacy.
       await sp`UPDATE public.practice_record SET evaluation_id = 'again' WHERE id = ${eventId}`;
+      await assert.rejects(
+        migrateGoals(
+          { begin: (callback) => sp.savepoint(callback) },
+          { apply: true }
+        ),
+        (error) =>
+          error instanceof GoalCutoverBlocked &&
+          error.report.incompleteNewEventIds.includes(eventId)
+      );
+      await assertUnconverted(sp);
       const partialPlan = await planFixture(sp);
       assert.equal(
         partialPlan.references.updates.filter(
@@ -441,8 +528,9 @@ try {
       await assertUnconverted(sp);
     });
     await rollbackCase(tx, async (sp) => {
+      const occupiedGoalKey = `custom:${goalId}`;
       await sp`INSERT INTO public.goal (id, name, private_for, default_technique)
-        VALUES (${randomUUID()}, ${`custom:${goalId}`}, ${userId}, 'fsrs')`;
+        VALUES (${randomUUID()}, ${occupiedGoalKey}, ${userId}, 'fsrs')`;
       await assert.rejects(
         applyGoalCutoverPlan(sp, plan),
         /target key is occupied/

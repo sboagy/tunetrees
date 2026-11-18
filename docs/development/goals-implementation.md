@@ -725,3 +725,33 @@ link writes are verified by isolated Postgres fixtures. The rehearsal also proce
 Fresh local CodeRabbit review of the queue-link checkpoint completed with zero
 findings across all 11 changed files. Before commit, typecheck, all 16 queue-link
 unit tests and the Postgres transaction suite were rerun successfully.
+
+
+## Migration tooling complete
+
+The final admin command is `npm run goals:migrate:production`, dry-run by default;
+`-- --apply` commits. Shared preflight and existing writers build a fresh plan under
+table locks and verify no eligible conversion remains before committing. No exported
+artifact is required. The short procedure is in `docs/development/goals-cutover.md`.
+This completes migration tooling, including supported definition/settings/reference
+conversion and evidence-based completion links. Actual production execution waits
+for the full feature release and synchronization/update of the user's devices.
+No production migration was executed during implementation. Queue allocation and
+UI activation remain runtime work, not further migration checkpoints.
+
+Validation: all **1,261 unit tests**, typecheck, lint/format checks and the local
+dry run pass. Real Postgres tests exercise apply, retry, dry-run rollback, pending
+draft blocking and late-write failure rollback inside an enclosing rollback scope.
+CodeRabbit reviewed all 14 changed files; its two findings led to blocking
+incomplete new-format events and removing a fixture-only total-count assumption
+with an explicit cutover-ready test prerequisite. Unknown legacy history remains
+reported and preserved. No schema/generated changes or browser activation.
+
+Fresh CodeRabbit follow-up: reject endpoint query overrides in the operator URL
+and pin an omitted port to 5432, so the displayed target cannot be redirected by
+those options or PGPORT. The runbook now explicitly uses the existing manual
+Force Clean Local Reset after verified synchronization on each device, including
+version-29 devices; it does not claim reopening guarantees a rebuild. This manual
+reset does not use the automatic preservation guard, so its preconditions are
+explicit. Scheduler-state-only partial metadata is already retained by the full
+row snapshot and rejected by the shared preflight.

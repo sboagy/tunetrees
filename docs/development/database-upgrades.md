@@ -1,5 +1,9 @@
 # Preserving local work during database upgrades
 
+For the one-time #426 data conversion and device update, follow
+[Goals cutover](goals-cutover.md). It is a separate admin operation, not an automatic
+part of schema promotion.
+
 A database-version change rebuilds the per-user SQLite mirror. A schema-version
 change can clear tables. Both paths use the oosync guard before destructive work.
 
