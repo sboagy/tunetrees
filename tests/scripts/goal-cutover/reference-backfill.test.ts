@@ -42,6 +42,19 @@ describe("legacy goal-reference backfill", () => {
     expect(original.goalId).toBeNull();
   });
 
+  it("updates an already attributed assignment key but keeps historical text", () => {
+    const assignment = source({ kind: "assignment", goalId: "owned" });
+    const history = source();
+    const result = prepareGoalReferenceBackfill(goals, [assignment, history]);
+    expect(
+      result.updates.map(({ goalId, goalKey }) => ({ goalId, goalKey }))
+    ).toEqual([
+      { goalId: "owned", goalKey: "custom:owned" },
+      { goalId: "owned", goalKey: "practice" },
+    ]);
+    expect(assignment.goal).toBe("practice");
+  });
+
   it("does not expose another owner's private goal", () => {
     const result = prepareGoalReferenceBackfill(goals, [
       source({ goal: "secret" }),

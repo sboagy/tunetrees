@@ -651,3 +651,38 @@ Validation: typecheck, all 18 reference-backfill tests, the database transaction
 suite, changed-file Biome checks and diff checks passed. An executable check also
 confirmed rejection of the exact zero-version edited-plan input. Review follow-ups
 are test/documentation changes only; no local E2E rerun is required.
+
+## Checkpoint 3k: custom stable-key conversion rehearsal
+
+Version-3 review artifacts convert owner-defined goal keys to `custom:<UUID>`.
+Existing friendly labels and configured evaluations remain unchanged; goals without
+a display label retain their old key as the friendly label. Original goal snapshots
+in the private artifact preserve the former key as migration evidence. History keeps
+its recorded goal text; active assignments receive the new key and stable ID in the
+same transaction. Names are resolved against the original namespace before any write.
+
+The writer rederives proposed values under the existing locks and requires every
+resolvable reference affected by a rename. Missing assignment/history entries,
+new history since preparation, or an omitted goal update block the whole batch.
+Occupied custom target keys (including deleted occupants) and personal goals using
+system names remain blockers; this does not silently merge custom goals into system
+overrides. Version-1/2 artifacts must be regenerated. Sparse/partial events remain
+unattributed, and pending staging still blocks the rehearsal.
+
+The local fixture exercises actual key/assignment changes, raw historical labels,
+microsecond timestamps, unchanged existing configuration, idempotent retries, stale/
+incomplete plans, occupied keys and rollback after a later SQL failure. This remains
+admin-only rollback rehearsal, with no browser or generated schema changes. Applying
+these semantic renames while old clients are writing would be unsafe: production
+application remains restricted to the approved all-device coordinated cutover and
+mandatory full download. No production apply mode or migration was added here.
+
+Validation: **1,234 unit tests**, typecheck, lint, formatting, changed-script Biome
+checks and the real Postgres transaction suite passed. Fresh version-3 export and
+local rehearsal processed 1,699 reference updates and 209 Recall inserts, then
+rolled them all back; this local snapshot has no custom definitions, so actual
+custom-key changes are exercised by the isolated database fixtures above.
+
+Fresh local CodeRabbit review of checkpoint 3k, including the SonarQube condition
+cleanup, completed with **zero findings across all 11 changed files**. No code
+changes were needed in response to this review.

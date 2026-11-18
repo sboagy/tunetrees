@@ -2,7 +2,10 @@ import { camelizeKeys } from "oosync/sync/casing";
 import { getBuiltInGoals } from "../../src/lib/goals/builtins.ts";
 import { parseGoalConfig } from "../../src/lib/goals/config.ts";
 import { requireValue, same, uniqueEntries } from "./cutover-checks.mjs";
-import { prepareLegacyGoalDefinition } from "./goal-cutover/legacy-goals.ts";
+import {
+  prepareLegacyGoalDefinition,
+  validateCustomGoalKeys,
+} from "./goal-cutover/legacy-goals.ts";
 import { prepareLegacyRecallSettings } from "./goal-cutover/legacy-preferences.ts";
 import {
   legacyPreferences,
@@ -10,6 +13,7 @@ import {
 } from "./goal-cutover-snapshot.mjs";
 import {
   validateReferenceUpdates,
+  validateRenameCoverage,
   writeReferenceUpdates,
 } from "./goal-reference-transaction.mjs";
 
@@ -17,18 +21,18 @@ function validateGoalUpdate(entry, current) {
   requireValue(
     current &&
       entry.expected?.id === entry.id &&
-      entry.expected.defaultConfig === null &&
       entry.expected.privateFor !== null,
     "Goal conversion source is unavailable"
   );
   const config = parseGoalConfig(JSON.parse(entry.values.defaultConfig));
   const ids = config.evaluations.map((choice) => choice.id);
   requireValue(
-    ids.every((id) =>
-      /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(
-        id
-      )
-    ),
+    entry.expected.defaultConfig !== null ||
+      ids.every((id) =>
+        /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(
+          id
+        )
+      ),
     "Converted custom choices must have UUID identities"
   );
   let index = 0;
@@ -91,8 +95,8 @@ export async function applyGoalCutoverPlan(tx, plan) {
 
 async function applyLockedPlan(tx, plan) {
   requireValue(
-    plan?.version === 2 && plan.scope === "definitions-settings-and-references",
-    "Unsupported cutover plan; prepare a new version-2 plan"
+    plan?.version === 3 && plan.scope === "definitions-settings-and-references",
+    "Unsupported cutover plan; prepare a new version-3 plan"
   );
   uniqueEntries(plan.goalUpdates, "id");
   uniqueEntries(plan.recallSettingsInserts, "userId");
@@ -108,6 +112,7 @@ async function applyLockedPlan(tx, plan) {
     stagedWork.length === 0,
     "Pending staged work blocks cutover; submit or explicitly discard drafts and synchronize all devices"
   );
+  validateCustomGoalKeys(goals.map(camelizeKeys));
   const recallId = getBuiltInGoals().find((goal) => goal.name === "recall")?.id;
   requireValue(
     goals.some(
@@ -142,11 +147,17 @@ async function applyLockedPlan(tx, plan) {
     references,
     plan.references?.updates
   );
+  validateRenameCoverage(
+    goals.map(camelizeKeys),
+    references,
+    updates,
+    referenceWrites
+  );
   for (const entry of updates) {
     const [updated] = await tx`
-      UPDATE public.goal SET display_name = ${entry.values.displayName},
+      UPDATE public.goal SET name = ${entry.values.name}, display_name = ${entry.values.displayName},
         description = ${entry.values.description}, default_config = ${entry.values.defaultConfig}
-      WHERE id = ${entry.id} AND default_config IS NULL
+      WHERE id = ${entry.id}
       RETURNING last_modified_at::text AS stamp
     `;
     requireValue(

@@ -413,8 +413,9 @@ FSRS/ladder definitions; generic custom evaluations/defaults live in `builtins.t
 Unknown plugin contracts and system-name collisions block preparation. Existing
 configuration is validated and retained, including its choice identities.
 `cutover-plan.ts` assembles definition updates, absent Recall-settings inserts and
-legacy goal-reference backfills with their source snapshots. Version-2 plans replace
-the earlier definition/settings-only format; regenerate old review artifacts.
+legacy goal-reference backfills with their source snapshots. Version-3 plans also
+convert owner-defined keys to `custom:<UUID>` while preserving editable labels.
+Regenerate version-1/2 review artifacts; the rehearsal rejects them.
 The audit's optional `--prepare <new-plan.json>` writes
 this review artifact with private permissions; it has no database apply mode.
 `scripts/lib/goal-cutover-snapshot.mjs` shares that database snapshot with the local
@@ -424,8 +425,8 @@ make no further writes; changed preferences/overrides are not overwritten. Exist
 goal timestamps are checked after UPDATE, with normal ownership/sync triggers enabled.
 `scripts/rehearse-goal-cutover.mjs` is local-only and always rolls back, including
 sync-log effects. It has no commit mode or remote connection option. Production
-migration/deployment integration, plugin conversion, custom-key renames and queue
-attribution remain part of the coordinated cutover implementation.
+migration/deployment integration, plugin conversion and queue attribution remain
+part of the coordinated cutover implementation.
 
 `goals/references.ts` contains the existing owner-before-system name resolution,
 shared by the runtime resolver and `reference-backfill.ts`. The latter attributes
@@ -433,7 +434,14 @@ legacy events without IDs and reconciles active repertoire assignments. Attribut
 history and new-format events (including partially populated new metadata) are
 never rewritten; unknown/ambiguous legacy names
 remain unattributed and are reported. `goal-reference-transaction.mjs` revalidates
-owner, row content and namespace resolution before changing only `goal_id`. Comparing
+owner, row content and namespace resolution before changing historical `goal_id`
+or active assignment `goal_id`/`goal` together. Custom goal keys and active assignment
+keys change in the same transaction; historical text stays intact. A rename requires
+all currently resolvable affected references, so edited/incomplete plans and new
+history since preparation cannot lose name attribution. Occupied target keys block
+conversion, including tombstoned occupants; shared-name custom collisions still
+require an explicit identity decision. Existing configuration/choice identities and
+friendly labels are retained. Comparing
 the complete returned row verifies that raw names, dates, scheduler data and sync
 timestamps remain intact. Repertoire ownership, assignments and history join the
 tables locked for the rehearsal. The server snapshot also inventories identities

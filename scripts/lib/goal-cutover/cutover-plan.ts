@@ -3,6 +3,7 @@ import { canonicalJson } from "../../../src/lib/goals/config";
 import {
   type LegacyGoalDefinition,
   prepareLegacyGoalDefinition,
+  validateCustomGoalKeys,
 } from "./legacy-goals";
 import {
   type LegacyRecallPreferences,
@@ -29,6 +30,7 @@ export function prepareGoalCutoverPlan(
   ) {
     throw new Error("Shared Recall goal is missing from the server snapshot");
   }
+  validateCustomGoalKeys(goals);
   const goalUpdates = goals.flatMap((goal) => {
     const values = prepareLegacyGoalDefinition(goal);
     return values ? [{ id: goal.id, expected: goal, values }] : [];
@@ -48,7 +50,7 @@ export function prepareGoalCutoverPlan(
   });
   // Clone so subsequent mutation of the input snapshot cannot change the plan.
   return structuredClone({
-    version: 2,
+    version: 3,
     scope: "definitions-settings-and-references",
     goalUpdates,
     recallSettingsInserts,

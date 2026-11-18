@@ -42,8 +42,9 @@ async function planFixture(tx) {
 
 async function assertUnconverted(tx) {
   const [goal] =
-    await tx`SELECT default_config FROM public.goal WHERE id = ${goalId}`;
+    await tx`SELECT default_config, name FROM public.goal WHERE id = ${goalId}`;
   assert.equal(goal.default_config, null);
+  assert.equal(goal.name, goalName);
   assert.equal(
     (
       await tx`SELECT goal_id FROM public.practice_record WHERE id = ${eventId}`
@@ -98,7 +99,7 @@ try {
           await nested`SELECT last_modified_at::text AS stamp, name, base_intervals
           FROM public.goal WHERE id = ${goalId}`;
         assert.equal(goal.stamp, stamp);
-        assert.equal(goal.name, goalName);
+        assert.equal(goal.name, `custom:${goalId}`);
         assert.equal(goal.base_intervals, "[0.1,1,3]");
         const [event] =
           await nested`SELECT goal_id, goal, practiced::text, due::text, last_modified_at::text, quality
@@ -116,7 +117,7 @@ try {
           FROM public.repertoire_tune WHERE repertoire_ref = ${repertoireId} AND tune_ref = ${tuneId}`;
         assert.deepEqual(assignment, {
           goal_id: goalId,
-          goal: goalName,
+          goal: `custom:${goalId}`,
           scheduled: due,
           last_modified_at: stamp,
         });
@@ -238,7 +239,7 @@ try {
       const expected = references.find(
         (source) => source.kind === "history" && source.key === eventId
       );
-      const forged = { expected, goalId };
+      const forged = { expected, goalId, goalKey: expected.goal };
       partialPlan.references.updates.push(forged);
       await assert.rejects(
         applyGoalCutoverPlan(sp, partialPlan),
@@ -306,6 +307,73 @@ try {
         );
       });
     }
+
+    await rollbackCase(tx, async (sp) => {
+      // Existing new configuration and friendly names survive a key-only conversion.
+      const config = plan.goalUpdates[0].values.defaultConfig;
+      await sp`UPDATE public.goal SET default_config = ${config}, display_name = 'Retained label'
+        WHERE id = ${goalId}`;
+      const configuredPlan = await planFixture(sp);
+      await applyGoalCutoverPlan(sp, configuredPlan);
+      const [converted] =
+        await sp`SELECT name, display_name, default_config, last_modified_at::text AS stamp
+        FROM public.goal WHERE id = ${goalId}`;
+      assert.deepEqual(converted, {
+        name: `custom:${goalId}`,
+        display_name: "Retained label",
+        default_config: config,
+        stamp,
+      });
+      assert.equal(
+        (await applyGoalCutoverPlan(sp, configuredPlan)).alreadyApplied,
+        4
+      );
+    });
+    const oldPlan = { ...plan, version: 2 };
+    await assert.rejects(
+      applyGoalCutoverPlan(tx, oldPlan),
+      /new version-3 plan/
+    );
+    await assertUnconverted(tx);
+
+    for (const kind of ["assignment", "history"]) {
+      const incomplete = structuredClone(plan);
+      incomplete.references.updates = incomplete.references.updates.filter(
+        (entry) => entry.expected.kind !== kind
+      );
+      await assert.rejects(
+        applyGoalCutoverPlan(tx, incomplete),
+        /missing an affected reference/
+      );
+      await assertUnconverted(tx);
+    }
+    const missingGoal = structuredClone(plan);
+    missingGoal.goalUpdates = [];
+    await assert.rejects(
+      applyGoalCutoverPlan(tx, missingGoal),
+      /matching custom goal conversion/
+    );
+    await assertUnconverted(tx);
+
+    await rollbackCase(tx, async (sp) => {
+      // New history inserted after plan preparation must not lose name attribution.
+      await sp`INSERT INTO public.practice_record (id, repertoire_ref, tune_ref, goal, practiced)
+        VALUES (${randomUUID()}, ${repertoireId}, ${tuneId}, ${goalName}, '2020-02-01')`;
+      await assert.rejects(
+        applyGoalCutoverPlan(sp, plan),
+        /missing an affected reference/
+      );
+      await assertUnconverted(sp);
+    });
+    await rollbackCase(tx, async (sp) => {
+      await sp`INSERT INTO public.goal (id, name, private_for, default_technique)
+        VALUES (${randomUUID()}, ${`custom:${goalId}`}, ${userId}, 'fsrs')`;
+      await assert.rejects(
+        applyGoalCutoverPlan(sp, plan),
+        /target key is occupied/
+      );
+      await assertUnconverted(sp);
+    });
 
     const wrongReference = structuredClone(plan);
     wrongReference.references.updates[0].goalId = recallId;

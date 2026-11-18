@@ -21,7 +21,12 @@ export function validateReferenceUpdates(goals, sources, entries) {
     const applied = {
       ...entry.expected,
       goalId: entry.goalId,
-      row: { ...entry.expected.row, goal_id: entry.goalId },
+      goal: entry.goalKey,
+      row: {
+        ...entry.expected.row,
+        goal_id: entry.goalId,
+        goal: entry.goalKey,
+      },
     };
     if (same(current, applied)) continue;
     requireValue(
@@ -31,7 +36,8 @@ export function validateReferenceUpdates(goals, sources, entries) {
     const derived = prepareGoalReferenceBackfill(goals, [current]);
     requireValue(
       derived.updates.length === 1 &&
-        derived.updates[0].goalId === entry.goalId,
+        derived.updates[0].goalId === entry.goalId &&
+        derived.updates[0].goalKey === entry.goalKey,
       "Goal-reference attribution changed or is not allowed"
     );
     writes.push(entry);
@@ -39,13 +45,47 @@ export function validateReferenceUpdates(goals, sources, entries) {
   return writes;
 }
 
-/** Only goal_id changes; compare the full returned row to detect trigger side effects. */
+/** A rename must include all resolvable references and the corresponding goal write. */
+export function validateRenameCoverage(
+  goals,
+  sources,
+  goalWrites,
+  referenceWrites
+) {
+  const projected = new Map(goals.map((goal) => [goal.id, goal]));
+  const renamed = new Set();
+  for (const entry of goalWrites) {
+    projected.set(entry.id, { ...entry.expected, ...entry.values });
+    if (entry.expected.name !== entry.values.name) renamed.add(entry.id);
+  }
+  for (const entry of referenceWrites) {
+    if (entry.expected.kind !== "assignment") continue;
+    const goal = projected.get(entry.goalId);
+    requireValue(
+      goal && (goal.privateFor === null || goal.name === entry.goalKey),
+      "Assignment key requires its matching custom goal conversion"
+    );
+  }
+  const required = prepareGoalReferenceBackfill(goals, sources).updates;
+  const planned = new Map(
+    referenceWrites.map((entry) => [identity(entry.expected), entry])
+  );
+  for (const entry of required) {
+    if (!renamed.has(entry.goalId)) continue;
+    requireValue(
+      same(planned.get(identity(entry.expected)) ?? null, entry),
+      "Custom goal rename is missing an affected reference; prepare a new plan"
+    );
+  }
+}
+
+/** History changes only goal_id; active assignments also receive the stable key. */
 export async function writeReferenceUpdates(tx, entries) {
-  for (const { expected, goalId } of entries) {
+  for (const { expected, goalId, goalKey } of entries) {
     let rows;
     if (expected.kind === "assignment") {
       rows = await tx`
-        UPDATE public.repertoire_tune AS rt SET goal_id = ${goalId}
+        UPDATE public.repertoire_tune AS rt SET goal_id = ${goalId}, goal = ${goalKey}
         WHERE repertoire_ref = ${expected.row.repertoire_ref} AND tune_ref = ${expected.row.tune_ref}
         RETURNING to_jsonb(rt) AS row
       `;
@@ -60,7 +100,7 @@ export async function writeReferenceUpdates(tx, entries) {
     }
     requireValue(
       rows.length === 1 &&
-        same(rows[0].row, { ...expected.row, goal_id: goalId }),
+        same(rows[0].row, { ...expected.row, goal_id: goalId, goal: goalKey }),
       "Goal-reference write changed other content; transaction must roll back"
     );
   }

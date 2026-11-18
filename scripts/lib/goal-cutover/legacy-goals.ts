@@ -20,8 +20,26 @@ export interface LegacyGoalDefinition {
   description: string | null;
 }
 
+export const customGoalKey = (id: string): string => `custom:${id}`;
+
+/** Refuse occupied target keys, even if the occupying row is deleted. */
+export function validateCustomGoalKeys(goals: readonly LegacyGoalDefinition[]) {
+  for (const goal of goals) {
+    if (goal.privateFor === null) continue;
+    if (
+      goals.some(
+        (other) => other.id !== goal.id && other.name === customGoalKey(goal.id)
+      )
+    ) {
+      throw new Error(
+        "Custom goal target key is occupied; resolve its identity first"
+      );
+    }
+  }
+}
+
 /**
- * Prepare only missing custom configuration; preserve legacy keys and history.
+ * Prepare custom stable keys and missing configuration; preserve historical text.
  * The eventual cutover writer must recheck its snapshot and preserve timestamps.
  * Unknown/plugin techniques and system-name collisions require explicit handling.
  */
@@ -44,7 +62,14 @@ export function prepareLegacyGoalDefinition(
       description: row.description ?? "",
       config: JSON.parse(row.defaultConfig),
     });
-    return null;
+    if (row.privateFor === null || row.name === customGoalKey(row.id))
+      return null;
+    return {
+      name: customGoalKey(row.id),
+      displayName: row.displayName ?? row.name,
+      description: row.description,
+      defaultConfig: row.defaultConfig,
+    };
   }
   if (row.privateFor === null) {
     if (builtins.some((builtin) => builtin.id === row.id)) return null;
@@ -76,6 +101,7 @@ export function prepareLegacyGoalDefinition(
     config,
   });
   return {
+    name: customGoalKey(row.id),
     displayName: definition.displayName,
     description: definition.description,
     defaultConfig: canonicalJson(definition.config),

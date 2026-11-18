@@ -47,7 +47,7 @@ describe("legacy custom goal conversion", () => {
       /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/
     );
     expect(result?.displayName).toBe(custom.name);
-    expect(result).not.toHaveProperty("name");
+    expect(result?.name).toBe(`custom:${custom.id}`);
   });
 
   it("uses common FSRS defaults with deliberate zero-minimum custom practice", () => {
@@ -142,6 +142,41 @@ describe("server cutover data plan", () => {
         []
       )
     ).toThrow(/contract/);
+  });
+
+  it("rejects an occupied custom target key even on a deleted goal", () => {
+    expect(() =>
+      prepareGoalCutoverPlan(
+        [
+          recall,
+          custom,
+          {
+            ...custom,
+            id: "other",
+            name: `custom:${custom.id}`,
+            deleted: true,
+          },
+        ],
+        []
+      )
+    ).toThrow(/target key is occupied/);
+  });
+
+  it("renames configured goals without regenerating choices or changing the label", () => {
+    const configured = prepareLegacyGoalDefinition(custom);
+    const existing = {
+      ...custom,
+      ...configured,
+      name: "Old key",
+      displayName: "My label",
+    };
+    const result = prepareLegacyGoalDefinition(existing);
+    expect(result).toEqual({
+      name: `custom:${custom.id}`,
+      displayName: "My label",
+      description: existing.description,
+      defaultConfig: existing.defaultConfig,
+    });
   });
 
   it("requires shared Recall before preparing user settings", () => {

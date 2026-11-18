@@ -6,7 +6,10 @@ import { camelizeKeys } from "oosync/sync/casing";
 import postgres from "postgres";
 import { getBuiltInGoals } from "../src/lib/goals/builtins.ts";
 import { prepareGoalCutoverPlan } from "./lib/goal-cutover/cutover-plan.ts";
-import { prepareLegacyGoalDefinition } from "./lib/goal-cutover/legacy-goals.ts";
+import {
+  prepareLegacyGoalDefinition,
+  validateCustomGoalKeys,
+} from "./lib/goal-cutover/legacy-goals.ts";
 import { prepareLegacyRecallSettings } from "./lib/goal-cutover/legacy-preferences.ts";
 import { prepareGoalReferenceBackfill } from "./lib/goal-cutover/reference-backfill.ts";
 import {
@@ -41,7 +44,8 @@ function auditGoalDefinition(goal, builtins, result) {
     );
   if (legacy) result.legacyCustomGoalIds.push(goal.id);
   try {
-    prepareLegacyGoalDefinition(camelizeKeys(goal));
+    const prepared = prepareLegacyGoalDefinition(camelizeKeys(goal));
+    if (prepared && prepared.name !== goal.name) result.customGoalKeysReady++;
     if (legacy) result.convertibleCustomGoalIds.push(goal.id);
   } catch {
     if (legacy) result.blockedLegacyGoalIds.push(goal.id);
@@ -51,6 +55,7 @@ function auditGoalDefinition(goal, builtins, result) {
 
 function hasBlockers(report) {
   return (
+    report.customKeyConflict ||
     report.stagedWork.length ||
     report.invalidRecallPreferenceUserIds.length ||
     report.blockedLegacyGoalIds.length ||
@@ -85,6 +90,8 @@ try {
         await readGoalCutoverSnapshot(tx);
       const result = {
         users: users.length,
+        customKeyConflict: false,
+        customGoalKeysReady: 0,
         stagedWork,
         stagedWorkGuidance:
           "Submit or explicitly discard pending drafts through a compatible app and synchronize all devices. An empty server table does not certify device-local work is safe.",
@@ -108,6 +115,11 @@ try {
           )
           .map((goal) => goal.id),
       };
+      try {
+        validateCustomGoalKeys(goals.map(camelizeKeys));
+      } catch {
+        result.customKeyConflict = true;
+      }
       auditRecallPreferences(users, result);
       for (const goal of goals) auditGoalDefinition(goal, builtins, result);
       const attribution = prepareGoalReferenceBackfill(

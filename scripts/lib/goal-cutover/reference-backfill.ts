@@ -5,6 +5,8 @@ import {
   resolveGoalReference,
 } from "../../../src/lib/goals/references";
 
+import { customGoalKey } from "./legacy-goals";
+
 export interface GoalReferenceSource extends GoalReference {
   kind: "assignment" | "history";
   key: string;
@@ -39,7 +41,11 @@ export function prepareGoalReferenceBackfill(
   goals: readonly GoalIdentity[],
   sources: readonly GoalReferenceSource[]
 ) {
-  const updates: Array<{ expected: GoalReferenceSource; goalId: string }> = [];
+  const updates: Array<{
+    expected: GoalReferenceSource;
+    goalId: string;
+    goalKey: string | null;
+  }> = [];
   const unresolved: Array<{
     kind: GoalReferenceSource["kind"];
     key: string;
@@ -63,14 +69,26 @@ export function prepareGoalReferenceBackfill(
         source,
         historical
       );
-      if (!goal) {
+      if (goal) {
+        // History keeps its recorded text. Active assignments must use the new
+        // key atomically with the goal rename so runtime reconciliation stays valid.
+        const goalKey =
+          historical || goal.privateFor === null
+            ? source.goal
+            : customGoalKey(goal.id);
+        if (goal.id !== source.goalId || goalKey !== source.goal) {
+          updates.push({
+            expected: structuredClone(source),
+            goalId: goal.id,
+            goalKey,
+          });
+        }
+      } else {
         unresolved.push({
           kind: source.kind,
           key: source.key,
           reason: "Legacy goal is unavailable",
         });
-      } else if (goal.id !== source.goalId) {
-        updates.push({ expected: structuredClone(source), goalId: goal.id });
       }
     } catch (error) {
       if (!(error instanceof AmbiguousGoalReferenceError)) throw error;
