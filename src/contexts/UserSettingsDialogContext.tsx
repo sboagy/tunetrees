@@ -65,7 +65,7 @@ export function useUserSettingsDialog(): UserSettingsDialogContextValue {
 }
 
 /** Default tab shown when no tab is specified on open. */
-const DEFAULT_TAB: UserSettingsTab = "scheduling-options";
+const DEFAULT_TAB: UserSettingsTab = "goals";
 
 export const UserSettingsDialogProvider: ParentComponent = (props) => {
   const [isOpen, setIsOpen] = createSignal(false);
@@ -73,7 +73,7 @@ export const UserSettingsDialogProvider: ParentComponent = (props) => {
     createSignal<UserSettingsTab>(DEFAULT_TAB);
 
   const openUserSettings = (tab?: UserSettingsTab) => {
-    if (tab) setCurrentTab(tab);
+    if (tab) setCurrentTab(tab === "scheduling-options" ? "goals" : tab);
     setIsOpen(true);
   };
 
@@ -82,7 +82,7 @@ export const UserSettingsDialogProvider: ParentComponent = (props) => {
   };
 
   const navigateToTab = (tab: UserSettingsTab) => {
-    setCurrentTab(tab);
+    setCurrentTab(tab === "scheduling-options" ? "goals" : tab);
   };
 
   return (

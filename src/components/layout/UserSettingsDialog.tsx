@@ -58,7 +58,6 @@ const sidebarNavItems: NavItem[] = [
   { title: "Storage provider", tab: "storage-provider" },
   { title: "Appearance", tab: "appearance" },
   { title: "Catalog & Sync", tab: "catalog-sync" },
-  { title: "Scheduling Options", tab: "scheduling-options" },
   { title: "Spaced Repetition", tab: "spaced-repetition" },
   { title: "Plugins", tab: "plugins" },
   { title: "Goals", tab: "goals" },

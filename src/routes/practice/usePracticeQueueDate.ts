@@ -38,8 +38,12 @@ import {
   type Resource,
 } from "solid-js";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
+import { runGoalQueueCommand } from "../../lib/goals/queue-commands";
 import {
-  ensureDailyQueue,
+  offerGoalQueueSaveRecovery,
+  reportGoalQueueNotices,
+} from "../../lib/goals/queue-feedback";
+import {
   getLatestActiveQueueWindow,
   getRecentActiveQueueWindows,
 } from "../../lib/services/practice-queue";
@@ -48,9 +52,11 @@ import {
   getPracticeDate,
 } from "../../lib/utils/practice-date";
 import {
+  getEmptyQueueDate,
   parseStoredDate,
   QUEUE_DATE_MANUAL_FLAG_KEY,
   QUEUE_DATE_STORAGE_KEY,
+  rememberEmptyQueueDate,
 } from "../../lib/utils/queue-date-storage";
 
 // localStorage keys — single source of truth for the queue date persistence contract.
@@ -94,7 +100,7 @@ export interface PracticeQueueDateState {
    * Sync update only — does NOT call ensureDailyQueue.
    * The caller (handlePracticeDateRefresh) is responsible for that.
    */
-  clearManualAndSetToday: () => void;
+  clearManualAndSetToday: (date?: Date, empty?: boolean) => void;
   /** Capture selection ownership before async refresh work; false after newer navigation. */
   captureQueueSelection: () => () => boolean;
   /** Return to the most recent queue instead of staying on a manual date. */
@@ -134,6 +140,7 @@ export function usePracticeQueueDate(
 ): PracticeQueueDateState {
   let selectionVersion = 0;
   let disposed = false;
+  let manualLoad = { work: Promise.resolve(), isCurrent: () => false };
   onCleanup(() => {
     disposed = true;
   });
@@ -148,6 +155,40 @@ export function usePracticeQueueDate(
       db === props.localDb() &&
       userId === props.userId() &&
       repertoireId === props.currentRepertoireId();
+  };
+
+  const ensureDailyQueue = async (
+    db: SqliteDatabase,
+    uid: string,
+    rid: string,
+    date: Date,
+    ownsSelection = captureQueueSelection()
+  ) => {
+    const isCurrent = () =>
+      ownsSelection() &&
+      db === props.localDb() &&
+      uid === props.userId() &&
+      rid === props.currentRepertoireId();
+    try {
+      const result = await runGoalQueueCommand(
+        db,
+        { userId: uid, repertoireId: rid, practiceDate: date },
+        { kind: "load" },
+        isCurrent
+      );
+      if (!isCurrent()) return;
+      reportGoalQueueNotices(result);
+    } catch (error) {
+      offerGoalQueueSaveRecovery(
+        db,
+        uid,
+        () => db === props.localDb() && uid === props.userId(),
+        async () => {
+          await refetchQueue();
+        }
+      );
+      if (isCurrent()) throw error;
+    }
   };
 
   // Bootstrap signals from localStorage so the UI shows a stable initial date
@@ -179,6 +220,7 @@ export function usePracticeQueueDate(
     repertoireId: string,
     limit = recentQueueLimit()
   ): Promise<Date | null> => {
+    const ownsSelection = captureQueueSelection();
     const summaries = await getRecentActiveQueueWindows(
       db,
       userId,
@@ -187,11 +229,25 @@ export function usePracticeQueueDate(
       0,
       toLocalDateString(getPracticeDate())
     );
+    if (
+      !ownsSelection() ||
+      db !== props.localDb() ||
+      userId !== props.userId() ||
+      repertoireId !== props.currentRepertoireId()
+    )
+      return null;
     const visibleSummaries = summaries.slice(0, limit);
     const visibleDates = visibleSummaries
       .map((row) => parseStoredDate(row.queueDate))
       .filter((date): date is Date => date !== null);
 
+    const emptyDate = getEmptyQueueDate(userId, repertoireId);
+    if (
+      emptyDate &&
+      (!visibleDates[0] ||
+        toLocalDateString(emptyDate) > toLocalDateString(visibleDates[0]))
+    )
+      visibleDates.unshift(emptyDate);
     setRecentQueueLimit(limit);
     setHasMoreRecentQueueDates(summaries.length > limit);
     setRecentQueueDates(visibleDates);
@@ -235,7 +291,7 @@ export function usePracticeQueueDate(
    * Instead, setManualDate awaits ensureDailyQueue itself before returning, so
    * by the time any caller increments practiceListStagedChanged the queue exists.
    */
-  const [queueReady] = createResource(
+  const [queueReady, { refetch: refetchQueue }] = createResource(
     () => {
       const db = props.localDb();
       const uid = props.userId();
@@ -267,6 +323,13 @@ export function usePracticeQueueDate(
         : null;
     },
     async (params): Promise<true> => {
+      const ownsSelection = captureQueueSelection();
+      const isCurrent = () =>
+        ownsSelection() &&
+        params.db === props.localDb() &&
+        params.userId === props.userId() &&
+        params.repertoireId === props.currentRepertoireId();
+      if (!isCurrent()) return true;
       const storedDateValue = localStorage.getItem(QUEUE_DATE_STORAGE_KEY);
       const storedManualFlag =
         localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
@@ -303,8 +366,10 @@ export function usePracticeQueueDate(
               params.db,
               params.userId,
               params.repertoireId,
-              storedDate
+              storedDate,
+              isCurrent
             );
+            if (manualLoad.isCurrent()) await manualLoad.work;
             await syncQueueWindowState(
               params.db,
               params.userId,
@@ -332,6 +397,7 @@ export function usePracticeQueueDate(
         params.repertoireId
       );
 
+      if (!isCurrent()) return true;
       let resolvedDate: Date;
       if (latestWindow.windowStartUtc) {
         resolvedDate =
@@ -340,17 +406,28 @@ export function usePracticeQueueDate(
         resolvedDate = getPracticeDate();
       }
 
+      const emptyDate = getEmptyQueueDate(params.userId, params.repertoireId);
+      const keepEmptyDay =
+        emptyDate !== null &&
+        toLocalDateString(emptyDate) <= toLocalDateString(getPracticeDate()) &&
+        (!latestWindow.windowStartUtc ||
+          toLocalDateString(emptyDate) >= toLocalDateString(resolvedDate));
+      if (keepEmptyDay) resolvedDate = emptyDate;
+
       if (queueDate().getTime() !== resolvedDate.getTime())
         setQueueDate(resolvedDate);
       setIsManual(false);
       persistToStorage(resolvedDate, false);
 
-      await ensureDailyQueue(
-        params.db,
-        params.userId,
-        params.repertoireId,
-        resolvedDate
-      );
+      if (!keepEmptyDay)
+        await ensureDailyQueue(
+          params.db,
+          params.userId,
+          params.repertoireId,
+          resolvedDate,
+          isCurrent
+        );
+      if (manualLoad.isCurrent()) await manualLoad.work;
       await syncQueueWindowState(params.db, params.userId, params.repertoireId);
 
       console.log(
@@ -390,7 +467,11 @@ export function usePracticeQueueDate(
     const uid = props.userId();
     const rid = props.currentRepertoireId();
     if (db && uid && rid) {
-      await ensureDailyQueue(db, uid, rid, dateAtNoon);
+      manualLoad = {
+        work: ensureDailyQueue(db, uid, rid, dateAtNoon),
+        isCurrent: captureQueueSelection(),
+      };
+      if (manualLoad.isCurrent()) await manualLoad.work;
       await syncQueueWindowState(db, uid, rid);
     }
   };
@@ -401,9 +482,15 @@ export function usePracticeQueueDate(
    * Sync state update only. Does NOT call ensureDailyQueue — the caller
    * (handlePracticeDateRefresh) is responsible for creating today's queue.
    */
-  const clearManualAndSetToday = (): void => {
+  const clearManualAndSetToday = (
+    date = getPracticeDate(),
+    empty = false
+  ): void => {
     selectionVersion += 1;
-    const today = getPracticeDate();
+    const today = new Date(date);
+    const uid = props.userId();
+    const rid = props.currentRepertoireId();
+    if (uid && rid) rememberEmptyQueueDate(uid, rid, empty ? today : null);
     setQueueDate(today);
     setIsManual(false);
     persistToStorage(today, false);
@@ -421,7 +508,11 @@ export function usePracticeQueueDate(
     const uid = props.userId();
     const rid = props.currentRepertoireId();
     if (db && uid && rid) {
-      await ensureDailyQueue(db, uid, rid, targetDate);
+      manualLoad = {
+        work: ensureDailyQueue(db, uid, rid, targetDate),
+        isCurrent: captureQueueSelection(),
+      };
+      if (manualLoad.isCurrent()) await manualLoad.work;
       await syncQueueWindowState(db, uid, rid);
     }
   };

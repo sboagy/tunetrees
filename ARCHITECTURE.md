@@ -435,9 +435,22 @@ Frozen allocation goals account for retained completed/staged rows; evaluation
 continues to use the current goal. Refresh deactivates unselected rows and reuses
 natural-key rows rather than deleting them. Explicit manual/add-more selections
 are budget exceptions and recorded as manual. Disk-save failures retain a result
-receipt for persistence-only retry without repeating selection. These goal-aware
-queue APIs await the coordinated practice/settings UI switch; the legacy queue
-service still serves existing UI callers.
+receipt for persistence-only retry without repeating selection. Runtime queue load,
+Refresh, Add more, Add to review and starter-repertoire setup use this allocator
+through `queue-commands.ts`. Commands serialize within each database session,
+coalesce consecutive overlapping identical requests, and retain failed-save receipts across
+component navigation. A different command cannot consume an unsaved receipt;
+retry the original action or use the save-only recovery action, which works after
+a date change or navigation. Callers supply selection/session ownership guards.
+Explicitly refreshed empty days retain a user/repertoire-scoped device-local date
+marker because no queue rows exist to discover on reload. This is navigation
+intent, not a cached assertion that the window still has no rows: synced rows remain
+visible through the normal database query. Queue notices expose unavailable-goal fallback
+and minimum shortfalls. Add to
+review creates queue rows directly, without placeholder practice-history events.
+Legacy queue functions remain for test/compatibility callers; they are no longer
+the interactive queue allocation path. Evaluation/staging/Submit activation still
+requires the versioned plugin contract and goal-aware evaluation UI.
 
 `preview.ts` calculates from that snapshot and fingerprints its relevant inputs without
 writing. These fingerprints are preparation for, not a substitute for, atomic Submit
@@ -470,16 +483,19 @@ triggers protect goal ownership and settings visibility even for privileged Work
 writes. Built-in definitions are seeded from the typed source; trusted migration
 and staging-restore transactions explicitly enable shared-goal writes. Staging
 refresh reapplies generated defaults after importing production rows. SQLite v28
-uses the guarded rebuild/full-pull path. The old scheduler/preferences remain
-active until the event/queue integration checkpoint. See
+uses the guarded rebuild/full-pull path. Legacy FSRS evaluation preferences remain active until the event/plugin UI
+integration checkpoint; daily allocation now reads per-goal settings. Goals owns
+daily settings and a shared read-only calendar summary. Old Scheduling Options
+links resolve to Goals; inactive weekly rules/exceptions remain stored unchanged. See
 [`goals-implementation.md`](docs/development/goals-implementation.md) for the
 checkpoint boundary and remaining integration work.
 
 Practice-event storage (SQLite v29) adds nullable goal/evaluation/scheduler identity,
 bounded JSON TEXT snapshots/state, and fractional `interval_days`. Staging adds
 predecessor/config fingerprints and a stable prospective event UUID; queue rows gain
-allocation and displayed-event references. These fields are not yet written by the
-practice UI. Legacy integer intervals and preference paths remain intact. Postgres
+allocation and displayed-event references. Queue allocation metadata is now written
+by the queue UI; event identity/state and displayed-event commit links still await
+the new evaluation/Submit UI. Legacy integer interval projections remain intact. Postgres
 serializes inserts sharing a practice natural key, rejects different event UUIDs at
 that key when either event uses the new format, and permits only transport metadata
 updates to submitted new-format events. Legacy-only upserts remain compatible.

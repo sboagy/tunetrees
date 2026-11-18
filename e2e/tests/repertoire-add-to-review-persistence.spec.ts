@@ -8,6 +8,7 @@ import {
   CATALOG_TUNE_ALEXANDERS_ID,
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { getBuiltInGoals } from "../../src/lib/goals/builtins";
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { waitForPracticeViewSettled } from "../helpers/practice-view";
@@ -32,10 +33,16 @@ test.describe("Add To Review persistence", () => {
       (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId =
         userId;
     }, testUser.userId);
-    // Future overrides keep automatic queue generation empty. Explicit additions
-    // must still work and must leave those overrides unchanged.
+    // Disable Recall top-up so future overrides leave the automatic queue empty.
+    // Explicit additions must work and leave those overrides unchanged.
     await setupForRepertoireTestsParallel(page, testUser, {
       repertoireTunes: tuneIds,
+      goalDailySettings: [
+        {
+          goalId: getBuiltInGoals().find((goal) => goal.name === "recall")!.id,
+          daily: { minimum: 0 },
+        },
+      ],
       scheduleTunes: true,
       scheduleDaysAgo: -30,
       scheduleBaseDate: STANDARD_TEST_DATE,

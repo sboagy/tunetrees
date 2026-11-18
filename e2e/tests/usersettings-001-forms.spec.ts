@@ -8,7 +8,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * USERSETTINGS-001: User Settings Forms
  * Priority: High
  *
- * Tests that user settings forms (Scheduling Options, Spaced Repetition, Account)
+ * Tests that user settings forms (Goals, Spaced Repetition, Account)
  * render correctly, validate input, and submit successfully.
  */
 
@@ -17,7 +17,7 @@ let ttPage: TuneTreesPage;
 // biome-ignore lint/correctness/noUnusedVariables: currentTestUser standard setup, but not used yet.
 let currentTestUser: TestUser;
 
-test.describe("USERSETTINGS-001: Scheduling Options Form", () => {
+test.describe("USERSETTINGS-001: Goal daily settings", () => {
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
     currentTestUser = testUser;
@@ -41,127 +41,71 @@ test.describe("USERSETTINGS-001: Scheduling Options Form", () => {
       await ttPage.settingsMenuToggle.click();
     }
     await page.waitForTimeout(800);
-    await ttPage.userSettingsSchedulingOptionsButton.click();
+    await page.getByTestId("settings-tab-goals").click();
     await page.waitForTimeout(500);
   });
 
-  test("should display scheduling options form", async ({ page }) => {
-    await expect(
-      page.getByRole("heading", { name: "Scheduling Options", level: 3 })
-    ).toBeVisible({ timeout: 5000 });
-
-    await expect(
-      page.getByText(
-        "Configure scheduling constraints and your practice calendar"
-      )
-    ).toBeVisible();
-  });
-
-  test("should display all form fields", async ({ page }) => {
-    // Wait for form to load
-    await page.waitForTimeout(1000);
-
-    await expect(
-      page.getByLabel("Acceptable Delinquency Window (days)")
-    ).toBeVisible({ timeout: 5000 });
-    await expect(page.getByLabel("Min Reviews Per Day")).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByLabel("Max Reviews Per Day")).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByLabel("Days per Week")).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByLabel("Weekly Rules (JSON)")).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByLabel("Exceptions (JSON)")).toBeVisible({
-      timeout: 5000,
-    });
-  });
-
-  test("should validate acceptable delinquency window range", async ({
+  test("shows shared calendar preferences without inactive editing controls", async ({
     page,
   }) => {
-    await page.waitForTimeout(1000);
-
-    const input = page.getByLabel("Acceptable Delinquency Window (days)");
-
-    // Try invalid value
-    await input.fill("-1");
-    await page.waitForTimeout(500);
-    try {
-      await expect(
-        page.getByText("Must be between 0 and 365 days")
-      ).toBeVisible({
-        // timeout: 3000,
-        timeout: 300,
-      });
-    } catch {
-      // Validation message may or may not be shown depending on implementation
-      console.log("Validation message check not implemented");
-    }
-
-    // Try valid value
-    await input.fill("30");
-    await page.waitForTimeout(500);
-
     await expect(
-      page.getByText("Must be between 0 and 365 days")
-    ).not.toBeVisible();
+      page.getByRole("heading", { name: "Goals", level: 3 })
+    ).toBeVisible({ timeout: 10000 });
+    await page
+      .getByTestId("shared-practice-calendar")
+      .locator("summary")
+      .click();
+    await expect(
+      page.getByText(
+        /Weekly rules and date exceptions are not currently applied/
+      )
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel("Min Reviews Per Day")).toHaveCount(0);
+    await expect(page.getByLabel("Weekly Rules (JSON)")).toHaveCount(0);
   });
 
-  test("should validate JSON format for weekly rules", async ({ page }) => {
-    await page.waitForTimeout(1000);
-
-    const input = page.getByLabel("Weekly Rules (JSON)");
-
-    // Type invalid JSON
-    await input.fill("not json");
-    await page.waitForTimeout(500);
-
-    try {
-      await expect(page.getByText(/Must be valid JSON/)).toBeVisible({
-        timeout: 3000,
-      });
-    } catch {
-      // Validation message may or may not be shown depending on implementation
-      console.log(
-        "Validation message 'Must be valid JSON' not yet implemented"
-      );
-    }
-
-    // Type valid JSON object
-    await input.fill('{"mon": true, "wed": true}');
-    await page.waitForTimeout(500);
-    await expect(page.getByText(/Must be valid JSON/)).not.toBeVisible();
+  test("validates a goal minimum against its finite maximum", async ({
+    page,
+  }) => {
+    const recall = page.locator("section[data-testid^='goal-panel-']").filter({
+      has: page.getByRole("heading", {
+        name: "Recall Built-in",
+        exact: true,
+      }),
+    });
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByTestId("goal-minimum").fill("11");
+    await page.getByTestId("goal-maximum").fill("10");
+    await page.getByTestId("goal-save").click();
+    await expect(
+      page.getByText("Minimum must not exceed a finite maximum", {
+        exact: true,
+      })
+    ).toBeVisible({ timeout: 10000 });
   });
 
-  test("should submit valid scheduling options form", async ({ page }) => {
-    await page.waitForTimeout(1000);
-
-    const input = page.getByLabel("Acceptable Delinquency Window (days)");
-    const submitButton = page.getByRole("button", { name: /update/i });
-
-    // Make changes
-    await input.fill("30");
-    await page.waitForTimeout(500);
-
-    // Submit should be enabled when dirty
-    await expect(submitButton).toBeEnabled({ timeout: 3000 });
-    await submitButton.click();
-    await page.waitForTimeout(500);
-
-    // Wait for success message
-    try {
-      await expect(page.getByText(/Successfully updated|saved/i)).toBeVisible({
-        timeout: 5000,
-      });
-    } catch {
-      // Success message may or may not be shown
-      console.log("Success message not implemented yet");
-    }
+  test("saves per-goal daily limits and restores defaults", async ({
+    page,
+  }) => {
+    const recall = page.locator("section[data-testid^='goal-panel-']").filter({
+      has: page.getByRole("heading", {
+        name: "Recall Built-in",
+        exact: true,
+      }),
+    });
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByTestId("goal-minimum").fill("1");
+    await page.getByTestId("goal-maximum").fill("4");
+    await page.getByTestId("goal-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(recall).toContainText("Daily 1–4", { timeout: 10000 });
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
+    await expect(page.getByTestId("goal-maximum")).toHaveValue("4");
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByTestId("goal-reset").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(recall).toContainText("Daily 3–10", { timeout: 10000 });
   });
 });
 
@@ -365,9 +309,9 @@ test.describe("USERSETTINGS-001: Navigation", () => {
   });
 
   test("should display all settings navigation links", async ({ page }) => {
-    await expect(
-      page.getByTestId("settings-tab-scheduling-options")
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("settings-tab-goals")).toBeVisible({
+      timeout: 5000,
+    });
     await expect(
       page.getByTestId("settings-tab-spaced-repetition")
     ).toBeVisible({ timeout: 5000 });
@@ -394,9 +338,9 @@ test.describe("USERSETTINGS-001: Navigation", () => {
     };
 
     // Click Scheduling Options (beforeEach already opened the sidebar on mobile)
-    await page.getByTestId("settings-tab-scheduling-options").click();
+    await page.getByTestId("settings-tab-goals").click();
     await expect(
-      page.getByRole("heading", { name: "Scheduling Options", level: 3 })
+      page.getByRole("heading", { name: "Goals", level: 3 })
     ).toBeVisible({ timeout: 5000 });
 
     // Click Spaced Repetition

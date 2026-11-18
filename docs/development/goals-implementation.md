@@ -867,3 +867,75 @@ goal key rather than editable menu text. All eight desktop/mobile Fluency scenar
 pass (nine tests including authentication setup). The developer subsequently
 reported the full local E2E suite passing. Final repository lint, formatting,
 typecheck and diff checks pass. These follow-ups do not change scheduler behavior.
+
+## Runtime queue and daily-settings integration — focused browser validation complete
+
+Interactive queue load/date navigation, Refresh, Add more, Add to review and starter
+repertoire initialization now use the per-goal allocator. The combined queue has
+no configurable global daily cap. Refresh retains completed work and drafts;
+Add to review does not manufacture an empty practice-history record. Add to review
+resolves the visible/latest active session explicitly, including older sessions;
+stale explicit selections remain errors rather than redirecting silently.
+
+Commands serialize within each database session and share overlapping identical
+requests while retaining all callers' ownership checks. Failed disk saves retain
+receipts across navigation. Exact retries save the original result without another
+allocation; a separate Retry saving action works after a date change or onboarding
+completion. Other commands cannot accidentally consume the original receipt.
+Date resolution and history publication discard obsolete results. Rollover publishes
+the actual generated date, not a later clock reading. Explicit empty-day refreshes
+retain scoped device-local navigation intent so reload does not reopen yesterday.
+
+Goals is the default settings panel. The standalone Scheduling Options navigation
+and global queue controls are removed; old links resolve to Goals. Shared practice
+calendar preferences are displayed read-only in Goals with an explicit explanation
+that weekly rules and exceptions are inactive; existing saved data is preserved.
+Per-goal edits explain frozen queues. Settings E2E now covers daily min/max validation,
+save/reset, and shared-calendar visibility; fixture cleanup isolates goal overrides.
+The legacy Spaced Repetition panel remains until evaluation activation is complete.
+
+This batch activates queue allocation only. Inspection found that new-format
+calculation still lacks the existing plugin execution contract, so evaluation and
+Submit must not be switched wholesale yet. Versioned plugin execution, goal-aware
+evaluation choices/effects, and removal of the legacy FSRS panel remain required.
+No schema migration or generated-contract changes are introduced.
+
+Local CodeRabbit's first review returned 15 findings/questions. Addressed valid
+issues involving command size, current/stale coalesced callers, save recovery after
+navigation/onboarding, active-session targeting, delayed date/history publication,
+midnight rollover, empty-day reload, and future-preview additions. Regression tests
+also verify already-correct preservation of completed/draft rows, normalized UTC
+window identity, no double allocation after a save failure, and frozen rows after a
+lower limit is saved. The proposed fallback from an explicit missing old window
+is intentionally rejected, following the approved queue-selection contract.
+The follow-up review returned ten findings/questions. Fixed the calendar resource
+error guard, repertoire-independent save recovery, Refresh view completion after
+retry, superseded Load readiness, and nonconsecutive Add-more coalescing. A stored
+global manual preference is now validated against the current repertoire before
+becoming an explicit command target. Once resolved, Add to review deliberately
+pins the click-time window; later Refresh actions do not retarget that command.
+Added regressions for fractional UTC historical Add more, superseded Load, and
+three accepted additions with a different intervening count. User switches create
+a new database object in the runtime, so the pending-save owner guard remains.
+The empty-day marker records navigation intent only; it does not hide rows later
+received through sync, and rendering still reads the database rather than the
+saved allocation receipt.
+
+Validation: all 1,337 unit tests pass across 104 files; repository typecheck,
+lint, format check, and diff whitespace checks pass. Focused desktop/mobile browser
+coverage includes Goals, settings forms, rollover, and Add-to-review persistence.
+The initial run had 48 passed, 2 skipped, and 7 failed; all failing cases have since
+passed in targeted reruns. This is not a fresh full-suite E2E pass.
+
+Browser verification exposed test-fixture assumptions and cleanup gaps:
+- Add-to-review fixtures now seed Recall minimum zero before initial sync so
+  future-due tunes do not automatically fill the queue under the new policy.
+- Goal-setting cleanup uses the existing owner-scoped Postgres test connection;
+  authenticated runtime clients cannot hard-delete these overrides.
+- Temporary-repertoire cleanup deletes dependent grid state before the repertoire,
+  avoiding a foreign-key failure after mobile navigation.
+
+All six Add-to-review cases passed on desktop/mobile after fixture cleanup was
+corrected. The final repertoire-switching rerun passed on both projects (three
+tests including auth setup). No runtime changes were needed for these fixes,
+and no dev/preview servers were restarted. Changes remain uncommitted for review.

@@ -33,10 +33,6 @@ const sidebarNavItems: SidebarNavItem[] = [
     href: "/user-settings/catalog-sync",
   },
   {
-    title: "Scheduling Options",
-    href: "/user-settings/scheduling-options",
-  },
-  {
     title: "Spaced Repetition",
     href: "/user-settings/spaced-repetition",
   },

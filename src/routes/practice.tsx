@@ -33,8 +33,12 @@ import { getTuneIdsForTuneSet } from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
+import { runGoalQueueCommand } from "../lib/goals/queue-commands";
+import {
+  offerGoalQueueSaveRecovery,
+  reportGoalQueueNotices,
+} from "../lib/goals/queue-feedback";
 import { useStarterRepertoire } from "../lib/hooks/useStarterRepertoire";
-import { generateOrGetPracticeQueue } from "../lib/services/practice-queue";
 import { getPracticeDate } from "../lib/utils/practice-date";
 import { useFlashcardPersistence } from "./practice/useFlashcardPersistence";
 import { usePracticeEvaluations } from "./practice/usePracticeEvaluations";
@@ -257,10 +261,12 @@ const PracticePage: Component = () => {
     handleAddTunes,
     handleQueueReset: resetQueue,
   } = usePracticeSubmit({
+    userId,
     localDb,
     getUserId,
     currentRepertoireId,
     queueDate,
+    captureQueueSelection,
     evaluationsCount,
     isStaging,
     prepareClearEvaluations,
@@ -330,25 +336,43 @@ const PracticePage: Component = () => {
       return;
     }
 
+    let refreshedEmpty = false;
     try {
-      await generateOrGetPracticeQueue(
+      const result = await runGoalQueueCommand(
         db,
-        userIdValue,
-        repertoireId,
-        practiceDate,
-        null,
-        "per_day",
-        true
+        { userId: userIdValue, repertoireId, practiceDate },
+        { kind: "refresh" },
+        isCurrentSelection
       );
       if (!isCurrentSelection()) return;
+      refreshedEmpty = result.rows.length === 0;
+      reportGoalQueueNotices(result);
       await refreshQueueWindowState();
     } catch (error) {
+      offerGoalQueueSaveRecovery(
+        db,
+        userIdValue,
+        () => localDb() === db && userId() === userIdValue,
+        async (saved) => {
+          if (!isCurrentSelection() || !saved?.refreshDate) return;
+          clearManualAndSetToday(
+            saved.refreshDate,
+            saved.result.rows.length === 0
+          );
+          incrementPracticeListStagedChanged();
+          await refreshQueueWindowState();
+        }
+      );
       console.warn(
         "[PracticePage] Failed to regenerate queue during refresh:",
         error
       );
       if (isCurrentSelection())
-        toast.error("Could not refresh the practice queue. Please try again.");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not refresh the practice queue. Please try again."
+        );
       return;
     }
 
@@ -356,7 +380,7 @@ const PracticePage: Component = () => {
     if (!isCurrentSelection()) return;
     // Generation awaits IndexedDB persistence. Keep the rollover button visible
     // and busy until that completes so hiding it means a reload is safe.
-    clearManualAndSetToday();
+    clearManualAndSetToday(practiceDate, refreshedEmpty);
     console.log(
       `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()}`
     );

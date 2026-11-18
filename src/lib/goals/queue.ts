@@ -54,7 +54,10 @@ export interface GoalQueueResult {
 export class GoalQueuePersistenceError extends Error {
   readonly result: GoalQueueResult;
   constructor(result: GoalQueueResult, cause: unknown) {
-    super("Queue changed in memory, but saving it failed", { cause });
+    super(
+      "Queue changed in memory, but saving it failed. Retry the same queue action to save without allocating again.",
+      { cause }
+    );
     this.result = result;
   }
 }

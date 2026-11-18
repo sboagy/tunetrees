@@ -3,6 +3,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { toast } from "solid-sonner";
 import { Button } from "@/components/ui/button";
 import { GoalEditor } from "@/components/user-settings/GoalEditor";
+import { PracticeCalendarSummary } from "@/components/user-settings/PracticeCalendarSummary";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getBuiltInGoals, getCustomGoalConfig } from "@/lib/goals/builtins";
 import {
@@ -17,7 +18,7 @@ import {
   type UnavailableGoalSettings,
 } from "@/lib/goals/settings";
 
-/** Settings edit goal configuration; practice/queue activation is a separate checkpoint. */
+/** Edit per-goal configuration and personal overrides. */
 export default function GoalsPage() {
   const {
     user,
@@ -129,9 +130,11 @@ export default function GoalsPage() {
         <p class="text-sm text-muted-foreground">
           Choose what you are working toward. Each goal has its own evaluations,
           scheduler and daily limits. Your settings apply across your
-          repertoires.
+          repertoires. Daily limits apply when a queue is created or refreshed;
+          editing them does not replace today’s existing queue.
         </p>
       </div>
+      <PracticeCalendarSummary />
       <Show when={error()}>
         <div role="alert" class="space-y-2 text-sm text-destructive">
           <p>{error()}</p>

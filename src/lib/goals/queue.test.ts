@@ -521,3 +521,53 @@ describe("empty-day additions", () => {
     expect(ids(result)).toEqual(["tune"]);
   });
 });
+
+it("keeps frozen row identities when a saved daily maximum is lowered", async () => {
+  add("a");
+  add("b");
+  add("c");
+  const original = await run();
+  settings(recall, { minimum: 0, maximum: 1 });
+  expect((await run()).rows).toEqual(original.rows);
+  expect((await run({ kind: "refresh" })).rows).toHaveLength(1);
+});
+
+it("loads an existing UTC window with fractional seconds without replacing completed rows", async () => {
+  add("done");
+  queue("done", {
+    windowStartUtc: "2026-11-16 00:00:00.000Z",
+    windowEndUtc: "2026-11-17 00:00:00.000Z",
+    completedAt: stamp,
+    displayedPracticeRecordId: "event",
+  });
+  const result = await updateGoalPracticeQueue(db, {
+    ...request,
+    localTzOffsetMinutes: 0,
+  });
+  expect(result.rows).toHaveLength(1);
+  expect(result.rows[0]).toMatchObject({
+    id: "q-done",
+    completedAt: stamp,
+    displayedPracticeRecordId: "event",
+  });
+  expect(db.select().from(dailyPracticeQueue).all()).toHaveLength(1);
+});
+
+it("adds to the selected historical window with fractional UTC timestamps", async () => {
+  add("existing");
+  add("extra", "2026-11-13T12:00:00Z");
+  queue("existing", {
+    windowStartUtc: "2026-11-14 00:00:00.000Z",
+    windowEndUtc: "2026-11-15 00:00:00.000Z",
+  });
+  const result = await run({
+    kind: "add-more",
+    count: 1,
+    windowStart: "2026-11-14T00:00:00",
+  });
+  expect(ids(result)).toEqual(["existing", "extra"]);
+  expect(result.rows.map((row) => row.windowStartUtc)).toEqual([
+    "2026-11-14 00:00:00.000Z",
+    "2026-11-14 00:00:00.000Z",
+  ]);
+});

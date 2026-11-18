@@ -144,15 +144,11 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
 
   const handleReset = async () => {
     if (
-      confirm("Reset today's queue? This will regenerate it on next access.")
+      confirm(
+        "Refresh today's queue using your current goal settings? Completed practice and drafts will be preserved."
+      )
     ) {
       await props.onReset();
-      props.onClose();
-    }
-  };
-
-  const handleBackdropClick = (e: MouseEvent) => {
-    if (e.target === e.currentTarget) {
       props.onClose();
     }
   };
@@ -347,16 +343,18 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   return (
     <Show when={props.isOpen}>
       <Portal>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay, not a focusable interactive element */}
-        <div
-          role="presentation"
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
-          onClick={handleBackdropClick}
-          onKeyDown={handleKeyDown}
-        >
+        <div class="fixed inset-0 flex items-center justify-center z-[100] pointer-events-none">
+          <button
+            type="button"
+            class="absolute inset-0 bg-black/50 pointer-events-auto"
+            aria-label="Close queue date selector"
+            onClick={props.onClose}
+            onKeyDown={handleKeyDown}
+          />
           <dialog
             ref={dialogRef}
-            class="relative mx-4 flex flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800"
+            onKeyDown={handleKeyDown}
+            class="relative mx-4 flex flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800 pointer-events-auto"
             aria-labelledby="queue-date-selector-title"
             style={{
               width:
@@ -478,20 +476,19 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
 
               {/* Custom date picker */}
               <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
-                <label
-                  for="custom-date-input"
-                  class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                >
-                  Custom Date
-                </label>
-                <div class="flex gap-2">
-                  <input
-                    id="custom-date-input"
-                    type="date"
-                    value={customDate()}
-                    onInput={(e) => setCustomDate(e.currentTarget.value)}
-                    class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  />
+                <div class="flex items-end gap-2">
+                  <label class="min-w-0 flex-1">
+                    <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Custom Date
+                    </span>
+                    <input
+                      id="custom-date-input"
+                      type="date"
+                      value={customDate()}
+                      onInput={(e) => setCustomDate(e.currentTarget.value)}
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    />
+                  </label>
                   <button
                     type="button"
                     onClick={handleCustomDate}
@@ -509,16 +506,18 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
                   type="button"
                   onClick={() => void handleReset()}
                   disabled={!canResetTodayQueue()}
-                  class="w-full text-left px-4 py-2 rounded-md text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  data-testid="queue-refresh-today"
+                  class="w-full text-left px-4 py-2 rounded-md text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   title={
                     canResetTodayQueue()
-                      ? "Reset today's active queue"
-                      : "Reset is only available when today's queue exists"
+                      ? "Refresh today's active queue"
+                      : "Refresh is available when today's queue exists"
                   }
                 >
-                  <div class="font-medium">Reset Today's Queue</div>
+                  <div class="font-medium">Refresh Today's Queue</div>
                   <div class="text-xs opacity-75">
-                    Delete and rebuild today's queue from scratch
+                    Apply goal limits while preserving completed practice and
+                    drafts
                   </div>
                 </button>
               </div>

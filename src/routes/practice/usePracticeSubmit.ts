@@ -1,16 +1,24 @@
-import { sql } from "drizzle-orm";
 import type { Accessor } from "solid-js";
 import { toast } from "solid-sonner";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
-import { addTunesToQueue } from "../../lib/services/practice-queue";
+import { runGoalQueueCommand } from "../../lib/goals/queue-commands";
+import {
+  offerGoalQueueSaveRecovery,
+  reportGoalQueueNotices,
+} from "../../lib/goals/queue-feedback";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
-import { formatAsWindowStart } from "../../lib/utils/practice-date";
+import {
+  formatAsWindowStart,
+  getPracticeDate,
+} from "../../lib/utils/practice-date";
 
 export interface PracticeSubmitProps {
   localDb: Accessor<SqliteDatabase | null>;
   getUserId: () => Promise<string | null>;
+  userId: Accessor<string | null>;
   currentRepertoireId: Accessor<string | null>;
   queueDate: Accessor<Date>;
+  captureQueueSelection: () => () => boolean;
   evaluationsCount: Accessor<number>;
   isStaging: Accessor<boolean>;
   prepareClearEvaluations: () => () => void;
@@ -105,6 +113,16 @@ export function usePracticeSubmit(
   };
 
   const handleAddTunes = async (count: number) => {
+    const isCurrent = props.captureQueueSelection();
+    const practiceDate = new Date(props.queueDate());
+    if (
+      formatAsWindowStart(practiceDate) > formatAsWindowStart(getPracticeDate())
+    ) {
+      toast.warning(
+        "Future queues are previews. Choose today or an earlier queue to add tunes."
+      );
+      return;
+    }
     const db = props.localDb();
     const repertoireId = props.currentRepertoireId();
 
@@ -126,7 +144,19 @@ export function usePracticeSubmit(
     );
 
     try {
-      const added = await addTunesToQueue(db, userId, repertoireId, count);
+      const result = await runGoalQueueCommand(
+        db,
+        { userId, repertoireId, practiceDate },
+        {
+          kind: "add-more",
+          count,
+          windowStart: formatAsWindowStart(practiceDate),
+        },
+        isCurrent
+      );
+      if (!isCurrent()) return;
+      reportGoalQueueNotices(result);
+      const added = result.addedTuneIds;
 
       if (added.length > 0) {
         toast.success(
@@ -142,6 +172,15 @@ export function usePracticeSubmit(
         console.log("⚠️ No tunes added - backlog may be empty");
       }
     } catch (error) {
+      offerGoalQueueSaveRecovery(
+        db,
+        userId,
+        () => props.localDb() === db && props.userId() === userId,
+        () => {
+          if (isCurrent()) props.incrementPracticeListStagedChanged();
+        }
+      );
+      if (!isCurrent()) return;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
       toast.error(`Error adding tunes: ${errorMessage}`, {
@@ -152,6 +191,8 @@ export function usePracticeSubmit(
   };
 
   const handleQueueReset = async () => {
+    const isCurrent = props.captureQueueSelection();
+    const practiceDate = getPracticeDate();
     const db = props.localDb();
     const repertoireId = props.currentRepertoireId();
 
@@ -171,21 +212,29 @@ export function usePracticeSubmit(
     console.log(`Resetting active queue for repertoire ${repertoireId}`);
 
     try {
-      const todayWindowIso19 = formatAsWindowStart(new Date())
-        .replace(" ", "T")
-        .substring(0, 19);
-
-      db.run(sql`
-        DELETE FROM daily_practice_queue
-        WHERE user_ref = ${userId}
-          AND repertoire_ref = ${repertoireId}
-          AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${todayWindowIso19}
-      `);
-
-      toast.success("Queue reset successfully. It will be regenerated.");
+      const result = await runGoalQueueCommand(
+        db,
+        { userId, repertoireId, practiceDate },
+        { kind: "refresh" },
+        isCurrent
+      );
+      if (!isCurrent()) return;
+      reportGoalQueueNotices(result);
+      toast.success(
+        "Queue refreshed. Completed practice and drafts were preserved."
+      );
       console.log("✅ Queue reset complete");
       props.incrementPracticeListStagedChanged();
     } catch (error) {
+      offerGoalQueueSaveRecovery(
+        db,
+        userId,
+        () => props.localDb() === db && props.userId() === userId,
+        () => {
+          if (isCurrent()) props.incrementPracticeListStagedChanged();
+        }
+      );
+      if (!isCurrent()) return;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
       toast.error(`Error resetting queue: ${errorMessage}`, {

@@ -1,19 +1,32 @@
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
+import { runGoalQueueCommand } from "@/lib/goals/queue-commands";
+import { getLatestActiveQueueWindow } from "@/lib/services/practice-queue";
 import { usePracticeQueueDate } from "@/routes/practice/usePracticeQueueDate";
 
 vi.mock("@/lib/services/practice-queue", () => ({
-  ensureDailyQueue: vi.fn(async () => []),
   getLatestActiveQueueWindow: vi.fn(),
   getRecentActiveQueueWindows: vi.fn(async () => []),
 }));
 
+vi.mock("@/lib/goals/queue-commands", () => ({
+  runGoalQueueCommand: vi.fn(async () => ({
+    rows: [],
+    addedTuneIds: [],
+    shortfalls: [],
+    notices: [],
+  })),
+}));
+
 let dispose: () => void;
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 afterEach(() => dispose());
 
-function setup() {
+function setup(initialSync = false) {
   return createRoot((cleanup) => {
     dispose = cleanup;
     const [localDb, setDb] = createSignal({} as SqliteDatabase);
@@ -24,8 +37,8 @@ function setup() {
       userId,
       currentRepertoireId,
       // Exercise navigation independently of the initial-sync resource.
-      initialSyncComplete: () => false,
-      remoteSyncDownCompletionVersion: () => 0,
+      initialSyncComplete: () => initialSync,
+      remoteSyncDownCompletionVersion: () => 1,
     });
     return { dates, setDb, setUser, setRepertoire };
   });
@@ -99,4 +112,77 @@ it("invalidates refresh after leaving the page", () => {
   const isCurrent = dates.captureQueueSelection();
   dispose();
   expect(isCurrent()).toBe(false);
+});
+
+it("retains an explicitly refreshed empty day on reload instead of reopening yesterday", async () => {
+  localStorage.setItem(
+    "TT_EMPTY_QUEUE_WINDOW:user:rep",
+    "2020-01-03T12:00:00.000Z"
+  );
+  vi.mocked(getLatestActiveQueueWindow).mockResolvedValue({
+    windowStartUtc: "2020-01-02T00:00:00",
+    hasIncompleteRows: true,
+    rowCount: 1,
+  });
+  const { dates } = setup(true);
+  await vi.waitFor(() => expect(dates.queueReady()).toBe(true));
+  expect(dates.queueDate()).toEqual(new Date("2020-01-03T12:00:00.000Z"));
+  expect(runGoalQueueCommand).not.toHaveBeenCalled();
+});
+
+it("publishes the generated refresh date rather than reading a later clock", () => {
+  const { dates } = setup();
+  const generatedDate = new Date("2020-01-02T12:00:00");
+  dates.clearManualAndSetToday(generatedDate, true);
+  expect(dates.queueDate()).toEqual(generatedDate);
+  expect(localStorage.getItem("TT_EMPTY_QUEUE_WINDOW:user:rep")).toBe(
+    generatedDate.toISOString()
+  );
+});
+
+it("does not publish an automatic lookup over a newer historical selection", async () => {
+  let resolve!: (
+    value: Awaited<ReturnType<typeof getLatestActiveQueueWindow>>
+  ) => void;
+  vi.mocked(getLatestActiveQueueWindow).mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      })
+  );
+  const { dates } = setup(true);
+  await vi.waitFor(() =>
+    expect(getLatestActiveQueueWindow).toHaveBeenCalledTimes(1)
+  );
+  await dates.setManualDate(new Date("2020-01-02T12:00:00"));
+  resolve({
+    windowStartUtc: "2020-01-03T00:00:00",
+    hasIncompleteRows: true,
+    rowCount: 1,
+  });
+  await vi.waitFor(() => expect(dates.queueReady()).toBe(true));
+  expect(dates.queueDate()).toEqual(new Date("2020-01-02T12:00:00"));
+  expect(dates.isManual()).toBe(true);
+});
+
+it("does not turn a superseded automatic load into a readiness error", async () => {
+  vi.mocked(getLatestActiveQueueWindow).mockResolvedValue({
+    windowStartUtc: "2020-01-03T00:00:00",
+    hasIncompleteRows: true,
+    rowCount: 1,
+  });
+  let finish!: (value: Awaited<ReturnType<typeof runGoalQueueCommand>>) => void;
+  vi.mocked(runGoalQueueCommand).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const { dates } = setup(true);
+  await vi.waitFor(() => expect(runGoalQueueCommand).toHaveBeenCalledTimes(1));
+  await dates.setManualDate(new Date("2020-01-02T12:00:00"));
+  finish({ rows: [], addedTuneIds: [], shortfalls: [], notices: [] });
+  await vi.waitFor(() => expect(dates.queueReady()).toBe(true));
+  expect(dates.queueReady.error).toBeUndefined();
+  expect(dates.queueDate()).toEqual(new Date("2020-01-02T12:00:00"));
 });

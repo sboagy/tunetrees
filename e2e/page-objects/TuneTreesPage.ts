@@ -181,7 +181,6 @@ export class TuneTreesPage {
   readonly userSettingsButton: Locator;
 
   readonly userSettingsCatalogSyncButton: Locator;
-  readonly userSettingsSchedulingOptionsButton: Locator;
   readonly userSettingsSpacedRepetitionButton: Locator;
   readonly userSettingsAccountButton: Locator;
   readonly userSettingsAvatarButton: Locator;
@@ -519,9 +518,6 @@ export class TuneTreesPage {
 
     this.userSettingsCatalogSyncButton = page.getByTestId(
       "settings-tab-catalog-sync"
-    );
-    this.userSettingsSchedulingOptionsButton = page.getByTestId(
-      "settings-tab-scheduling-options"
     );
     this.userSettingsSpacedRepetitionButton = page.getByTestId(
       "settings-tab-spaced-repetition"
