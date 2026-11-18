@@ -755,3 +755,54 @@ version-29 devices; it does not claim reopening guarantees a rebuild. This manua
 reset does not use the automatic preservation guard, so its preconditions are
 explicit. Scheduler-state-only partial metadata is already retained by the full
 row snapshot and rejected by the shared preflight.
+
+
+## Combined queue implementation batch
+
+The new `updateGoalPracticeQueue` boundary handles daily load/generation, Refresh,
+add-more and explicit selected-tune additions using one classification/allocation
+policy. It shares repertoire ownership, goal identity/defaults and overrides with
+practice previews, with definitions parsed once per goal rather than per tune.
+Latest history selection reuses the canonical repertoire-scoped SQL helper.
+
+Implemented together:
+
+- Per-goal minimum/maximum, Unlimited, persisted auto-new and delinquency settings;
+  due today → recent overdue → old overdue → unscheduled/future minimum top-up.
+- Frozen allocation-goal attribution for previously unannotated active rows,
+  preserving completed-event links/counters and not guessing historical reasons.
+- Refresh retention of completion and all drafts (including note-only drafts),
+  accounting against original allocation goals even after a goal/limit change.
+- Same-day practiced exclusion, deterministic ordering and explicit shortfalls.
+- Manual/add-more budget exceptions with accurate schedule snapshots, deduplication,
+  selected older-window support and atomic row reuse/deactivation for sync.
+- Persistence-error receipts: retry saving the already-applied result rather than
+  repeating add-more. Callers must retain the same user/database ownership.
+
+This replaces the need for separate review cycles for each queue primitive, but
+**does not activate the new queue service in the UI yet**. The next integration
+batch must replace legacy `generateOrGetPracticeQueue`, `addTunesToQueue` and
+`addSpecificTunesToExistingQueue` callers together with the goal-aware settings and
+practice flow, retain persistence receipts, and display selection/fallback notices.
+No new database columns, generated artifacts or migration tasks are introduced.
+
+CI follow-up: shard 1 failed before Playwright in the admin cutover test because
+its restored legacy seed lacked built-in configuration. The test now runs the
+existing canonical seed inside its enclosing rollback transaction, then disables
+the seed-write allowance before exercising cutover. This changes test setup only;
+normal migration preflight still rejects missing defaults.
+
+Local CodeRabbit reviewed all seven changed/new files and raised one finding:
+empty-day manual/add-more requests could target an older active queue. The fix
+uses the requested practice day by default; an explicitly selected older window
+must exist. Four SQLite regressions cover both addition modes, a stale old-window
+selection, and an explicitly selected empty current day. Existing older-window
+selection remains supported. The caller must pass the visible older window rather
+than relying on an implicit latest-window fallback.
+
+Final local validation: **1,299 unit tests** pass, including 30 new SQLite-backed
+queue tests and the existing 54 goal-context/staging/Submit tests. Typecheck, lint,
+formatting and diff checks pass. The real Postgres cutover transaction suite passes
+with the canonical seed fixture. The developer subsequently reported the full
+local E2E run passing before commit. No production migration was performed; the
+new queue API remains outside active UI callers.

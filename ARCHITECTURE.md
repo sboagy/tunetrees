@@ -415,6 +415,19 @@ the enriched per-tune query and history charts use the same generic ordering hel
 Display callers explicitly tolerate invalid timestamps as missing; scheduling rejects
 them. Canonical JSON hashing lives once in `goals/config.ts` and serves ladders and
 preview fingerprints with unchanged digest bytes.
+`queue-allocation.ts` owns shared goal-based date classification and allocation:
+due/recent/old backlog up to each maximum, then unscheduled/future top-ups only to
+the minimum. It does not impose a combined repertoire limit. `queue.ts` reads the
+same owner-scoped goal snapshot as practice previews, selects canonical latest
+due dates and applies queue mutations in one synchronous SQLite transaction.
+Frozen allocation goals account for retained completed/staged rows; evaluation
+continues to use the current goal. Refresh deactivates unselected rows and reuses
+natural-key rows rather than deleting them. Explicit manual/add-more selections
+are budget exceptions and recorded as manual. Disk-save failures retain a result
+receipt for persistence-only retry without repeating selection. These goal-aware
+queue APIs await the coordinated practice/settings UI switch; the legacy queue
+service still serves existing UI callers.
+
 `preview.ts` calculates from that snapshot and fingerprints its relevant inputs without
 writing. These fingerprints are preparation for, not a substitute for, atomic Submit
 validation. `db/practice-history-sql.ts` supplies canonical SQLite ordering for

@@ -10,7 +10,19 @@ import {
 } from "../db/schema";
 import { getBuiltInGoals } from "./builtins";
 import { parseGoalConfig, resolveGoalDefinition } from "./config";
-import { resolveGoalReference } from "./references";
+import { type GoalReference, resolveGoalReference } from "./references";
+
+/**
+ * Resolves repertoire tune assignments into effective practice goals for the
+ * supplied user: goal identity, validated defaults plus personal overrides,
+ * and explicit Recall fallback notices when an assigned goal is unavailable.
+ * Reads local SQLite synchronously, checks repertoire ownership and active tune
+ * membership, and shares a goal snapshot between queue allocation and practice
+ * previews. Per-tune context also includes the canonical latest practice record,
+ * its legacy goal identity, and the number of tunes assigned to the effective goal.
+ * This module only reads and resolves context; it does not calculate schedules,
+ * allocate queue slots, or persist changes. Callers supply the active auth user ID.
+ */
 
 export { type GoalReference, resolveGoalReference } from "./references";
 
@@ -31,11 +43,10 @@ function defaultDefinition(row: GoalRow) {
 }
 
 /** Synchronous reads form one local snapshot; caller must supply the active auth owner. */
-export function readGoalPracticeContext(
+export function readGoalRepertoireSnapshot(
   db: SqliteDatabase,
   userId: string,
-  repertoireId: string,
-  tuneId: string
+  repertoireId: string
 ) {
   const owner = db
     .select()
@@ -63,47 +74,73 @@ export function readGoalPracticeContext(
       )
     )
     .all();
-  const assignment = members.find(
-    (row) => row.assignment.tuneRef === tuneId
-  )?.assignment;
-  if (!assignment) throw new Error("Tune is not active in this repertoire");
   const goals = db
     .select()
     .from(goal)
     .where(or(isNull(goal.privateFor), eq(goal.privateFor, userId)))
     .all();
-  const assigned = resolveGoalReference(goals, userId, assignment);
   const recallId = getBuiltInGoals().find(
     (entry) => entry.name === "recall"
   )?.id;
-  const effective =
-    assigned ??
-    goals.find(
-      (row) => row.id === recallId && row.privateFor === null && !row.deleted
-    );
-  if (!effective)
-    throw new Error(
-      "Recall fallback is unavailable; synchronize goal definitions"
-    );
   const settings = db
     .select()
     .from(goalUserSettings)
     .where(
-      and(
-        eq(goalUserSettings.userId, userId),
-        eq(goalUserSettings.goalId, effective.id),
-        eq(goalUserSettings.deleted, 0)
-      )
+      and(eq(goalUserSettings.userId, userId), eq(goalUserSettings.deleted, 0))
     )
-    .get();
-  const definition = resolveGoalDefinition(
-    {
-      displayName: effective.displayName ?? effective.name,
-      description: effective.description ?? "",
-      config: defaultDefinition(effective),
-    },
-    settings ? JSON.parse(settings.overrides) : {}
-  );
+    .all();
+  const definitions = new Map<
+    string,
+    ReturnType<typeof resolveGoalDefinition>
+  >();
+  function resolveAssignment(reference: GoalReference) {
+    const assigned = resolveGoalReference(goals, userId, reference);
+    const effective =
+      assigned ??
+      goals.find(
+        (row) => row.id === recallId && row.privateFor === null && !row.deleted
+      );
+    if (!effective)
+      throw new Error(
+        "Recall fallback is unavailable; synchronize goal definitions"
+      );
+    let definition = definitions.get(effective.id);
+    if (!definition) {
+      const personal = settings.find((row) => row.goalId === effective.id);
+      definition = resolveGoalDefinition(
+        {
+          displayName: effective.displayName ?? effective.name,
+          description: effective.description ?? "",
+          config: defaultDefinition(effective),
+        },
+        personal ? JSON.parse(personal.overrides) : {}
+      );
+      definitions.set(effective.id, definition);
+    }
+    return {
+      goalId: effective.id,
+      goalKey: effective.name,
+      ...definition,
+      notices: assigned ? [] : ["Assigned goal is unavailable; using Recall"],
+    };
+  }
+  return { members, goals, recallId, resolveAssignment };
+}
+
+/** One owner-scoped snapshot, shared with queue allocation without per-tune queries. */
+export function readGoalPracticeContext(
+  db: SqliteDatabase,
+  userId: string,
+  repertoireId: string,
+  tuneId: string
+) {
+  const { members, goals, recallId, resolveAssignment } =
+    readGoalRepertoireSnapshot(db, userId, repertoireId);
+  const assignment = members.find(
+    (row) => row.assignment.tuneRef === tuneId
+  )?.assignment;
+  if (!assignment) throw new Error("Tune is not active in this repertoire");
+  const definition = resolveAssignment(assignment);
   const predecessor =
     readPracticeRecordsForTune(db, tuneId, repertoireId)[0] ?? null;
   const legacyGoalId =
@@ -113,18 +150,15 @@ export function readGoalPracticeContext(
   const goalTuneCount = members.filter(
     ({ assignment: candidate }) =>
       (resolveGoalReference(goals, userId, candidate)?.id ?? recallId) ===
-      effective.id
+      definition.goalId
   ).length;
   return {
     userId,
     repertoireId,
     tuneId,
-    goalId: effective.id,
-    goalKey: effective.name,
     ...definition,
     predecessor,
     legacyGoalId,
     goalTuneCount,
-    notices: assigned ? [] : ["Assigned goal is unavailable; using Recall"],
   };
 }

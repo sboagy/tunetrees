@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { camelizeKeys } from "oosync/sync/casing";
 import postgres from "postgres";
 import { getBuiltInGoals } from "../src/lib/goals/builtins.ts";
@@ -89,6 +90,16 @@ async function rollbackCase(tx, test) {
 
 try {
   await sql.begin(async (tx) => {
+    // CI's restored legacy seed can overwrite configuration installed by migrations.
+    // Apply the canonical seed only inside this rollback scope, as restore does.
+    const seed = readFileSync(
+      new URL("../sql_scripts/seed_goal_configuration.sql", import.meta.url),
+      "utf8"
+    )
+      .replace(/^BEGIN;$/m, "")
+      .replace(/^COMMIT;$/m, "");
+    await tx.unsafe(seed);
+    await tx`SET LOCAL tunetrees.goal_seed_write = 'off'`;
     // Fail explicitly on unsupported test setup, before inserting any fixture.
     const baseline = prepareCompleteGoalCutover(
       await readGoalCutoverSnapshot(tx)
