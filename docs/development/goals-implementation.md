@@ -686,3 +686,42 @@ custom-key changes are exercised by the isolated database fixtures above.
 Fresh local CodeRabbit review of checkpoint 3k, including the SonarQube condition
 cleanup, completed with **zero findings across all 11 changed files**. No code
 changes were needed in response to this review.
+
+## Checkpoint 3l: legacy queue completion links
+
+Version-4 plans include conservative displayed-event link proposals. The legacy
+Submit code writes the same `now` into the event's `last_modified_at` and queue's
+`completed_at`. The planner uses that exact evidence with repertoire ownership,
+tune identity and practice between generation/completion, without rounding fractions
+or requiring submission on the original queue day. Exactly one legacy event must
+match. Missing, ambiguous, corrupt or partial/new-format evidence stays unlinked
+and is reported. Existing links and unfinished/inactive rows are preserved.
+
+Queue rows join the transaction lock set. Before any write, the writer rederives
+planned evidence from the current snapshot; an edited plan, new ambiguity, changed
+completion or altered event is rejected. Exact retries preserve existing links,
+including across goal-ID backfill in the same batch. Only the displayed-event ID
+changes; full-row comparison verifies dates, allocation fields and counters remain
+unchanged. A failure in this final phase rolls back earlier goal/reference/settings
+writes too. Server staging must still be empty; device-local checks remain required.
+
+This does not infer allocation goals or selection reasons from historical buckets.
+Those frozen allocation snapshots remain part of first-load/new queue integration,
+as planned. No browser activation, schema change, production apply mode or permanent
+backfill was introduced. Regenerate older plan artifacts for version 4.
+
+Validation: **1,250 unit tests**, typecheck, lint, formatting, targeted script Biome
+checks and real Postgres transaction tests pass. Tests cover exact microseconds,
+delayed submission, ownership/tune/repertoire boundaries, ambiguity, corrupt and
+partial evidence, existing links, retry, unchanged queue content, stale/edited plans,
+concurrent queue writes and whole-batch rollback after a final-phase failure.
+
+Fresh local version-4 export/rehearsal completed and rolled back. This snapshot has
+591 completed queue rows without a unique matching submission timestamp, so all
+remain unlinked and are reported; zero completion links were guessed. Successful
+link writes are verified by isolated Postgres fixtures. The rehearsal also processed
+1,699 goal references and 209 Recall inserts, then rolled them back.
+
+Fresh local CodeRabbit review of the queue-link checkpoint completed with zero
+findings across all 11 changed files. Before commit, typecheck, all 16 queue-link
+unit tests and the Postgres transaction suite were rerun successfully.

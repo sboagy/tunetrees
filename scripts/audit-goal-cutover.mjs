@@ -11,6 +11,7 @@ import {
   validateCustomGoalKeys,
 } from "./lib/goal-cutover/legacy-goals.ts";
 import { prepareLegacyRecallSettings } from "./lib/goal-cutover/legacy-preferences.ts";
+import { prepareQueueCompletions } from "./lib/goal-cutover/queue-completions.ts";
 import { prepareGoalReferenceBackfill } from "./lib/goal-cutover/reference-backfill.ts";
 import {
   legacyPreferences,
@@ -86,7 +87,7 @@ try {
     "isolation level repeatable read read only",
     async (tx) => {
       const builtins = getBuiltInGoals();
-      const { users, goals, references, stagedWork } =
+      const { users, goals, references, stagedWork, queues } =
         await readGoalCutoverSnapshot(tx);
       const result = {
         users: users.length,
@@ -126,6 +127,9 @@ try {
         goals.map(camelizeKeys),
         references
       );
+      const completions = prepareQueueCompletions(queues, references);
+      result.queueCompletionsReady = completions.updates.length;
+      result.unresolvedQueueCompletions = completions.unresolved;
       result.goalReferencesReady = attribution.updates.length;
       result.unresolvedGoalReferences = attribution.unresolved;
       const plan =
@@ -136,7 +140,8 @@ try {
                 id: user.id,
                 preferences: legacyPreferences(user),
               })),
-              references
+              references,
+              queues
             )
           : null;
       return { report: result, plan };

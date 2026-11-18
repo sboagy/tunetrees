@@ -27,7 +27,7 @@ const newEventFields = [
   "interval_days",
 ];
 
-function hasNewEventMetadata(source: GoalReferenceSource): boolean {
+export function hasNewEventMetadata(source: GoalReferenceSource): boolean {
   return (
     source.schedulerId !== null ||
     newEventFields.some(

@@ -10,6 +10,10 @@ import {
   prepareLegacyRecallSettings,
 } from "./legacy-preferences";
 import {
+  prepareQueueCompletions,
+  type QueueCompletionSource,
+} from "./queue-completions";
+import {
   type GoalReferenceSource,
   prepareGoalReferenceBackfill,
 } from "./reference-backfill";
@@ -18,7 +22,8 @@ import {
 export function prepareGoalCutoverPlan(
   goals: readonly LegacyGoalDefinition[],
   users: readonly { id: string; preferences: LegacyRecallPreferences }[],
-  references: readonly GoalReferenceSource[] = []
+  references: readonly GoalReferenceSource[] = [],
+  queues: readonly QueueCompletionSource[] = []
 ) {
   const recall = getBuiltInGoals().find((goal) => goal.name === "recall");
   if (!recall) throw new Error("Recall defaults are unavailable");
@@ -50,10 +55,11 @@ export function prepareGoalCutoverPlan(
   });
   // Clone so subsequent mutation of the input snapshot cannot change the plan.
   return structuredClone({
-    version: 3,
+    version: 4,
     scope: "definitions-settings-and-references",
     goalUpdates,
     recallSettingsInserts,
     references: prepareGoalReferenceBackfill(goals, references),
+    queueCompletions: prepareQueueCompletions(queues, references),
   });
 }

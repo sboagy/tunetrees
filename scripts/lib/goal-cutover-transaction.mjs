@@ -12,6 +12,10 @@ import {
   readGoalCutoverSnapshot,
 } from "./goal-cutover-snapshot.mjs";
 import {
+  validateQueueCompletions,
+  writeQueueCompletions,
+} from "./goal-queue-transaction.mjs";
+import {
   validateReferenceUpdates,
   validateRenameCoverage,
   writeReferenceUpdates,
@@ -95,8 +99,8 @@ export async function applyGoalCutoverPlan(tx, plan) {
 
 async function applyLockedPlan(tx, plan) {
   requireValue(
-    plan?.version === 3 && plan.scope === "definitions-settings-and-references",
-    "Unsupported cutover plan; prepare a new version-3 plan"
+    plan?.version === 4 && plan.scope === "definitions-settings-and-references",
+    "Unsupported cutover plan; prepare a new version-4 plan"
   );
   uniqueEntries(plan.goalUpdates, "id");
   uniqueEntries(plan.recallSettingsInserts, "userId");
@@ -105,8 +109,8 @@ async function applyLockedPlan(tx, plan) {
   await tx`LOCK TABLE public.goal, public.goal_user_settings,
     public.prefs_scheduling_options, public.prefs_spaced_repetition,
     public.user_profile, public.repertoire, public.repertoire_tune,
-    public.practice_record, public.table_transient_data IN SHARE ROW EXCLUSIVE MODE`;
-  const { users, goals, references, stagedWork } =
+    public.practice_record, public.table_transient_data, public.daily_practice_queue IN SHARE ROW EXCLUSIVE MODE`;
+  const { users, goals, references, stagedWork, queues } =
     await readGoalCutoverSnapshot(tx);
   requireValue(
     stagedWork.length === 0,
@@ -147,6 +151,11 @@ async function applyLockedPlan(tx, plan) {
     references,
     plan.references?.updates
   );
+  const queueWrites = validateQueueCompletions(
+    queues,
+    references,
+    plan.queueCompletions?.updates
+  );
   validateRenameCoverage(
     goals.map(camelizeKeys),
     references,
@@ -177,14 +186,18 @@ async function applyLockedPlan(tx, plan) {
     );
   }
   await writeReferenceUpdates(tx, referenceWrites);
+  await writeQueueCompletions(tx, queueWrites);
   return {
+    queueCompletionsUpdated: queueWrites.length,
     referencesUpdated: referenceWrites.length,
     goalsUpdated: updates.length,
     recallSettingsInserted: inserts.length,
     alreadyApplied:
       plan.goalUpdates.length +
       plan.recallSettingsInserts.length +
-      plan.references.updates.length -
+      plan.references.updates.length +
+      plan.queueCompletions.updates.length -
+      queueWrites.length -
       referenceWrites.length -
       updates.length -
       inserts.length,

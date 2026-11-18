@@ -413,9 +413,9 @@ FSRS/ladder definitions; generic custom evaluations/defaults live in `builtins.t
 Unknown plugin contracts and system-name collisions block preparation. Existing
 configuration is validated and retained, including its choice identities.
 `cutover-plan.ts` assembles definition updates, absent Recall-settings inserts and
-legacy goal-reference backfills with their source snapshots. Version-3 plans also
+legacy goal-reference backfills with their source snapshots. Version-4 plans include completed-queue event evidence and
 convert owner-defined keys to `custom:<UUID>` while preserving editable labels.
-Regenerate version-1/2 review artifacts; the rehearsal rejects them.
+Regenerate version-1/2/3 review artifacts; the rehearsal rejects them.
 The audit's optional `--prepare <new-plan.json>` writes
 this review artifact with private permissions; it has no database apply mode.
 `scripts/lib/goal-cutover-snapshot.mjs` shares that database snapshot with the local
@@ -425,7 +425,7 @@ make no further writes; changed preferences/overrides are not overwritten. Exist
 goal timestamps are checked after UPDATE, with normal ownership/sync triggers enabled.
 `scripts/rehearse-goal-cutover.mjs` is local-only and always rolls back, including
 sync-log effects. It has no commit mode or remote connection option. Production
-migration/deployment integration, plugin conversion and queue attribution remain
+migration/deployment integration, plugin conversion and queue allocation remain
 part of the coordinated cutover implementation.
 
 `goals/references.ts` contains the existing owner-before-system name resolution,
@@ -451,6 +451,19 @@ and before any writes, so an older empty-staging audit cannot authorize discardi
 new work. It never clears drafts. This server check does not certify device-local
 staging or outboxes; the per-device preflight and rebuild guard remain required.
 No guard or sync trigger is disabled.
+
+`queue-completions.ts` prepares displayed-event links for active, completed legacy
+queue rows with no existing link. It requires matching repertoire ownership and one
+same-tune event whose modification timestamp exactly equals completion, with practice
+between queue generation and completion. Shared timestamp normalization retains
+microseconds and permits delayed submission across days. Ambiguous, damaged or
+partial/new-format evidence is reported, never replaced with a latest-record guess.
+The rehearsal locks queue/history tables, rederives evidence even on retries and
+changes only the displayed-event ID, comparing the entire returned queue row.
+Goal-ID backfills are excluded from the event evidence comparison; other content
+changes invalidate it. Allocations, selection reasons, completion markers and
+staged data are untouched. Allocation snapshots still belong to first load in the
+new queue model; no historical allocation is inferred by this admin step.
 
 `resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
 active tune assignments, visible goal definitions, personal overrides and history.

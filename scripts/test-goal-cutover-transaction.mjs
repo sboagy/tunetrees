@@ -21,6 +21,7 @@ const goalId = randomUUID();
 const repertoireId = randomUUID();
 const tuneId = randomUUID();
 const eventId = randomUUID();
+const queueId = randomUUID();
 const due = "2020-01-05 03:04:05.123456";
 const goalName = `cutover:${goalId}`;
 const recallId = getBuiltInGoals().find((goal) => goal.name === "recall").id;
@@ -28,7 +29,8 @@ const stamp = "2020-01-02 03:04:05.123456";
 const rollback = new Error("Rollback successful fixture");
 
 async function planFixture(tx) {
-  const { goals, users, references } = await readGoalCutoverSnapshot(tx);
+  const { goals, users, references, queues } =
+    await readGoalCutoverSnapshot(tx);
   return prepareGoalCutoverPlan(
     goals
       .filter((goal) => [goalId, recallId].includes(goal.id))
@@ -36,7 +38,8 @@ async function planFixture(tx) {
     users
       .filter((user) => user.id === userId)
       .map((user) => ({ id: user.id, preferences: legacyPreferences(user) })),
-    references.filter((source) => source.ownerId === userId)
+    references.filter((source) => source.ownerId === userId),
+    queues.filter((source) => source.ownerId === userId)
   );
 }
 
@@ -45,6 +48,12 @@ async function assertUnconverted(tx) {
     await tx`SELECT default_config, name FROM public.goal WHERE id = ${goalId}`;
   assert.equal(goal.default_config, null);
   assert.equal(goal.name, goalName);
+  assert.equal(
+    (
+      await tx`SELECT displayed_practice_record_id FROM public.daily_practice_queue WHERE id = ${queueId}`
+    )[0].displayed_practice_record_id,
+    null
+  );
   assert.equal(
     (
       await tx`SELECT goal_id FROM public.practice_record WHERE id = ${eventId}`
@@ -83,6 +92,11 @@ try {
       VALUES (${repertoireId}, ${tuneId}, ${goalName}, ${due}, ${stamp})`;
     await tx`INSERT INTO public.practice_record (id, repertoire_ref, tune_ref, goal, practiced, due, last_modified_at, quality)
       VALUES (${eventId}, ${repertoireId}, ${tuneId}, ${goalName}, ${stamp}, ${due}, ${stamp}, 2)`;
+    await tx`INSERT INTO public.daily_practice_queue
+      (id, user_ref, repertoire_ref, tune_ref, window_start_utc, window_end_utc,
+       bucket, order_index, snapshot_coalesced_ts, generated_at, completed_at, last_modified_at)
+      VALUES (${queueId}, ${userId}, ${repertoireId}, ${tuneId}, '2020-01-01', '2020-01-02',
+        1, 0, ${stamp}, '2020-01-01', ${stamp}, ${stamp})`;
     const plan = await planFixture(tx);
 
     await rollbackCase(tx, async (sp) => {
@@ -90,10 +104,17 @@ try {
         await sp`SELECT * FROM public.sync_change_log ORDER BY table_name`;
       await rollbackCase(sp, async (nested) => {
         assert.deepEqual(await applyGoalCutoverPlan(nested, plan), {
+          queueCompletionsUpdated: 1,
           referencesUpdated: 2,
           goalsUpdated: 1,
           recallSettingsInserted: 1,
           alreadyApplied: 0,
+        });
+        const [linkedQueue] =
+          await nested`SELECT to_jsonb(q) AS row FROM public.daily_practice_queue q WHERE id = ${queueId}`;
+        assert.deepEqual(linkedQueue.row, {
+          ...plan.queueCompletions.updates[0].expected.row,
+          displayed_practice_record_id: eventId,
         });
         const [goal] =
           await nested`SELECT last_modified_at::text AS stamp, name, base_intervals
@@ -124,10 +145,11 @@ try {
         const logs =
           await nested`SELECT * FROM public.sync_change_log ORDER BY table_name`;
         assert.deepEqual(await applyGoalCutoverPlan(nested, plan), {
+          queueCompletionsUpdated: 0,
           referencesUpdated: 0,
           goalsUpdated: 0,
           recallSettingsInserted: 0,
-          alreadyApplied: 4,
+          alreadyApplied: 5,
         });
         assert.deepEqual(
           await nested`SELECT * FROM public.sync_change_log ORDER BY table_name`,
@@ -326,13 +348,66 @@ try {
       });
       assert.equal(
         (await applyGoalCutoverPlan(sp, configuredPlan)).alreadyApplied,
-        4
+        5
       );
+    });
+    await rollbackCase(tx, async (sp) => {
+      await sp`ALTER TABLE public.daily_practice_queue ADD CONSTRAINT cutover_queue_test_reject
+        CHECK (displayed_practice_record_id IS NULL) NOT VALID`;
+      await assert.rejects(
+        applyGoalCutoverPlan(sp, plan),
+        (error) => error.code === "23514"
+      );
+      await assertUnconverted(sp);
+      assert.equal(
+        (
+          await sp`SELECT 1 FROM public.goal_user_settings WHERE user_id = ${userId}`
+        ).length,
+        0
+      );
+    });
+    await rollbackCase(tx, async (sp) => {
+      await sp`INSERT INTO public.practice_record (id, repertoire_ref, tune_ref, practiced, last_modified_at)
+        VALUES (${randomUUID()}, ${repertoireId}, ${tuneId}, '2020-01-01 12:00:00', ${stamp})`;
+      await assert.rejects(
+        applyGoalCutoverPlan(sp, plan),
+        /completion evidence changed or is ambiguous/
+      );
+      await assertUnconverted(sp);
+    });
+    await rollbackCase(tx, async (sp) => {
+      await sp`UPDATE public.daily_practice_queue SET completed_at = null WHERE id = ${queueId}`;
+      await assert.rejects(
+        applyGoalCutoverPlan(sp, plan),
+        /Queue completion changed/
+      );
+      await assertUnconverted(sp);
+    });
+    const wrongCompletion = structuredClone(plan);
+    wrongCompletion.queueCompletions.updates[0].event.key = randomUUID();
+    await assert.rejects(
+      applyGoalCutoverPlan(tx, wrongCompletion),
+      /completion evidence changed/
+    );
+    await assertUnconverted(tx);
+    await rollbackCase(tx, async (sp) => {
+      const queueOnly = {
+        ...plan,
+        goalUpdates: [],
+        recallSettingsInserts: [],
+        references: { updates: [] },
+      };
+      await sp`UPDATE public.practice_record SET quality = 4 WHERE id = ${eventId}`;
+      await assert.rejects(
+        applyGoalCutoverPlan(sp, queueOnly),
+        /completion evidence changed/
+      );
+      await assertUnconverted(sp);
     });
     const oldPlan = { ...plan, version: 2 };
     await assert.rejects(
       applyGoalCutoverPlan(tx, oldPlan),
-      /new version-3 plan/
+      /new version-4 plan/
     );
     await assertUnconverted(tx);
 
@@ -408,6 +483,13 @@ try {
         await other`SET LOCAL lock_timeout = '100ms'`;
         await other`UPDATE public.repertoire_tune SET goal_id = ${recallId}
           WHERE repertoire_ref = ${repertoireId} AND tune_ref = ${tuneId}`;
+      }),
+      (error) => error.code === "55P03"
+    );
+    await assert.rejects(
+      sql.begin(async (other) => {
+        await other`SET LOCAL lock_timeout = '100ms'`;
+        await other`UPDATE public.daily_practice_queue SET completed_at = null WHERE id = ${queueId}`;
       }),
       (error) => error.code === "55P03"
     );

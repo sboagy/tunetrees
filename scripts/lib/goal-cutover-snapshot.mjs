@@ -63,5 +63,12 @@ export async function readGoalCutoverSnapshot(tx) {
     SELECT user_id, repertoire_id, tune_id FROM public.table_transient_data
     ORDER BY user_id, repertoire_id, tune_id
   `;
-  return { users, goals, references, stagedWork };
+  const queueRows = await tx`
+    SELECT r.user_ref AS owner, to_jsonb(q) AS row
+    FROM public.daily_practice_queue q
+    LEFT JOIN public.repertoire r ON r.repertoire_id = q.repertoire_ref
+    WHERE q.active = true
+  `;
+  const queues = queueRows.map(({ owner, row }) => ({ ownerId: owner, row }));
+  return { users, goals, references, stagedWork, queues };
 }
