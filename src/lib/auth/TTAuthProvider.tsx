@@ -1005,6 +1005,9 @@ const TTInner: ParentComponent = (props) => {
               "tune_type",
               "instrument",
               "user_profile",
+              // Queue allocation needs definitions even for device-only users.
+              "goal",
+              "goal_user_settings",
               "user_genre_selection",
               "repertoire",
             ],
@@ -1015,6 +1018,8 @@ const TTInner: ParentComponent = (props) => {
         if (isAnonymousUser && anonymousCatalogSyncRequested()) {
           const catalogTablesOverride = {
             pullTables: [
+              "goal",
+              "goal_user_settings",
               "tune",
               "reference",
               "media_asset",

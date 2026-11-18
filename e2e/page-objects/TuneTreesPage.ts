@@ -4853,15 +4853,23 @@ export class TuneTreesPage {
         return;
       }
 
+      // Retain this DOM node: the first() locator otherwise moves to the next
+      // toast after dismissal and incorrectly waits for that different toast.
+      const closer = await toastCloser.elementHandle();
+      if (!closer) continue;
       try {
-        await toastCloser.click({ timeout: 5_000 });
-      } catch (error) {
-        // A transient toast can expire while Playwright waits for its exit
-        // animation to settle. Disappearance already satisfies dismissal;
-        // a still-visible obstruction must retain the original failure.
-        if (await toastCloser.isVisible()) throw error;
+        try {
+          await closer.click({ timeout: 5_000 });
+        } catch (error) {
+          // Expiration during the click also satisfies dismissal.
+          if (await closer.isVisible()) throw error;
+        }
+        await expect
+          .poll(() => closer.isVisible(), { timeout: 10_000 })
+          .toBe(false);
+      } finally {
+        await closer.dispose();
       }
-      await expect(toastCloser).toBeHidden({ timeout: 5_000 });
     }
   }
 

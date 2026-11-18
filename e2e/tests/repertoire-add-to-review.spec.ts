@@ -1,6 +1,7 @@
 /** Regression coverage for Add To Review feedback and duplicate handling. */
 
 import { expect } from "@playwright/test";
+import { getBuiltInGoals } from "../../src/lib/goals/builtins";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MORRISON_ID,
@@ -15,6 +16,13 @@ test.describe("Repertoire: Add To Review", () => {
   test.beforeEach(async ({ page, testUser }) => {
     await setupForRepertoireTestsParallel(page, testUser, {
       repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MORRISON_ID], // User's 2 private tunes
+      // These tests exercise explicit additions, not Recall's automatic top-up.
+      goalDailySettings: [
+        {
+          goalId: getBuiltInGoals().find((goal) => goal.name === "recall")!.id,
+          daily: { minimum: 0 },
+        },
+      ],
       scheduleTunes: true,
       scheduleDaysAgo: -30,
     });

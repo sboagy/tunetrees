@@ -452,3 +452,32 @@ describe("provider sync completion lifetime", () => {
     expect(mocks.persist).not.toHaveBeenCalled();
   });
 });
+
+describe("anonymous goal downloads", () => {
+  it("includes goal definitions and personal settings in the initial restricted pull", async () => {
+    setUser({ ...user, is_anonymous: true });
+    mount();
+    await started();
+    expect(await workerConfig.requestOverridesProvider()).toMatchObject({
+      pullTables: expect.arrayContaining(["goal", "goal_user_settings"]),
+    });
+  });
+
+  it("includes goal definitions and personal settings in the onboarding catalog pull", async () => {
+    setUser({ ...user, is_anonymous: true });
+    mount();
+    await started();
+    let catalogRequest: unknown;
+    mocks.down.mockImplementationOnce(async () => {
+      catalogRequest = await workerConfig.requestOverridesProvider();
+    });
+    await state.triggerCatalogSync();
+    expect(catalogRequest).toMatchObject({
+      pullTables: expect.arrayContaining([
+        "tune",
+        "goal",
+        "goal_user_settings",
+      ]),
+    });
+  });
+});

@@ -939,3 +939,25 @@ All six Add-to-review cases passed on desktop/mobile after fixture cleanup was
 corrected. The final repertoire-switching rerun passed on both projects (three
 tests including auth setup). No runtime changes were needed for these fixes,
 and no dev/preview servers were restarted. Changes remain uncommitted for review.
+
+## Full-suite regression follow-up — affected suites verified
+
+The developer's full desktop/mobile run on `742dae2b` reported 14 failures across
+three groups. Anonymous starter onboarding omitted goal definitions/settings from
+both restricted download lists; both now include the existing `goal` and
+`goal_user_settings` tables. Two auth lifecycle regressions protect those download
+contracts. This uses existing Worker/schema ownership rules; no migration,
+generated-contract edit, or local shared-goal authoring is involved.
+
+The older Add-to-review feedback suite now explicitly seeds Recall minimum zero,
+as the persistence suite already does, so its future-due tunes remain available
+for manual addition. Toast dismissal now retains the exact close-button DOM node
+through its exit instead of letting a `first()` locator retarget another toast.
+
+All 1,339 unit tests, typecheck, lint, formatting and diff checks pass. After
+1Password authorization, the three affected suites passed on desktop Chromium and
+Mobile Chrome: 27 tests including authentication setup, in 3.5 minutes. This covers
+all 14 previously failing cases; it is not a fresh full-suite E2E run. No servers
+were restarted.
+No commit/push or next-stage implementation has been performed in this follow-up;
+the separately identified CodeRabbit fixes remain pending.

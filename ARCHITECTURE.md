@@ -231,6 +231,10 @@ before invoking the callback is outside this consumer-side guard.
 A service operation may perform an upload/download followed by another download.
 Full-pull completion metadata retains the first full pull's generation across both
 engine requests and resets at the service callback, including failed operations.
+Anonymous onboarding includes `goal` and `goal_user_settings` in both its initial
+restricted pull and its genre-filtered catalog pull, so starter queue allocation
+uses downloaded definitions and personal settings without authoring shared goals locally.
+
 The explicit injected-user test path can initialize local anonymous storage without
 an auth session. Its lifetime expires on unmount, reset or real sign-in; it starts
 no sync service without an authenticated identity. Real sign-in waits for pending
