@@ -1015,3 +1015,74 @@ executes that array in order. With this change the sequence is baseline, current
 goal configuration, then private test tunes. The actual CI checkout script was
 compared with the installed script; no Rhizome change is needed. Repo-wide lint
 and format checks also pass. No actionable CodeRabbit findings remain.
+
+## Versioned scheduler integration: execution contract
+
+The shared QuickJS protocol now accepts `scheduleGoalV1(payload, meta)` as a
+direct function, separate from the legacy numeric-review factory API. It uses
+the existing sandbox, deadlines and error propagation. The real-VM tests verify
+that evaluation identifiers and JSON state pass through, asynchronous results
+settle, and script errors do not invoke the legacy factory. Protocol tests reject
+legacy method dispatch on the new entry point.
+
+The developer confirmed explicit per-goal plugin selection and recoverable errors
+without fallback, and chose plugin-declared compatibility with earlier state.
+`plugins/goal-scheduler.ts` now implements that execution boundary using the real
+sandbox. It first calls `describeGoalSchedulerV1()` for `{ apiVersion: 1,
+stateVersion, compatibleStateVersions, actions }`, then calls `scheduleGoalV1(input)` with
+the same captured script. These are separate VM contexts: declarations must be
+stable for the script and scheduling must not depend on globals set by the
+description call.
+
+The developer also selected named plugin actions for the goal editor. The
+declaration includes a nonempty `actions` list of `{ id, label, description }`.
+Action IDs must be nonempty and unique; labels must be nonempty. Calculation
+rejects a missing selected action before invoking the scheduling function.
+
+Scheduling input includes API version, goal ID, `evaluation: { id, actionId }`, practiced
+ISO timestamp, options, target state version, and `previousState` (null or
+`{ version, data }`). The plugin returns `{ due, state }`: due must be a UTC ISO
+timestamp in `Date.toISOString()` format, and state must be a JSON object.
+Due time is quantized to seconds, and fractional `intervalDays` is derived by the
+host. The bounded state envelope records plugin identity, code version, exact
+script hash, state version and plugin data. The host checks envelope validity;
+the plugin owns semantic validation of its data. Invalid results propagate as
+errors, without producing a replacement schedule.
+
+Only the latest same-goal/same-plugin event is eligible for continuation. The
+manifest must list the current state version as readable and may list earlier
+versions; undeclared versions start fresh. Script changes alone do not reset
+explicitly compatible state. Malformed matching state blocks calculation.
+
+Validation: typecheck, lint and formatting pass; all 80 plugin tests pass,
+including real-VM continuation across code/state versions, goal/plugin isolation,
+script snapshot isolation, invalid dates, payload limits and error propagation.
+Goal configuration, preview/staging/Submit wiring and UI activation remain
+unfinished. That wiring must include exact script/metadata in configuration
+fingerprints, so compatible script edits still invalidate staged previews.
+No schema, live scheduling behavior or UI changed.
+
+CodeRabbit reviewed the execution-contract changes and identified one valid DST
+bug: a local millisecond setter could move a due instant into the earlier
+occurrence of a repeated hour. Quantization now uses the UTC setter. A regression
+test explicitly sets America/New_York and verifies the second occurrence remains
+future and retains its exact interval. The named-action extension was added while
+that review ran and has separate validation/removed-action tests; do not count it
+as independently re-reviewed by CodeRabbit.
+
+### Required legacy-plugin removal checkpoint (within #426 / PR #940)
+
+`src/lib/plugins/scheduling.ts` is transitional and must be removed before this
+PR is considered complete, during activation of the new evaluation/staging/Submit
+flow—not deferred to an unspecified cleanup issue.
+
+- [ ] Replace its active caller in `services/practice-recording.ts` with the
+  goal-aware flow, including explicit plugin selection and recoverable errors.
+- [ ] If legacy `createScheduler` scripts remain supported, isolate only the
+  required API translation in a named adapter with explicit numeric mappings.
+  Do not preserve implicit plugin selection or the old fallback orchestration.
+- [ ] Move relevant behavior coverage to the new executor/adapter and remove
+  obsolete `scheduling-output.test.ts` coverage with the implementation it tests.
+- [ ] Validate evaluation previews, stale-input checks, Submit, plugin failures
+  and persistence on desktop/mobile; then delete `plugins/scheduling.ts` and
+  verify no imports remain. Keep the shared QuickJS runtime.

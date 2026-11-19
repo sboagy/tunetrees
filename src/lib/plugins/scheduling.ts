@@ -1,5 +1,18 @@
 /**
- * Scheduling plugin helpers
+ * LEGACY / TRANSITIONAL scheduling integration, pending removal in #426 / PR #940.
+ * Still used by services/practice-recording.ts: selects plugins implicitly,
+ * passes numeric evaluations and FSRS-shaped records, and supplies a built-in
+ * fallback. Do not add new callers or extend this orchestration.
+ *
+ * Replacement: plugins/goal-scheduler.ts provides the versioned, explicitly
+ * selected goal-plugin executor with plugin-owned JSON state and no fallback.
+ * It is not yet connected to the active preview/staging/Submit flow.
+ *
+ * Delete this module in the #426 activation/cleanup checkpoint once those
+ * callers use the new flow and desktop/mobile regression coverage passes.
+ * Extract only any required legacy API translation into a narrowly scoped
+ * adapter; do not retain this parallel scheduling/fallback implementation.
+ * See docs/development/goals-implementation.md for the removal checklist.
  */
 
 import { sql } from "drizzle-orm";

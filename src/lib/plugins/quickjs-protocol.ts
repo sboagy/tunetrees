@@ -1,4 +1,10 @@
-export type PluginFunctionName = "parseImport" | "createScheduler";
+// The versioned goal entry point is deliberately separate from the legacy
+// factory API: invoking it must never implicitly run a numeric FSRS review.
+export type PluginFunctionName =
+  | "parseImport"
+  | "createScheduler"
+  | "describeGoalSchedulerV1"
+  | "scheduleGoalV1";
 
 export interface InvokeRequest {
   type: "invoke";
@@ -93,7 +99,9 @@ export function isWorkerInput(value: unknown): value is AnyMessage {
   if (value.type === "invoke")
     return (
       typeof value.script === "string" &&
-      ((value.functionName === "parseImport" &&
+      (((value.functionName === "parseImport" ||
+        value.functionName === "describeGoalSchedulerV1" ||
+        value.functionName === "scheduleGoalV1") &&
         value.methodName === undefined) ||
         (value.functionName === "createScheduler" && method(value.methodName)))
     );
@@ -115,7 +123,13 @@ export type PluginInvocation = {
   payload: unknown;
   meta?: unknown;
 } & (
-  | { functionName: "parseImport"; methodName?: never }
+  | {
+      functionName:
+        | "parseImport"
+        | "describeGoalSchedulerV1"
+        | "scheduleGoalV1";
+      methodName?: never;
+    }
   | {
       functionName: "createScheduler";
       methodName: "processFirstReview" | "processReview";

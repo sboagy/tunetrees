@@ -71,6 +71,44 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
       await run('function parseImport() { return {title: "Tune"}; }')
     ).toEqual({ title: "Tune" });
   });
+  it("runs a goal entry point without invoking the legacy scheduler factory", async () => {
+    const result = await executePlugin(
+      runtime,
+      invocation(
+        `
+        function createScheduler() { throw new Error("Legacy API invoked"); }
+        async function scheduleGoalV1(input) {
+          await Promise.resolve();
+          return { evaluationId: input.evaluationId, state: input.state };
+        }
+      `,
+        {
+          functionName: "scheduleGoalV1",
+          payload: { evaluationId: "played-from-memory", state: { step: 2 } },
+        }
+      ),
+      {}
+    );
+    expect(result).toEqual({
+      evaluationId: "played-from-memory",
+      state: { step: 2 },
+    });
+  });
+  it("propagates a goal scheduler error without running a legacy fallback", async () => {
+    await expect(
+      executePlugin(
+        runtime,
+        invocation(
+          `
+      function createScheduler() { return { processReview() { return 7; } }; }
+      function scheduleGoalV1() { throw new Error("Invalid practice state"); }
+    `,
+          { functionName: "scheduleGoalV1" }
+        ),
+        {}
+      )
+    ).rejects.toThrow("Invalid practice state");
+  });
   it("drains a promise without any host bridge calls", async () => {
     expect(
       await run(

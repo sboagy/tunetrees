@@ -189,6 +189,29 @@ describe("worker transport lifetime", () => {
   });
 });
 describe("worker protocol validation", () => {
+  it("accepts the versioned goal entry point", () => {
+    expect(
+      isWorkerInput({
+        type: "invoke",
+        id: 1,
+        functionName: "scheduleGoalV1",
+        script: "",
+        payload: {},
+      })
+    ).toBe(true);
+  });
+  it("rejects legacy method dispatch on the goal entry point", () => {
+    expect(
+      isWorkerInput({
+        type: "invoke",
+        id: 1,
+        functionName: "scheduleGoalV1",
+        methodName: "processReview",
+        script: "",
+        payload: {},
+      })
+    ).toBe(false);
+  });
   it.each([
     null,
     [],

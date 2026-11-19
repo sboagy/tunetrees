@@ -388,6 +388,17 @@ invocations cannot reach its replacement. Plugin failures preserve the practice
 flow's goal-ladder/FSRS fallback. Staging checks request ownership immediately
 before SQLite writes so older evaluations cannot overwrite newer selections.
 
+The sandbox protocol also accepts `describeGoalSchedulerV1` and `scheduleGoalV1`
+for the new goal-aware contract, separate from the legacy `createScheduler`
+factory. `plugins/goal-scheduler.ts` validates the compatibility declaration,
+restricts continuation to the supplied latest event with matching goal/plugin,
+and validates due dates and bounded JSON state. Script errors propagate without
+fallback. The state envelope records plugin identity, code version, script hash
+and state version; only plugin-declared compatible state versions can continue.
+Both calls use a captured script and the existing VM lifecycle and deadlines.
+Goal configuration and preview/staging/Submit/UI wiring remain pending; this
+executor does not yet activate custom scheduling in the new preview path.
+
 The #426 domain foundation lives in `src/lib/goals`: `builtins.ts` holds the
 editable built-in definitions, `config.ts` validates JSON and resolves overrides,
 and `calculate.ts` dispatches pure previews to `fsrs.ts` or `ladder.ts` without
