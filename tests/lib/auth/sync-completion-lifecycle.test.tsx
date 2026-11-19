@@ -608,3 +608,21 @@ it("rejects a returned download failure without publishing a UI refresh", async 
   );
   expect(state.remoteSyncDownCompletionVersion()).toBe(version);
 });
+
+it("does not turn startup skipSync reconciliation into a delayed full pull", async () => {
+  setUser({ ...user, email: "owner-a@example.test" });
+  mocks.selected.mockResolvedValue(["irish"]);
+  mocks.required.mockResolvedValue(["irish", "scottish"]);
+  mount();
+  await started();
+  await workerConfig.onSyncComplete(result);
+  expect(mocks.upsert).toHaveBeenCalledOnce();
+  mocks.selected.mockResolvedValue(["irish", "scottish"]);
+  const version = state.catalogListChanged();
+  await workerConfig.onSyncComplete(result);
+  await waitFor(() =>
+    expect(state.catalogListChanged()).toBeGreaterThan(version)
+  );
+  expect(mocks.up).not.toHaveBeenCalled();
+  expect(mocks.down).not.toHaveBeenCalled();
+});

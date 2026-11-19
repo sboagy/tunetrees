@@ -121,9 +121,11 @@ export async function installSyncErrorGuard(
       // it omits the transport cause. Do not exempt arbitrary "upload failed" logs.
       return (
         detail.startsWith("/api/sync:") &&
-        text.endsWith(
-          "Cannot syncDown while pending changes exist - upload failed. Local data preserved."
-        )
+        text
+          .split("\n", 1)[0]
+          .endsWith(
+            "Cannot syncDown while pending changes exist - upload failed. Local data preserved."
+          )
       );
     });
   };

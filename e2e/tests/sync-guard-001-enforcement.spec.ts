@@ -338,7 +338,7 @@ test("attributes the exact pending-upload failure wrapper to an expected outage"
   end();
   await page.evaluate(() =>
     console.error(
-      "[SyncDiag] initialSyncDown:error attempt=1/3 message=Cannot syncDown while pending changes exist - upload failed. Local data preserved."
+      "[SyncService] Initial syncDown failed: Error: Cannot syncDown while pending changes exist - upload failed. Local data preserved.\n    at SyncService.syncDown (http://sync-guard.test/service.js:1:1)"
     )
   );
   await expect(guard.finish()).resolves.toBeUndefined();

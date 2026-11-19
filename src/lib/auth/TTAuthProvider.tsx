@@ -848,7 +848,9 @@ const TTInner: ParentComponent = (props) => {
 
       const selectionChanged = !arraysEqual(selected, effectiveSelected);
       if (selectionChanged) {
-        pendingCatalogRefresh.add(params.userId);
+        // Startup reconciliation explicitly skips sync; it must not schedule a
+        // delayed full pull that races the user's first interactions.
+        if (!params.skipSync) pendingCatalogRefresh.add(params.userId);
         await genreSelection.upsertUserGenreSelection(
           params.db,
           params.userId,
@@ -871,7 +873,7 @@ const TTInner: ParentComponent = (props) => {
       );
       if (!isCurrent()) return;
 
-      if (purgeResult.tuneIds.length > 0)
+      if (!params.skipSync && purgeResult.tuneIds.length > 0)
         pendingCatalogRefresh.add(params.userId);
 
       if (!params.skipSync && pendingCatalogRefresh.has(params.userId)) {
