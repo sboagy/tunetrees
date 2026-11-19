@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { GoalEditor } from "@/components/user-settings/GoalEditor";
 import { PracticeCalendarSummary } from "@/components/user-settings/PracticeCalendarSummary";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { getPluginsByCapability } from "@/lib/db/queries/plugins";
 import { getBuiltInGoals, getCustomGoalConfig } from "@/lib/goals/builtins";
+import { inspectGoalPlugin } from "@/lib/goals/plugin-settings";
 import {
   createConfiguredGoal,
   deleteConfiguredGoal,
@@ -18,6 +20,12 @@ import {
   type UnavailableGoalSettings,
 } from "@/lib/goals/settings";
 
+const schedulerLabels = {
+  "builtin:fsrs6": "FSRS-6",
+  "builtin:interval-ladder": "Interval ladder",
+  plugin: "Custom scheduler",
+};
+
 /** Edit per-goal configuration and personal overrides. */
 export default function GoalsPage() {
   const {
@@ -26,6 +34,10 @@ export default function GoalsPage() {
     incrementRepertoireListChanged,
     incrementPracticeListStagedChanged,
   } = useAuth();
+  const [plugins, setPlugins] = createSignal<{ id: string; name: string }[]>(
+    []
+  );
+  const [pluginsError, setPluginsError] = createSignal("");
   const [goals, setGoals] = createSignal<GoalSettingsEntry[]>([]);
   const [unavailable, setUnavailable] = createSignal<UnavailableGoalSettings[]>(
     []
@@ -44,6 +56,49 @@ export default function GoalsPage() {
   onCleanup(() => {
     disposed = true;
   });
+  let pluginOwnerDb: ReturnType<typeof localDb>;
+  let pluginOwnerId: string | undefined;
+  const loadPlugins = async () => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (pluginOwnerDb !== db || pluginOwnerId !== userId) {
+      pluginOwnerDb = db;
+      pluginOwnerId = userId;
+      setPlugins([]);
+      setPluginsError("");
+    }
+    if (!db || !userId) {
+      return;
+    }
+    const current = () =>
+      !disposed && localDb() === db && user()?.id === userId;
+    setPluginsError("");
+    try {
+      const rows = await getPluginsByCapability(db, userId, "scheduleGoal");
+      if (current())
+        setPlugins(
+          rows
+            .map(({ id, name }) => ({ id, name }))
+            .sort(
+              (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+            )
+        );
+    } catch {
+      if (current())
+        setPluginsError(
+          "Could not load custom schedulers. Retry to refresh the available choices."
+        );
+    }
+  };
+  const inspectPlugin = async (id: string) => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId) throw new Error("Settings are not ready");
+    const selection = await inspectGoalPlugin(db, userId, id);
+    if (disposed || localDb() !== db || user()?.id !== userId)
+      throw new Error("The settings session changed. Reopen Goals.");
+    return selection;
+  };
   const refresh = () => {
     const db = localDb();
     const userId = user()?.id;
@@ -53,6 +108,7 @@ export default function GoalsPage() {
         : { entries: [], unavailable: [] };
     setGoals(catalog.entries);
     setUnavailable(catalog.unavailable);
+    void loadPlugins();
   };
   createEffect(() => {
     // refresh() reads the auth user and database synchronously, tracking both.
@@ -71,7 +127,8 @@ export default function GoalsPage() {
   const perform = async (
     operation: (
       db: NonNullable<ReturnType<typeof localDb>>,
-      userId: string
+      userId: string,
+      isCurrent: () => boolean
     ) => Promise<void>
   ) => {
     const db = localDb();
@@ -85,7 +142,7 @@ export default function GoalsPage() {
     setError("");
     setCanRetryPersistence(false);
     try {
-      await operation(db, userId);
+      await operation(db, userId, current);
       if (!current()) return;
       incrementRepertoireListChanged();
       incrementPracticeListStagedChanged();
@@ -135,6 +192,18 @@ export default function GoalsPage() {
         </p>
       </div>
       <PracticeCalendarSummary />
+      <Show when={pluginsError()}>
+        <div role="alert" class="space-y-2 text-sm text-destructive">
+          <p>{pluginsError()}</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void loadPlugins()}
+          >
+            Retry
+          </Button>
+        </div>
+      </Show>
       <Show when={error()}>
         <div role="alert" class="space-y-2 text-sm text-destructive">
           <p>{error()}</p>
@@ -195,10 +264,8 @@ export default function GoalsPage() {
                     {entry.effective.description}
                   </p>
                   <p class="text-xs text-muted-foreground">
-                    {entry.effective.config.scheduler.id === "builtin:fsrs6"
-                      ? "FSRS-6"
-                      : "Interval ladder"}{" "}
-                    · Daily {entry.effective.config.daily.minimum}–
+                    {schedulerLabels[entry.effective.config.scheduler.id]} ·
+                    Daily {entry.effective.config.daily.minimum}–
                     {entry.effective.config.daily.maximum || "Unlimited"}
                     <Show when={entry.overridden}> · Personalized</Show>
                   </p>
@@ -218,10 +285,15 @@ export default function GoalsPage() {
               <Show when={editing()?.row.id === entry.row.id}>
                 <GoalEditor
                   initial={entry.effective}
+                  plugins={plugins()}
+                  onInspectPlugin={inspectPlugin}
                   onCancel={() => setEditing(undefined)}
-                  onSave={(definition) =>
-                    perform((db, uid) =>
-                      saveGoalSettings(db, uid, entry, definition)
+                  onSave={(definition, reviewedPlugin) =>
+                    perform((db, uid, isCurrent) =>
+                      saveGoalSettings(db, uid, entry, definition, {
+                        isCurrent,
+                        reviewedPlugin,
+                      })
                     )
                   }
                 />
@@ -237,8 +309,10 @@ export default function GoalsPage() {
                           )
                         )
                           report(
-                            perform((db, uid) =>
-                              saveGoalSettings(db, uid, entry, entry.defaults)
+                            perform((db, uid, isCurrent) =>
+                              saveGoalSettings(db, uid, entry, entry.defaults, {
+                                isCurrent,
+                              })
                             )
                           );
                       }}
@@ -325,10 +399,15 @@ export default function GoalsPage() {
               <h4 class="font-medium">New goal</h4>
               <GoalEditor
                 initial={draft.definition}
+                plugins={plugins()}
+                onInspectPlugin={inspectPlugin}
                 onCancel={() => setAdding(undefined)}
-                onSave={(definition) =>
-                  perform((db, uid) =>
-                    createConfiguredGoal(db, uid, draft.id, definition)
+                onSave={(definition, reviewedPlugin) =>
+                  perform((db, uid, isCurrent) =>
+                    createConfiguredGoal(db, uid, draft.id, definition, {
+                      isCurrent,
+                      reviewedPlugin,
+                    })
                   )
                 }
               />

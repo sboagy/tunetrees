@@ -400,8 +400,13 @@ Goal configuration supports explicit plugin IDs/options and named action mapping
 The owner-scoped context resolves only that enabled, visible scheduling plugin
 from local SQLite. Preview fingerprints include its exact script and metadata;
 the existing staging/Submit checks reject intervening edits. The executor now
-feeds these service boundaries, but plugin selection in settings and activation
-of the goal-aware practice UI remain pending.
+feeds these service boundaries. Goals settings offer explicit plugin selection
+and named-action mappings through `goals/plugin-settings.ts`. The editor retains
+a reviewed script/declaration snapshot; Save revalidates the declaration and
+rechecks access, code, goal revision and caller lifetime before a local write.
+Reloading actions preserves existing evaluation identities, labels and options;
+missing actions require an explicit replacement. Activation of the goal-aware
+practice UI remains pending.
 For plugins, the staged calculation hash binds the current input fingerprints
 and checked event content. Submit verifies that receipt and commits the reviewed
 result without executing the script again, allowing nondeterministic plugins.

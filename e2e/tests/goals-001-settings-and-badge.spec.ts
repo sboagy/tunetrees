@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { CATALOG_TUNE_COOLEYS_ID } from "../../src/lib/db/catalog-tune-ids";
 import {
+  seedSchedulingPluginLocally,
   setupDeterministicTestParallel,
   setupForRepertoireTestsParallel,
 } from "../helpers/practice-scenarios";
@@ -135,6 +136,73 @@ test.describe("GOALS-001: Goals settings", () => {
       clearRepertoire: true,
       seedRepertoire: [],
     });
+  });
+
+  test("C: selects named plugin actions and preserves personal labels after offline save", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    const goalName = `custom_scheduler_${test.info().workerIndex}_${Date.now()}`;
+    await seedSchedulingPluginLocally(page, {
+      userId: testUser.userId,
+      name: "Named action scheduler",
+      script: `
+        function describeGoalSchedulerV1() {
+          return { apiVersion: 1, stateVersion: 1, compatibleStateVersions: [1], actions: [
+            { id: "advance", label: "Advance", description: "Review tomorrow" },
+            { id: "repeat", label: "Repeat", description: "Review in six hours" }
+          ] };
+        }
+        function scheduleGoalV1(input) {
+          const hours = input.evaluation.actionId === "repeat" ? 6 : 24;
+          return { due: new Date(Date.parse(input.practiced) + hours * 3600000).toISOString(), state: {} };
+        }
+      `,
+    });
+    await openSettingsTab(page, "goals");
+    await page.getByTestId("goal-add").click();
+    await page.getByTestId("goal-name").fill(goalName);
+    await page
+      .getByTestId("goal-scheduler")
+      .selectOption({ label: "Named action scheduler (custom scheduler)" });
+    await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
+      "Advance",
+      { timeout: 10000 }
+    );
+    await page.getByTestId("goal-choice-label-0").fill("At tempo");
+    await page.getByTestId("goal-choice-action-0").selectOption("repeat");
+    // Inspection loads the sandbox before going offline; saving must still use
+    // the locally stored script and declarations, not contact a remote service.
+    await context.setOffline(true);
+    await page.getByTestId("goal-save").click();
+    await expect(page.getByTestId("goal-editor")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    const row = page.locator("section[data-testid^='goal-panel-']").filter({
+      has: page.getByRole("heading", {
+        name: goalName,
+        exact: true,
+      }),
+    });
+    await expect(row).toContainText("Custom scheduler", { timeout: 10000 });
+    await context.setOffline(false);
+    await page.reload();
+    await openSettingsTab(page, "goals");
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await row.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByTestId("goal-plugin-reload")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
+      "At tempo",
+      { timeout: 10000 }
+    );
+    await expect(page.getByTestId("goal-choice-action-0")).toHaveValue(
+      "repeat",
+      { timeout: 10000 }
+    );
   });
 
   test("A: should create, edit, and delete a user-defined goal", async ({

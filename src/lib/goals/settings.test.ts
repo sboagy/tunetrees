@@ -12,16 +12,20 @@ import {
   dailyPracticeQueue,
   goal,
   goalUserSettings,
+  plugin,
   practiceRecord,
   repertoireTune,
   tableTransientData,
   tune,
 } from "../db/schema";
+import * as pluginRuntime from "../plugins/runtime";
 import { getBuiltInGoals } from "./builtins";
 import { canonicalJson } from "./config";
+import { inspectGoalPlugin } from "./plugin-settings";
 import {
   createConfiguredGoal,
   deleteConfiguredGoal,
+  type EditableGoalDefinition,
   readGoalSettings,
   readGoalSettingsCatalog,
   saveGoalSettings,
@@ -318,4 +322,171 @@ it("blocks deletion for attributed drafts even after assignment changes", async 
     deleteConfiguredGoal(db, "owner", source, recall.id)
   ).rejects.toThrow("pending practice");
   expect(entry(source.row.id)).toBeDefined();
+});
+
+describe("explicit scheduler settings validation", () => {
+  const manifest = {
+    apiVersion: 1,
+    stateVersion: 1,
+    compatibleStateVersions: [1],
+    actions: [
+      { id: "advance", label: "Advance", description: "Review tomorrow" },
+    ],
+  };
+  const pluginDefinition = (): EditableGoalDefinition => ({
+    ...structuredClone(custom),
+    config: {
+      ...structuredClone(custom.config),
+      scheduler: {
+        id: "plugin",
+        version: 1,
+        pluginId: "selected",
+        options: {},
+      },
+      evaluations: [
+        {
+          id: "smooth",
+          label: "Smooth",
+          description: "Played confidently",
+          action: { kind: "plugin", actionId: "advance" },
+        },
+      ],
+    },
+  });
+  beforeEach(() => {
+    db.insert(plugin)
+      .values({
+        id: "selected",
+        userRef: "owner",
+        name: "My scheduler",
+        script: "script-v1",
+        capabilities: '{"scheduleGoal":true}',
+        lastModifiedAt: stamp,
+      })
+      .run();
+    vi.spyOn(pluginRuntime, "runPluginFunction").mockResolvedValue(manifest);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("saves reviewed named actions as personal overrides", async () => {
+    const reviewedPlugin = await inspectGoalPlugin(db, "owner", "selected");
+    const definition = pluginDefinition();
+    await saveGoalSettings(db, "owner", entry(), definition, {
+      reviewedPlugin,
+    });
+    expect(entry().effective).toEqual(definition);
+    expect(pluginRuntime.runPluginFunction).toHaveBeenCalledTimes(2);
+  });
+  it("creates a custom plugin goal with truthful technique metadata", async () => {
+    await createConfiguredGoal(
+      db,
+      "owner",
+      "custom-plugin",
+      pluginDefinition()
+    );
+    expect(entry("custom-plugin").row.defaultTechnique).toBe("plugin:selected");
+    expect(entry("custom-plugin").effective).toEqual(pluginDefinition());
+  });
+  it("rejects a removed named action before writing", async () => {
+    const definition = pluginDefinition();
+    definition.config.evaluations[0].action = {
+      kind: "plugin",
+      actionId: "removed",
+    };
+    await expect(
+      saveGoalSettings(db, "owner", entry(), definition)
+    ).rejects.toThrow("available scheduling effect");
+    expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
+  });
+  it("rejects script changes after the editor reviewed the actions", async () => {
+    const reviewedPlugin = await inspectGoalPlugin(db, "owner", "selected");
+    db.update(plugin).set({ script: "changed-without-version-bump" }).run();
+    await expect(
+      saveGoalSettings(db, "owner", entry(), pluginDefinition(), {
+        reviewedPlugin,
+      })
+    ).rejects.toThrow("plugin changed");
+    expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
+  });
+  it("rejects script changes during sandbox validation", async () => {
+    vi.mocked(pluginRuntime.runPluginFunction).mockImplementationOnce(
+      async () => {
+        db.update(plugin).set({ script: "changed-while-awaiting" }).run();
+        return manifest;
+      }
+    );
+    await expect(
+      createConfiguredGoal(db, "owner", "not-created", pluginDefinition())
+    ).rejects.toThrow("plugin changed");
+    expect(
+      db.select().from(goal).where(eq(goal.id, "not-created")).get()
+    ).toBeUndefined();
+  });
+  it("rejects a settings-session change before the write", async () => {
+    let current = true;
+    vi.mocked(pluginRuntime.runPluginFunction).mockImplementationOnce(
+      async () => {
+        current = false;
+        return manifest;
+      }
+    );
+    await expect(
+      saveGoalSettings(db, "owner", entry(), pluginDefinition(), {
+        isCurrent: () => current,
+      })
+    ).rejects.toThrow("session changed");
+    expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
+  });
+  it("rejects goal edits that arrive during sandbox validation", async () => {
+    vi.mocked(pluginRuntime.runPluginFunction).mockImplementationOnce(
+      async () => {
+        db.update(goal)
+          .set({ displayName: "Incoming edit" })
+          .where(eq(goal.id, recall.id))
+          .run();
+        return manifest;
+      }
+    );
+    await expect(
+      saveGoalSettings(db, "owner", entry(), pluginDefinition())
+    ).rejects.toThrow("settings changed");
+    expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
+  });
+  it("does not silently accept a changed declaration with unchanged code", async () => {
+    const reviewedPlugin = await inspectGoalPlugin(db, "owner", "selected");
+    vi.mocked(pluginRuntime.runPluginFunction).mockResolvedValueOnce({
+      ...manifest,
+      actions: [{ ...manifest.actions[0], description: "Review in a year" }],
+    });
+    await expect(
+      saveGoalSettings(db, "owner", entry(), pluginDefinition(), {
+        reviewedPlugin,
+      })
+    ).rejects.toThrow("actions changed");
+    expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
+  });
+  it.each([{ enabled: 0 }, { userRef: "other", isPublic: 0 }, { deleted: 1 }])(
+    "rejects an unavailable plugin %j",
+    async (changes) => {
+      db.update(plugin).set(changes).run();
+      await expect(
+        saveGoalSettings(db, "owner", entry(), pluginDefinition())
+      ).rejects.toThrow("unavailable");
+      expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
+    }
+  );
+  it("allows an explicitly selected public plugin", async () => {
+    db.update(plugin).set({ userRef: "other", isPublic: 1 }).run();
+    await saveGoalSettings(db, "owner", entry(), pluginDefinition());
+    expect(entry().effective.config.scheduler).toEqual(
+      pluginDefinition().config.scheduler
+    );
+  });
+  it("keeps legacy scripts without a valid declaration from becoming goal schedulers", async () => {
+    vi.mocked(pluginRuntime.runPluginFunction).mockResolvedValueOnce(null);
+    await expect(
+      saveGoalSettings(db, "owner", entry(), pluginDefinition())
+    ).rejects.toThrow("contract object");
+    expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
+  });
 });

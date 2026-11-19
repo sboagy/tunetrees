@@ -13,6 +13,11 @@ import {
   type GoalOverrides,
   resolveGoalDefinition,
 } from "./config";
+import {
+  assertGoalPluginSelection,
+  type GoalPluginSelection,
+  prepareGoalPluginSettings,
+} from "./plugin-settings";
 import { resolveGoalReference } from "./references";
 import { defaultGoalDefinition } from "./resolve";
 
@@ -155,15 +160,40 @@ function currentEntry(
   return current;
 }
 
+export interface GoalSettingsSaveContext {
+  isCurrent?: () => boolean;
+  reviewedPlugin?: GoalPluginSelection;
+}
+
+function assertSaveCurrent(context?: GoalSettingsSaveContext) {
+  if (context?.isCurrent?.() === false)
+    throw new Error(
+      "The settings session changed. Reopen Goals before saving."
+    );
+}
+
 export async function saveGoalSettings(
   db: SqliteDatabase,
   userId: string,
   expected: GoalSettingsEntry,
-  edited: EditableGoalDefinition
+  edited: EditableGoalDefinition,
+  context?: GoalSettingsSaveContext
 ) {
+  assertSaveCurrent(context);
+  const snapshot = structuredClone(expected);
+  const valid = resolveGoalDefinition(edited);
+  currentEntry(db, userId, snapshot);
+  const selection = await prepareGoalPluginSettings(
+    db,
+    userId,
+    valid.config,
+    context?.reviewedPlugin
+  );
   db.transaction((tx) => {
-    const entry = currentEntry(tx, userId, expected);
-    const overrides = canonicalJson(goalOverrides(entry.defaults, edited));
+    assertSaveCurrent(context);
+    if (selection) assertGoalPluginSelection(tx, userId, selection);
+    const entry = currentEntry(tx, userId, snapshot);
+    const overrides = canonicalJson(goalOverrides(entry.defaults, valid));
     const lastModifiedAt = new Date().toISOString();
     tx.insert(goalUserSettings)
       .values({ userId, goalId: entry.row.id, overrides, lastModifiedAt })
@@ -186,9 +216,17 @@ export async function createConfiguredGoal(
   db: SqliteDatabase,
   userId: string,
   id: string,
-  definition: EditableGoalDefinition
+  definition: EditableGoalDefinition,
+  context?: GoalSettingsSaveContext
 ) {
+  assertSaveCurrent(context);
   const valid = resolveGoalDefinition(definition);
+  const selection = await prepareGoalPluginSettings(
+    db,
+    userId,
+    valid.config,
+    context?.reviewedPlugin
+  );
   let defaultTechnique = "base_interval";
   if (valid.config.scheduler.id === "builtin:fsrs6") defaultTechnique = "fsrs";
   if (valid.config.scheduler.id === "plugin")
@@ -207,6 +245,8 @@ export async function createConfiguredGoal(
         : null,
   };
   db.transaction((tx) => {
+    assertSaveCurrent(context);
+    if (selection) assertGoalPluginSelection(tx, userId, selection);
     const existing = tx.select().from(goal).where(eq(goal.id, id)).get();
     if (existing) {
       if (

@@ -171,6 +171,19 @@ function scheduledResult(value: unknown, practiced: Date) {
   return { due: due.toISOString(), intervalDays, data: row.state };
 }
 
+/** Read named actions through the same sandbox and validator used by practice. */
+export async function describeGoalPlugin(plugin: GoalPluginInput["plugin"]) {
+  const { id, name, script } = plugin;
+  return parseGoalPluginManifest(
+    await runPluginFunction({
+      functionName: "describeGoalSchedulerV1",
+      script,
+      payload: null,
+      meta: { pluginId: id, pluginName: name },
+    })
+  );
+}
+
 export async function calculateGoalPlugin(input: GoalPluginInput) {
   // Capture before the first await so script edits or caller mutation cannot mix
   // two definitions within one preview. The staging caller must recheck its DB
@@ -200,9 +213,7 @@ export async function calculateGoalPlugin(input: GoalPluginInput) {
     payload: unknown
   ) =>
     runPluginFunction({ functionName, script: plugin.script, payload, meta });
-  const manifest = parseGoalPluginManifest(
-    await invoke("describeGoalSchedulerV1", null)
-  );
+  const manifest = await describeGoalPlugin(plugin);
   if (
     !manifest.actions.some(
       (action) => action.id === snapshot.evaluation.actionId

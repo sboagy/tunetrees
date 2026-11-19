@@ -1126,3 +1126,60 @@ passes. Settings plugin selection, save-time declaration validation, and active
 practice evaluation/Submit UI activation remain pending. The existing UI still
 uses the transitional orchestration; the removal gate above remains unchecked.
 No local E2E, server restart, migration, deployment, commit or push performed.
+
+
+## Plugin selection and named-action settings checkpoint
+
+Based on `2a02cd29`, the Goals editor now lists enabled owner-visible/public
+scheduling plugins alongside built-in schedulers. Selecting one inspects its
+versioned declaration in the existing sandbox and seeds editable evaluation
+labels/descriptions from its named actions. Reloading a selected plugin retains
+personal labels, evaluation identities and existing options. Removed effects
+remain visibly unavailable and cannot be saved without an explicit replacement.
+Load errors retain the draft and expose Retry; changing scheduler supersedes
+older asynchronous results.
+
+Save/create validate the current declaration, compare the reviewed script and
+manifest, and recheck plugin visibility, the goal revision and auth/DB lifetime
+before the synchronous local write. No declaration/script races silently change
+the reviewed choice. The same declaration parser/executor is reused by settings
+and practice. No schema, generated artifacts or server configuration changed.
+
+Active practice evaluation/Submit integration and removal of transitional
+orchestration remain the next checkpoint. This settings capability alone does
+not activate the new practice pipeline. Plugin-specific options retain existing
+values; defining a custom options form/schema is not part of this batch.
+
+### Feature verification record (Q1)
+
+Tracking destination: this section. Scope: new scheduler picker, named effects,
+load/retry and save validation in Settings → Goals → Edit/Add goal, on the local
+uncommitted branch after `2a02cd29`. Existing desktop/mobile servers reused;
+per-worker E2E fixtures supply one owned versioned scheduler.
+
+- F1/F3/C3/R2: native labeled selects, descriptive action text, semantic classes,
+  persistent errors and stable selectors implemented. Component interaction
+  tests pass for selection, pending-save prevention, load retry, obsolete async
+  results, retained personal choices and unavailable effects.
+- E3/E4/E5: SQLite settings tests pass for script/declaration changes, visibility,
+  stale goal edits and session changes; no writes on validation failure.
+- Browser desktop/mobile persistence/offline coverage: passes on both projects.
+  The existing CRUD and badge tests also passed in the preceding runs. Browser
+  testing exposed an async native-select display bug; explicit option selection
+  now preserves the stored non-first action after declaration loading. The new
+  fixture uses a unique goal name and waits for Save to close the editor before
+  reloading, avoiding matches against goals retained from previous runs.
+- R4/R5/L2/Q2: visual contrast, both themes, 320/768/1280 widths, 200% zoom,
+  assistive technology and keyboard-only flow not yet tested in this checkpoint.
+- Existing Settings shell/editor gaps (E2/E6/F2): per-record save controls,
+  category-wide draft/footer, shared exit guards and field-error focus remain
+  pending the planned goal UI/design-system pass. This batch adds no alternate
+  save surface and does not claim those existing workflows are compliant.
+
+Validation: 1,407 unit tests passed; the 11 editor tests passed again after the
+async option-selection fix. Typecheck, lint, formatting and diff checks pass.
+CodeRabbit completed its uncommitted review with two findings: fixed retention
+of the previous account's plugin choices during an account/DB change; the
+stale-plugin-save concern was already prevented by snapshot checks before and
+inside both save/create transactions, with regression coverage. No server
+restarts, commits or pushes performed in this checkpoint.

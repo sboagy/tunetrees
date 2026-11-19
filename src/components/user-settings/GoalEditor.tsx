@@ -1,5 +1,5 @@
 import { Plus, Save } from "lucide-solid";
-import { createSignal, For, Index, Show } from "solid-js";
+import { createSignal, For, Index, onCleanup, onMount, Show } from "solid-js";
 import { Button } from "@/components/ui/button";
 import { getBuiltInGoals, getCustomGoalConfig } from "@/lib/goals/builtins";
 import {
@@ -8,6 +8,10 @@ import {
   type GoalScheduler,
   resolveGoalDefinition,
 } from "@/lib/goals/config";
+import {
+  type GoalPluginSelection,
+  validateGoalPluginChoices,
+} from "@/lib/goals/plugin-settings";
 import type { EditableGoalDefinition } from "@/lib/goals/settings";
 
 const inputClass =
@@ -192,7 +196,12 @@ function SchedulerFields(props: {
 
 export function GoalEditor(props: {
   initial: EditableGoalDefinition;
-  onSave: (definition: EditableGoalDefinition) => Promise<void>;
+  plugins?: { id: string; name: string }[];
+  onInspectPlugin?: (id: string) => Promise<GoalPluginSelection>;
+  onSave: (
+    definition: EditableGoalDefinition,
+    selection?: GoalPluginSelection
+  ) => Promise<void>;
   onCancel: () => void;
 }) {
   const [definition, setDefinition] = createSignal(
@@ -214,7 +223,74 @@ export function GoalEditor(props: {
         i === index ? { ...choice, ...patch } : choice
       ),
     });
+  const schedulerValue = () => {
+    const scheduler = config().scheduler;
+    return scheduler.id === "plugin"
+      ? `plugin:${scheduler.pluginId}`
+      : scheduler.id;
+  };
+  const [selectedScheduler, setSelectedScheduler] = createSignal(
+    schedulerValue()
+  );
+  const [pluginSelection, setPluginSelection] =
+    createSignal<GoalPluginSelection>();
+  const [pluginPending, setPluginPending] = createSignal(false);
+  const [pluginError, setPluginError] = createSignal("");
+  let pluginRequest = 0;
+  onCleanup(() => {
+    pluginRequest++;
+  });
+
+  const loadPlugin = async (id: string, replaceChoices: boolean) => {
+    const request = ++pluginRequest;
+    setPluginPending(true);
+    setPluginError("");
+    setPluginSelection(undefined);
+    try {
+      if (!props.onInspectPlugin)
+        throw new Error(
+          "Scheduling plugins are not available. Reopen Goals and retry."
+        );
+      const selection = await props.onInspectPlugin(id);
+      if (request !== pluginRequest) return;
+      setPluginSelection(selection);
+      if (replaceChoices) {
+        changeConfig({
+          scheduler: { id: "plugin", version: 1, pluginId: id, options: {} },
+          evaluations: selection.manifest.actions.map((action) => ({
+            id: crypto.randomUUID(),
+            label: action.label,
+            description: action.description,
+            action: { kind: "plugin", actionId: action.id },
+          })),
+        });
+      }
+    } catch (cause) {
+      if (request === pluginRequest)
+        setPluginError(
+          cause instanceof Error
+            ? cause.message
+            : "Could not load scheduling actions. Retry or choose another scheduler."
+        );
+    } finally {
+      if (request === pluginRequest) setPluginPending(false);
+    }
+  };
+  onMount(() => {
+    const scheduler = config().scheduler;
+    if (scheduler.id === "plugin") void loadPlugin(scheduler.pluginId, false);
+  });
   const changeScheduler = (id: string) => {
+    setSelectedScheduler(id);
+    setError("");
+    if (id.startsWith("plugin:")) {
+      void loadPlugin(id.slice(7), id !== schedulerValue());
+      return;
+    }
+    pluginRequest++;
+    setPluginPending(false);
+    setPluginError("");
+    setPluginSelection(undefined);
     const source = getBuiltInGoals().find(
       (item) => item.config.scheduler.id === id
     );
@@ -222,13 +298,34 @@ export function GoalEditor(props: {
     const next = getCustomGoalConfig(source.config.scheduler);
     changeConfig({ scheduler: next.scheduler, evaluations: next.evaluations });
   };
+  const choiceValue = (action: EvaluationAction) => {
+    if (action.kind === "fsrs") return String(action.rating);
+    return action.kind === "plugin" ? action.actionId : action.kind;
+  };
+  const pluginActions = () => pluginSelection()?.manifest.actions ?? [];
+  const newAction = (): EvaluationAction => {
+    if (config().scheduler.id === "builtin:fsrs6")
+      return { kind: "fsrs", rating: 3 };
+    if (config().scheduler.id === "plugin")
+      return { kind: "plugin", actionId: pluginActions()[0]?.id ?? "" };
+    return { kind: "stay" };
+  };
   const submit = async (event: Event) => {
     event.preventDefault();
-    if (busy()) return;
+    if (busy() || pluginPending()) return;
     setError("");
     setBusy(true);
     try {
-      await props.onSave(resolveGoalDefinition(definition()));
+      if (selectedScheduler() !== schedulerValue() || pluginError())
+        throw new Error("Load the selected scheduler's actions before saving.");
+      const valid = resolveGoalDefinition(definition());
+      if (valid.config.scheduler.id === "plugin") {
+        const selection = pluginSelection();
+        if (!selection)
+          throw new Error("Load scheduling actions before saving.");
+        validateGoalPluginChoices(valid.config, selection);
+      }
+      await props.onSave(valid, pluginSelection());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -343,17 +440,80 @@ export function GoalEditor(props: {
           <select
             class={inputClass}
             data-testid="goal-scheduler"
-            value={config().scheduler.id}
+            value={selectedScheduler()}
+            aria-describedby="goal-scheduler-help"
             onChange={(e) => changeScheduler(e.currentTarget.value)}
           >
             <option value="builtin:fsrs6">FSRS-6 (memory recall)</option>
             <option value="builtin:interval-ladder">Interval ladder</option>
+            <Show
+              when={
+                selectedScheduler().startsWith("plugin:") &&
+                !(props.plugins ?? []).some(
+                  (plugin) => `plugin:${plugin.id}` === selectedScheduler()
+                )
+              }
+            >
+              <option value={selectedScheduler()} selected>
+                Selected plugin (unavailable)
+              </option>
+            </Show>
+            <For each={props.plugins ?? []}>
+              {(plugin) => (
+                <option
+                  value={`plugin:${plugin.id}`}
+                  selected={selectedScheduler() === `plugin:${plugin.id}`}
+                >
+                  {plugin.name} (custom scheduler)
+                </option>
+              )}
+            </For>
           </select>
         </label>
-        <p class="text-xs text-muted-foreground">
+        <p id="goal-scheduler-help" class="text-sm text-muted-foreground">
           Changing scheduler replaces the evaluation choices below with
           compatible defaults. Changes take effect when you save.
         </p>
+        <Show when={pluginPending()}>
+          <output class="block text-sm text-muted-foreground">
+            Loading scheduling actions… Save is unavailable until they are
+            ready.
+          </output>
+        </Show>
+        <Show when={pluginError()}>
+          <div role="alert" class="space-y-2 text-sm text-destructive">
+            <p>{pluginError()}</p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => changeScheduler(selectedScheduler())}
+            >
+              Retry
+            </Button>
+          </div>
+        </Show>
+        <Show
+          when={
+            selectedScheduler().startsWith("plugin:") &&
+            !pluginPending() &&
+            !pluginError()
+          }
+        >
+          <div class="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Choose one of this scheduler’s named effects for each evaluation.
+              Your labels and explanations remain editable.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="goal-plugin-reload"
+              onClick={() => changeScheduler(selectedScheduler())}
+            >
+              Reload scheduling actions
+            </Button>
+          </div>
+        </Show>
         <Show when={config().scheduler.id} keyed>
           {(_schedulerId) => (
             <SchedulerFields
@@ -400,44 +560,72 @@ export function GoalEditor(props: {
                   <select
                     class={inputClass}
                     data-testid={`goal-choice-action-${index}`}
-                    value={
-                      choice().action.kind === "fsrs"
-                        ? String(
-                            (
-                              choice().action as Extract<
-                                EvaluationAction,
-                                { kind: "fsrs" }
-                              >
-                            ).rating
-                          )
-                        : choice().action.kind
-                    }
+                    value={choiceValue(choice().action)}
                     onChange={(e) => {
                       const value = e.currentTarget.value;
-                      const action: EvaluationAction =
-                        config().scheduler.id === "builtin:fsrs6"
-                          ? {
-                              kind: "fsrs",
-                              rating: Number(value) as 1 | 2 | 3 | 4,
-                            }
-                          : {
-                              kind:
-                                ladderActions.find((item) => item === value) ??
-                                "stay",
-                            };
+                      let action: EvaluationAction;
+                      if (config().scheduler.id === "builtin:fsrs6") {
+                        action = {
+                          kind: "fsrs",
+                          rating: Number(value) as 1 | 2 | 3 | 4,
+                        };
+                      } else if (config().scheduler.id === "plugin") {
+                        action = { kind: "plugin", actionId: value };
+                      } else {
+                        action = {
+                          kind:
+                            ladderActions.find((item) => item === value) ??
+                            "stay",
+                        };
+                      }
                       changeChoice(index, { action });
                     }}
                   >
                     <Show
                       when={config().scheduler.id === "builtin:fsrs6"}
                       fallback={
-                        <For each={ladderActions}>
-                          {(action) => (
-                            <option value={action}>
-                              {actionLabels[action]}
+                        <Show
+                          when={config().scheduler.id === "plugin"}
+                          fallback={
+                            <For each={ladderActions}>
+                              {(action) => (
+                                <option value={action}>
+                                  {actionLabels[action]}
+                                </option>
+                              )}
+                            </For>
+                          }
+                        >
+                          <Show
+                            when={
+                              !pluginActions().some(
+                                (action) =>
+                                  action.id === choiceValue(choice().action)
+                              )
+                            }
+                          >
+                            <option
+                              value={choiceValue(choice().action)}
+                              selected
+                            >
+                              Unavailable effect — choose another
                             </option>
-                          )}
-                        </For>
+                          </Show>
+                          <For each={pluginActions()}>
+                            {(action) => (
+                              // Options arrive asynchronously without changing the saved action.
+                              // Select that action when its option mounts, not the first option.
+                              <option
+                                value={action.id}
+                                selected={
+                                  action.id === choiceValue(choice().action)
+                                }
+                              >
+                                {action.label}
+                              </option>
+                            )}
+                          </For>
+                        </Show>
                       }
                     >
                       <option value="1">Again — failed recall</option>
@@ -446,6 +634,15 @@ export function GoalEditor(props: {
                       <option value="4">Easy — effortless recall</option>
                     </Show>
                   </select>
+                  <Show when={config().scheduler.id === "plugin"}>
+                    <span class="block text-sm text-muted-foreground">
+                      {
+                        pluginActions().find(
+                          (action) => action.id === choiceValue(choice().action)
+                        )?.description
+                      }
+                    </span>
+                  </Show>
                 </label>
                 <Button
                   variant="destructive-ghost"
@@ -477,10 +674,7 @@ export function GoalEditor(props: {
                     id: crypto.randomUUID(),
                     label: "New choice",
                     description: "",
-                    action:
-                      config().scheduler.id === "builtin:fsrs6"
-                        ? { kind: "fsrs", rating: 3 }
-                        : { kind: "stay" },
+                    action: newAction(),
                   },
                 ],
               })
@@ -499,7 +693,11 @@ export function GoalEditor(props: {
           <Button type="button" variant="outline" onClick={props.onCancel}>
             Cancel
           </Button>
-          <Button type="submit" data-testid="goal-save">
+          <Button
+            type="submit"
+            data-testid="goal-save"
+            disabled={pluginPending()}
+          >
             <Save class="size-4" />
             {busy() ? "Saving…" : "Save goal"}
           </Button>
