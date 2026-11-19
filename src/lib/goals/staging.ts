@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
 import { tableTransientData } from "../db/schema";
 import { practiceContextKey, prepareGoalPracticePreview } from "./preview";
-import { readGoalPracticeContext } from "./resolve";
+import { readGoalPracticeContext, readGoalRepertoireSnapshot } from "./resolve";
 
 type StageInput = Parameters<typeof prepareGoalPracticePreview>[1];
 
@@ -102,4 +102,71 @@ export async function stageGoalPracticeEvaluation(
   });
   if (result.status === "staged") await persistDb();
   return result;
+}
+
+/** Clear only the performance draft. Notes/purpose survive, and the completed
+ * queue/event remain untouched so canceling Practice again restores their display.
+ * The caller must invalidate its earlier staging request before calling clear,
+ * including when no draft exists yet. isCurrent belongs to this clear request;
+ * it must not reuse the invalidated staging request's token. */
+export async function clearGoalPracticeEvaluation(
+  db: SqliteDatabase,
+  input: Pick<StageInput, "userId" | "repertoireId" | "tuneId">,
+  isCurrent: () => boolean
+) {
+  if (!isCurrent()) return { status: "superseded" as const };
+  const { members } = readGoalRepertoireSnapshot(
+    db,
+    input.userId,
+    input.repertoireId
+  );
+  if (!members.some(({ assignment }) => assignment.tuneRef === input.tuneId))
+    throw new Error("Tune is not active in this repertoire");
+  const where = practiceDraftWhere(input);
+  const draft = db.select().from(tableTransientData).where(where).get();
+  if (draft) {
+    if (
+      draft.notePrivate === null &&
+      draft.notePublic === null &&
+      draft.purpose === null
+    ) {
+      db.delete(tableTransientData).where(where).run();
+    } else {
+      db.update(tableTransientData)
+        .set({
+          recallEval: null,
+          practiced: null,
+          quality: null,
+          easiness: null,
+          difficulty: null,
+          interval: null,
+          step: null,
+          repetitions: null,
+          due: null,
+          backupPracticed: null,
+          goal: null,
+          technique: null,
+          stability: null,
+          state: null,
+          goalId: null,
+          evaluationId: null,
+          evaluationSnapshot: null,
+          schedulerId: null,
+          schedulerVersion: null,
+          schedulerState: null,
+          intervalDays: null,
+          predecessorRecordId: null,
+          predecessorFingerprint: null,
+          calculationConfigHash: null,
+          practiceRecordId: null,
+          lastModifiedAt: new Date().toISOString(),
+          syncVersion: sql.raw(`${tableTransientData.syncVersion.name} + 1`),
+        })
+        .where(where)
+        .run();
+    }
+  }
+  // Also persist an empty retry after a previous in-memory clear failed to save.
+  await persistDb();
+  return { status: "cleared" as const };
 }

@@ -41,14 +41,21 @@ import {
   orderPracticeHistory,
 } from "../utils/practice-history";
 import { getBuiltInGoals } from "./builtins";
-import { commitGoalPracticeEvaluations, type GoalCommitItem } from "./commit";
+import {
+  commitGoalPracticeEvaluations,
+  type GoalCommitItem,
+  readGoalCommitItems,
+} from "./commit";
 import { canonicalJson } from "./config";
 import {
   practiceContextFingerprints,
   prepareGoalPracticePreview,
 } from "./preview";
 import { readGoalPracticeContext, resolveGoalReference } from "./resolve";
-import { stageGoalPracticeEvaluation } from "./staging";
+import {
+  clearGoalPracticeEvaluation,
+  stageGoalPracticeEvaluation,
+} from "./staging";
 
 vi.mock("../db/client-sqlite", () => ({ persistDb: vi.fn() }));
 
@@ -482,6 +489,20 @@ describe("goal preview staging", () => {
     });
   });
 
+  it("canceling the first pending calculation cannot recreate an absent draft", async () => {
+    let current = true;
+    const pending = stageGoalPracticeEvaluation(db, input(), () => current);
+    expect(draft()).toBeUndefined();
+    // Same request ownership contract as the UI: a new clear request supersedes
+    // the old evaluation before either asynchronous operation can write.
+    current = false;
+    await expect(
+      clearGoalPracticeEvaluation(db, input(), () => true)
+    ).resolves.toEqual({ status: "cleared" });
+    expect(await pending).toEqual({ status: "superseded" });
+    expect(draft()).toBeUndefined();
+  });
+
   it("does not recreate a draft cleared during calculation", async () => {
     await stageGoalPracticeEvaluation(db, input(), () => true);
     duringCalculation(() => raw.run("DELETE FROM table_transient_data"));
@@ -718,6 +739,171 @@ describe("atomic goal practice submission", () => {
   const events = () => db.select().from(practiceRecord).all();
   const drafts = () => db.select().from(tableTransientData).all();
   const queue = () => db.select().from(dailyPracticeQueue).get();
+
+  const capture = (windowStart = stamp) =>
+    readGoalCommitItems(db, {
+      userId: "owner",
+      repertoireId: "rep",
+      windowStart,
+    });
+  const cancel = (isCurrent = () => true) =>
+    clearGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+      },
+      isCurrent
+    );
+
+  it("captures reviewed receipts for only the selected active queue window", async () => {
+    const receipt = await item();
+    expect(capture("2026-11-16 07:00:00-05")).toEqual([receipt]);
+    expect(capture("2026-11-17T12:00:00Z")).toEqual([]);
+    raw.run("UPDATE daily_practice_queue SET active=0");
+    expect(capture()).toEqual([]);
+  });
+
+  it("rejects receipt capture for a different owner", async () => {
+    await item();
+    expect(() =>
+      readGoalCommitItems(db, {
+        userId: "other",
+        repertoireId: "rep",
+        windowStart: stamp,
+      })
+    ).toThrow(/unavailable/);
+  });
+
+  it("rejects clearing a draft through another owner's repertoire", async () => {
+    await item();
+    const before = drafts();
+    await expect(
+      clearGoalPracticeEvaluation(
+        db,
+        {
+          userId: "other",
+          repertoireId: "rep",
+          tuneId: "tune",
+        },
+        () => true
+      )
+    ).rejects.toThrow(/unavailable/);
+    expect(drafts()).toEqual(before);
+  });
+
+  it("captures incomplete legacy ratings so Submit requires review instead of skipping them", async () => {
+    await item();
+    raw.run(
+      "UPDATE table_transient_data SET evaluation_id=NULL, evaluation_snapshot=NULL"
+    );
+    expect(capture()).toHaveLength(1);
+    await expect(submit(capture())).rejects.toThrow(/incomplete preview/);
+    expect(events()).toEqual([]);
+    expect(drafts()).toHaveLength(1);
+  });
+
+  it("keeps a captured receipt independent of subsequent draft changes", async () => {
+    await item();
+    const receipt = capture();
+    raw.run("UPDATE table_transient_data SET recall_eval='again'");
+    expect(receipt[0].draft.recallEval).toBe("good");
+    expect((await submit(receipt)).status).toBe("stale");
+    expect(events()).toEqual([]);
+  });
+
+  it("clears evaluation state while preserving note-only drafts", async () => {
+    await item();
+    raw.run(
+      "UPDATE table_transient_data SET note_private='Private draft', note_public='Public draft', purpose='notes'"
+    );
+    await cancel();
+    expect(drafts()[0]).toMatchObject({
+      notePrivate: "Private draft",
+      notePublic: "Public draft",
+      purpose: "notes",
+      evaluationId: null,
+      evaluationSnapshot: null,
+      schedulerState: null,
+      practiced: null,
+      due: null,
+      practiceRecordId: null,
+      calculationConfigHash: null,
+    });
+    expect(capture()).toEqual([]);
+    raw.run("UPDATE table_transient_data SET recall_eval=''");
+    expect(capture()).toEqual([]);
+  });
+
+  it("does not clear another session's draft after cancellation", async () => {
+    await item();
+    const before = drafts();
+    expect(await cancel(() => false)).toEqual({ status: "superseded" });
+    expect(drafts()).toEqual(before);
+  });
+
+  it("retries persistence after clearing the in-memory draft", async () => {
+    await item();
+    vi.mocked(persistDb).mockRejectedValueOnce(new Error("disk full"));
+    await expect(cancel()).rejects.toThrow("disk full");
+    expect(drafts()).toEqual([]);
+    await expect(cancel()).resolves.toEqual({ status: "cleared" });
+  });
+
+  it.each(["2026-11-16T18:00:00Z", "2026-11-17T12:00:00Z"])(
+    "appends a repeat at %s and preserves the earlier event",
+    async (practiced) => {
+      await submit([await item()]);
+      const first = events()[0];
+      await stageGoalPracticeEvaluation(
+        db,
+        {
+          userId: "owner",
+          repertoireId: "rep",
+          tuneId: "tune",
+          evaluationId: "hard",
+          practiced: new Date(practiced),
+        },
+        () => true
+      );
+      const receipts = capture();
+      expect(receipts[0].draft.practiceRecordId).not.toBe(first.id);
+      expect((await submit(receipts)).status).toBe("committed");
+      expect(events()).toHaveLength(2);
+      expect(events().find((row) => row.id === first.id)).toEqual(first);
+      expect(queue()?.displayedPracticeRecordId).toBe(
+        receipts[0].draft.practiceRecordId
+      );
+      expect(queue()?.exposuresCompleted).toBe(2);
+      await submit(receipts);
+      expect(events()).toHaveLength(2);
+      expect(queue()?.exposuresCompleted).toBe(2);
+    }
+  );
+
+  it("canceling a repeat preserves completion, history and the next due date", async () => {
+    await submit([await item()]);
+    const previousEvents = events();
+    const completed = queue();
+    const assignment = db.select().from(repertoireTune).all();
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "again",
+        practiced: new Date("2026-11-16T18:00:00Z"),
+      },
+      () => true
+    );
+    await cancel();
+    expect(events()).toEqual(previousEvents);
+    expect(queue()).toEqual(completed);
+    expect(db.select().from(repertoireTune).all()).toEqual(assignment);
+    expect(drafts()).toEqual([]);
+  });
 
   describe("explicit goal plugin integration", () => {
     let runtime: QuickJSAsyncRuntime;

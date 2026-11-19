@@ -1183,3 +1183,44 @@ of the previous account's plugin choices during an account/DB change; the
 stale-plugin-save concern was already prevented by snapshot checks before and
 inside both save/create transactions, with regression coverage. No server
 restarts, commits or pushes performed in this checkpoint.
+
+
+## Active practice integration preparation
+
+The settings checkpoint was committed and pushed as `80736ffc`; the developer
+confirmed full local E2E passed. Issue #426 and PR #940 checklists now distinguish
+completed settings/domain integration from pending active practice UI integration.
+
+The new Submit boundary no longer imports legacy recording orchestration merely
+for manual-schedule preservation: both paths use the unchanged shared policy in
+`services/scheduled-override.ts`. No runtime scheduling behavior changed in this
+extraction. The active picker, staging and Submit paths are still legacy. The approved UI keeps the existing in-row picker and Submit layout. A completed
+evaluation retains its label and gains a dropdown indicator; its small menu offers
+Practice again, which restores the existing picker. No new dialog, permanent
+preview block or scope change is intended. This clarification is also recorded in
+`_notes/426_goals_plan.md` section 5.
+
+
+The next Submit integration now has a queue-scoped receipt reader and an
+owner-checked evaluation-clear operation. Clearing retains notes/purpose while
+removing scheduling state and the prospective event ID. It leaves submitted
+history, completion/display links and current due dates untouched. Persistence
+can be retried after an in-memory clear. Neither helper is connected to the
+active legacy practice UI yet; the integration must switch picker choices,
+staging and Submit together rather than send new evaluation IDs into the old
+FSRS-only path.
+
+Regression coverage includes selected queue/date and owner scope, stale captured
+receipts, preserved note-only drafts, canceled request lifetimes, persistence
+retry, same-day/later-day repeat event identity, exact repeat submission retries,
+and cancellation restoring the prior completed state without rewriting history.
+
+
+CodeRabbit completed the local review and raised one cancellation-contract
+question. The caller must invalidate pending staging before clearing, even if no
+draft has been written yet. This is now explicit in the clear API documentation
+and covered by a first-evaluation cancellation regression. The UI integration
+must retain its per-tune request-token invalidation; a database delete alone is
+not cancellation. Full unit verification, typecheck, lint, formatting and diff
+checks pass. No browser rerun was performed for these currently disconnected
+service changes. No commit or push in this preparation batch.

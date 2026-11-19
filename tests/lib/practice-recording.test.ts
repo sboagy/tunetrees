@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldClearConsumedScheduledOverride } from "../../src/lib/services/practice-recording";
+import { shouldClearConsumedScheduledOverride } from "../../src/lib/services/scheduled-override";
 
 describe("shouldClearConsumedScheduledOverride", () => {
   it("clears an unchanged override that already scheduled the current queue row", () => {

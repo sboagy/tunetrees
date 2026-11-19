@@ -8,7 +8,7 @@ import {
   tableTransientData,
 } from "../db/schema";
 import { parseGoalPluginState } from "../plugins/goal-scheduler";
-import { shouldClearConsumedScheduledOverride } from "../services/practice-recording";
+import { shouldClearConsumedScheduledOverride } from "../services/scheduled-override";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import { nonFsrsCompatibility } from "./calculate";
 import { practiceEventContent as eventContent } from "./practice-event-content";
@@ -44,6 +44,47 @@ export interface GoalCommitItem {
   queueRowId: string;
   /** Retain the reviewed snapshot for exact retries after the local draft is removed. */
   draft: Draft;
+}
+
+/** Capture the selected queue's reviewed drafts, not drafts from other dates or
+ * hidden queues. Retain this receipt for persistence retries after Submit. */
+export function readGoalCommitItems(
+  db: SqliteDatabase,
+  input: { userId: string; repertoireId: string; windowStart: string }
+): GoalCommitItem[] {
+  readGoalRepertoireSnapshot(db, input.userId, input.repertoireId);
+  const windowStart = normalizePracticeTimestamp(input.windowStart);
+  const rows = db
+    .select({ queue: dailyPracticeQueue, draft: tableTransientData })
+    .from(dailyPracticeQueue)
+    .innerJoin(
+      tableTransientData,
+      and(
+        eq(tableTransientData.userId, dailyPracticeQueue.userRef),
+        eq(tableTransientData.repertoireId, dailyPracticeQueue.repertoireRef),
+        eq(tableTransientData.tuneId, dailyPracticeQueue.tuneRef)
+      )
+    )
+    .where(
+      and(
+        eq(dailyPracticeQueue.userRef, input.userId),
+        eq(dailyPracticeQueue.repertoireRef, input.repertoireId),
+        eq(dailyPracticeQueue.active, 1)
+      )
+    )
+    .all();
+  return rows
+    .filter(
+      ({ queue, draft }) =>
+        normalizePracticeTimestamp(queue.windowStartUtc) === windowStart &&
+        Boolean(draft.evaluationId || draft.recallEval || draft.practiced)
+    )
+    .sort(
+      (a, b) =>
+        a.queue.orderIndex - b.queue.orderIndex ||
+        a.queue.id.localeCompare(b.queue.id)
+    )
+    .map(({ queue, draft }) => ({ queueRowId: queue.id, draft }));
 }
 
 const requiredDraftFields = [

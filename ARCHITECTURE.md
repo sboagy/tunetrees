@@ -533,7 +533,9 @@ serializes inserts sharing a practice natural key, rejects different event UUIDs
 that key when either event uses the new format, and permits only transport metadata
 updates to submitted new-format events. Legacy-only upserts remain compatible.
 The same event UUID/content can be retried. `src/lib/goals/commit.ts` implements the
-new-format batch Submit boundary, currently disconnected from the UI. It validates
+new-format batch Submit boundary, currently disconnected from the UI. The shared
+manual-schedule consumption policy lives in `services/scheduled-override.ts`, so
+this boundary does not import legacy recording/plugin orchestration. It validates
 reviewed draft receipts against current predecessor/configuration, then synchronously
 rechecks ownership, queue and draft snapshots before atomically writing events,
 current due dates, queue completion/display links and draft removal. Stale previews
