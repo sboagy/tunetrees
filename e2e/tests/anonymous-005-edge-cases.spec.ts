@@ -11,7 +11,8 @@
  * - Development server running on ${BASE_URL}
  */
 
-import { test as base, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test as base } from "../helpers/sync-test";
 import { getRequiredTestPassword } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 import { BASE_URL } from "../test-config";

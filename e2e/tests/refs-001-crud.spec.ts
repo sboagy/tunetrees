@@ -1,3 +1,4 @@
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 // spec: e2e/tests/notes-references-test-plan.md
 
 import { expect } from "@playwright/test";
@@ -263,13 +264,13 @@ test.describe("REFS-001: References CRUD Operations", () => {
       fileName: "offline-draft.mp3",
     });
     await saveMockGoogleStorageSettings(page);
-    await context.setOffline(true);
+    await setOfflineForTest(context, true);
     await ttPage.referenceSubmitButton.click();
     await expect(page.getByTestId("byos-queued-upload")).toContainText(
       "offline-draft",
       { timeout: 10000 }
     );
-    await context.setOffline(false);
+    await setOfflineForTest(context, false);
     await expect(ttPage.referencesList).toContainText("offline-draft", {
       timeout: 20000,
     });

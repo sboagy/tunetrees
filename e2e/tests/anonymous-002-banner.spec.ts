@@ -12,7 +12,8 @@
  * - Development server running on ${BASE_URL}
  */
 
-import { test as base, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test as base } from "../helpers/sync-test";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 // Override the base test to NOT use stored auth state (we need fresh sessions)

@@ -21,6 +21,7 @@ import {
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 import {
   getSyncOutboxCount,
   triggerManualSync,
@@ -216,7 +217,7 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
     page,
   }) => {
     const currentUrl = page.url();
-    await page.context().setOffline(false);
+    await setOfflineForTest(page.context(), false);
     await waitForServiceWorker(page.context(), currentUrl);
 
     // Go offline

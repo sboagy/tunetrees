@@ -5,6 +5,7 @@ import {
   setupDeterministicTestParallel,
   setupForRepertoireTestsParallel,
 } from "../helpers/practice-scenarios";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -196,7 +197,7 @@ test.describe("GOALS-001: Goals settings", () => {
     await page.getByTestId("goal-choice-action-0").selectOption("repeat");
     // Inspection loads the sandbox before going offline; saving must still use
     // the locally stored script and declarations, not contact a remote service.
-    await context.setOffline(true);
+    await setOfflineForTest(context, true);
     await page.getByTestId("goal-save").click();
     await expect(page.getByTestId("goal-editor")).toHaveCount(0, {
       timeout: 10000,
@@ -209,7 +210,7 @@ test.describe("GOALS-001: Goals settings", () => {
       }),
     });
     await expect(row).toContainText("Custom scheduler", { timeout: 10000 });
-    await context.setOffline(false);
+    await setOfflineForTest(context, false);
     await page.reload();
     await openSettingsTab(page, "goals");
     await expect(row).toBeVisible({ timeout: 10000 });

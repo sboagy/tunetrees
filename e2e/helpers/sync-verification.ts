@@ -247,7 +247,12 @@ export async function waitForSync(
       log.info(`📦 Pending sync items: ${JSON.stringify(pendingItems)}`);
     }
 
-    if (count === 0) {
+    if (
+      count === 0 &&
+      syncSuccess === "true" &&
+      syncErrorCount === "0" &&
+      !syncErrorSummary
+    ) {
       zeroStableMs += pollInterval;
       stalledCountMs = 0;
       idleWithPendingMs = 0;

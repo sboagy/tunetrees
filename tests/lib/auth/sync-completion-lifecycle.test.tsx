@@ -11,6 +11,7 @@ type TestUser = {
   id: string;
   email?: string;
   is_anonymous: boolean;
+  app_metadata?: Record<string, unknown>;
   user_metadata: Record<string, string>;
 };
 type Completion = {
@@ -153,6 +154,8 @@ beforeEach(() => {
   mocks.initialize.mockResolvedValue(db);
   mocks.selectRows.mockResolvedValue([]); // New profile keeps initial sync pending.
   mocks.insert.mockResolvedValue(undefined);
+  mocks.down.mockResolvedValue(result);
+  mocks.up.mockResolvedValue(result);
   mocks.repair.mockResolvedValue({});
   mocks.snapshot.mockResolvedValue(undefined);
   mocks.close.mockResolvedValue(undefined);
@@ -470,14 +473,138 @@ describe("anonymous goal downloads", () => {
     let catalogRequest: unknown;
     mocks.down.mockImplementationOnce(async () => {
       catalogRequest = await workerConfig.requestOverridesProvider();
+      return result;
     });
     await state.triggerCatalogSync();
     expect(catalogRequest).toMatchObject({
       pullTables: expect.arrayContaining([
         "tune",
+        "user_profile",
+        "note",
+        "reference",
         "goal",
         "goal_user_settings",
       ]),
     });
   });
+});
+
+describe("manual sync uploads", () => {
+  beforeEach(() => setUser({ ...user, email: "owner-a@example.test" }));
+  it("keeps anonymous actions local without publishing a sync completion", async () => {
+    setUser({ ...user, is_anonymous: true });
+    mount();
+    await started();
+    const version = state.remoteSyncDownCompletionVersion();
+    await state.forceSyncUp();
+    expect(mocks.up).not.toHaveBeenCalled();
+    expect(state.remoteSyncDownCompletionVersion()).toBe(version);
+    expect(state.localDb()).toBe(db);
+  });
+
+  it("uploads registered users' changes and publishes successful completion", async () => {
+    mocks.up.mockResolvedValueOnce(result);
+    mount();
+    await started();
+    const version = state.remoteSyncDownCompletionVersion();
+    await state.forceSyncUp({ allowDeletes: true });
+    expect(mocks.up).toHaveBeenCalledWith({ allowDeletes: true });
+    expect(state.remoteSyncDownCompletionVersion()).toBe(version + 1);
+  });
+
+  it("rejects returned upload failures without publishing successful completion", async () => {
+    mocks.up.mockResolvedValueOnce({
+      ...result,
+      success: false,
+      errors: ["Upload rejected"],
+    });
+    mount();
+    await started();
+    const version = state.remoteSyncDownCompletionVersion();
+    await expect(state.forceSyncUp()).rejects.toThrow("Upload rejected");
+    expect(state.remoteSyncDownCompletionVersion()).toBe(version);
+  });
+
+  it("rejects a failed result after retrying an in-progress upload", async () => {
+    mocks.up.mockRejectedValueOnce(
+      Object.assign(new Error("Busy"), { name: "SyncInProgressError" })
+    );
+    mocks.up.mockResolvedValueOnce({
+      ...result,
+      success: false,
+      errors: ["Retry rejected"],
+    });
+    mount();
+    await started();
+    await expect(state.forceSyncUp()).rejects.toThrow("Retry rejected");
+    expect(mocks.up).toHaveBeenCalledTimes(2);
+  });
+});
+
+it("skips uploads for restored anonymous metadata", async () => {
+  setUser({
+    ...user,
+    email: "restored@example.test",
+    app_metadata: { is_anonymous: true },
+  });
+  mount();
+  await started();
+  await state.forceSyncUp();
+  expect(mocks.up).not.toHaveBeenCalled();
+});
+
+it("retries catalog download after a failed upload even when selection is already saved", async () => {
+  setUser({ ...user, email: "owner-a@example.test" });
+  mocks.selected.mockResolvedValue(["irish"]);
+  mocks.required.mockResolvedValue(["irish"]);
+  mount();
+  await started();
+  await workerConfig.onSyncComplete(result);
+  mocks.required.mockResolvedValue(["irish", "scottish"]);
+  mocks.up.mockResolvedValueOnce({
+    ...result,
+    success: false,
+    errors: ["Upload rejected"],
+  });
+  await workerConfig.onSyncComplete(result);
+  await waitFor(() => expect(mocks.up).toHaveBeenCalledOnce());
+  expect(mocks.down).not.toHaveBeenCalled();
+  mocks.selected.mockResolvedValue(["irish", "scottish"]);
+  await workerConfig.onSyncComplete(result);
+  await waitFor(() => expect(mocks.down).toHaveBeenCalledOnce());
+  expect(mocks.up).toHaveBeenCalledTimes(2);
+});
+
+it("publishes transport results before asynchronous completion work resumes", async () => {
+  mount();
+  await started();
+  const gate = deferred<{ id: string }[]>();
+  mocks.selectRows.mockReturnValueOnce(gate.promise);
+  const oldCompletion = workerConfig.onSyncComplete(result);
+  await waitFor(() => expect(mocks.selectRows).toHaveBeenCalledTimes(2));
+  await workerConfig.onSyncComplete({
+    ...result,
+    success: false,
+    errors: ["New failure"],
+  });
+  gate.resolve([{ id: user.id }]);
+  await oldCompletion;
+  const marker = document.querySelector("[data-sync-result-version]");
+  expect(marker?.getAttribute("data-sync-result-version")).toBe("2");
+  expect(marker?.getAttribute("data-sync-success")).toBe("false");
+});
+
+it("rejects a returned download failure without publishing a UI refresh", async () => {
+  mocks.down.mockResolvedValueOnce({
+    ...result,
+    success: false,
+    errors: ["Download rejected"],
+  });
+  mount();
+  await started();
+  const version = state.remoteSyncDownCompletionVersion();
+  await expect(state.forceSyncDown({ full: true })).rejects.toThrow(
+    "Download rejected"
+  );
+  expect(state.remoteSyncDownCompletionVersion()).toBe(version);
 });

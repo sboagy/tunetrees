@@ -14,6 +14,7 @@ import {
   submitAndWaitForPracticeSettled,
 } from "../helpers/practice-view";
 import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -161,7 +162,7 @@ test.describe("Fluency scheduling", () => {
         payload: {},
       })
     );
-    await context.setOffline(true);
+    await setOfflineForTest(context, true);
     await selectEvaluation(page, "smooth");
     await submitAndWaitForPracticeSettled(page, tt);
     const record = await queryLatestPracticeRecord(
@@ -175,7 +176,7 @@ test.describe("Fluency scheduling", () => {
       evaluation_id: "smooth",
       interval_days: 0.25,
     });
-    await context.setOffline(false);
+    await setOfflineForTest(context, false);
     await runTestHook(page, "__forceSyncUpForTest");
     // Await the exact event's server acknowledgment, not unrelated outbox entries.
     await expect

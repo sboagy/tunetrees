@@ -234,6 +234,17 @@ engine requests and resets at the service callback, including failed operations.
 Anonymous onboarding includes `goal` and `goal_user_settings` in both its initial
 restricted pull and its genre-filtered catalog pull, so starter queue allocation
 uses downloaded definitions and personal settings without authoring shared goals locally.
+The catalog pull also includes `user_profile`, because public notes and references
+require their authors as foreign-key parents after genre selection. Anonymous
+sessions download only: `forceSyncUp` skips uploads for device-only actions without
+publishing a sync completion. For registered users, it propagates unsuccessful
+upload results as errors, including after an in-progress-operation retry. Catalog
+reconciliation retains its pending refresh across failed attempts, including when
+the local selection has already been saved. Reconciliation is serialized per user
+and retried after successful sync callbacks rather than immediately looping on errors.
+A separate `data-sync-result-version` is published with status at transport callback
+entry, before asynchronous reconciliation. The existing UI refresh version remains
+separate, so delayed UI callbacks cannot report recovery from newer sync failures.
 
 The explicit injected-user test path can initialize local anonymous storage without
 an auth session. Its lifetime expires on unmount, reset or real sign-in; it starts

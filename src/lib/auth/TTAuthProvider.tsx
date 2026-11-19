@@ -466,6 +466,7 @@ const TTInner: ParentComponent = (props) => {
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
   const [remoteSyncDownCompletionVersion, setRemoteSyncDownCompletionVersion] =
     createSignal(0);
+  const [syncResultVersion, setSyncResultVersion] = createSignal(0);
   const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
   const [catalogSyncPending, setCatalogSyncPending] = createSignal(false);
   const [anonymousCatalogSyncRequested, setAnonymousCatalogSyncRequested] =
@@ -522,6 +523,8 @@ const TTInner: ParentComponent = (props) => {
 
   // Catalog reconciliation tracking
   let catalogSelectionReconciledKey: string | null = null;
+  const pendingCatalogRefresh = new Set<string>();
+  const catalogReconciliations = new Set<string>();
   let reconcileRunCount = 0;
   const RECONCILE_CHECK_INTERVAL = 10;
 
@@ -765,7 +768,8 @@ const TTInner: ParentComponent = (props) => {
     isCurrent: () => boolean;
   }) => {
     const { isCurrent } = params;
-    if (!isCurrent()) return;
+    if (!isCurrent() || catalogReconciliations.has(params.userId)) return;
+    catalogReconciliations.add(params.userId);
     try {
       const [genreSelection, genreQueries] = await Promise.all([
         import("@/lib/db/queries/user-genre-selection"),
@@ -821,6 +825,7 @@ const TTInner: ParentComponent = (props) => {
       ].join("|");
 
       const shouldReconcile =
+        pendingCatalogRefresh.has(params.userId) ||
         catalogSelectionReconciledKey !== reconcileKey ||
         reconcileRunCount % RECONCILE_CHECK_INTERVAL === 0;
 
@@ -843,6 +848,7 @@ const TTInner: ParentComponent = (props) => {
 
       const selectionChanged = !arraysEqual(selected, effectiveSelected);
       if (selectionChanged) {
+        pendingCatalogRefresh.add(params.userId);
         await genreSelection.upsertUserGenreSelection(
           params.db,
           params.userId,
@@ -865,15 +871,17 @@ const TTInner: ParentComponent = (props) => {
       );
       if (!isCurrent()) return;
 
-      if (!params.skipSync) {
-        if (selectionChanged && !params.isAnonymousUser) {
+      if (purgeResult.tuneIds.length > 0)
+        pendingCatalogRefresh.add(params.userId);
+
+      if (!params.skipSync && pendingCatalogRefresh.has(params.userId)) {
+        if (!params.isAnonymousUser) {
           await forceSyncUp({ allowDeletes: true }, isCurrent);
           if (!isCurrent()) return;
         }
-        if (selectionChanged || purgeResult.tuneIds.length > 0) {
-          await forceSyncDown({ full: true }, isCurrent);
-          if (!isCurrent()) return;
-        }
+        await forceSyncDown({ full: true }, isCurrent);
+        if (!isCurrent()) return;
+        pendingCatalogRefresh.delete(params.userId);
       }
 
       incrementCatalogListChanged();
@@ -882,6 +890,8 @@ const TTInner: ParentComponent = (props) => {
         "[TTAuthProvider] Failed to reconcile catalog genre selection:",
         error
       );
+    } finally {
+      catalogReconciliations.delete(params.userId);
     }
   };
 
@@ -1018,6 +1028,9 @@ const TTInner: ParentComponent = (props) => {
         if (isAnonymousUser && anonymousCatalogSyncRequested()) {
           const catalogTablesOverride = {
             pullTables: [
+              // Public notes/references require their authors as FK parents.
+              // The initial metadata pull precedes the selected catalog genres.
+              "user_profile",
               "goal",
               "goal_user_settings",
               "tune",
@@ -1197,6 +1210,10 @@ const TTInner: ParentComponent = (props) => {
           affectedTables: result?.affectedTables ?? [],
           timestamp: result?.timestamp ?? null,
         });
+        // Publish transport completion before any asynchronous reconciliation. UI refresh
+        // callbacks can finish out of order and must not impersonate a newer sync result.
+        recordSyncStatus(result);
+        setSyncResultVersion((previous) => previous + 1);
         const completedPullMode = completionPullMode;
         const completedPullGeneration = completionPullGeneration;
         completionPullMode = null;
@@ -1225,8 +1242,6 @@ const TTInner: ParentComponent = (props) => {
         if (!isCurrentSync()) return;
         const isFirstSyncCompletion = !firstSyncCompletionHandled;
         if (isFirstSyncCompletion) firstSyncCompletionHandled = true;
-
-        recordSyncStatus(result);
 
         if (!initialSyncComplete()) {
           const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
@@ -1289,7 +1304,7 @@ const TTInner: ParentComponent = (props) => {
           userId: authUserId,
         });
 
-        if (!isFirstSyncCompletion) {
+        if (!isFirstSyncCompletion && result.success) {
           setTimeout(() => {
             if (!isCurrentSync()) return;
             void reconcileCatalogSelection({
@@ -1950,8 +1965,11 @@ const TTInner: ParentComponent = (props) => {
       return;
     }
     try {
+      let result: Awaited<ReturnType<SyncService["syncDown"]>>;
       try {
-        await (opts?.full ? service.forceFullSyncDown() : service.syncDown());
+        result = await (opts?.full
+          ? service.forceFullSyncDown()
+          : service.syncDown());
       } catch (error) {
         if (
           error instanceof SyncInProgressError ||
@@ -1959,12 +1977,17 @@ const TTInner: ParentComponent = (props) => {
         ) {
           await waitForSyncIdle();
           if (!isCurrent() || syncServiceInstance !== service) return;
-          await (opts?.full ? service.forceFullSyncDown() : service.syncDown());
+          result = await (opts?.full
+            ? service.forceFullSyncDown()
+            : service.syncDown());
         } else {
           throw error;
         }
       }
       if (!isCurrent() || syncServiceInstance !== service) return;
+      if (!result.success) {
+        throw new Error(result.errors.join("; ") || "Sync download failed");
+      }
       setRemoteSyncDownCompletionVersion((prev) => prev + 1);
       const ts = service.getLastSyncDownTimestamp();
       if (ts) setLastSyncTimestamp(ts);
@@ -1981,14 +2004,18 @@ const TTInner: ParentComponent = (props) => {
     isCurrent: () => boolean = () => true
   ) => {
     if (!isCurrent()) return;
+    // Device-only actions still save locally; never ask the pull-only service
+    // to upload or manufacture a successful sync completion for that no-op.
+    if (isUserAnonymous(rhizome.user())) return;
     const service = syncServiceInstance;
     if (!service) {
       console.warn("⚠️ [ForceSyncUp] Sync service not available");
       return;
     }
     try {
+      let result: Awaited<ReturnType<SyncService["syncUp"]>>;
       try {
-        await service.syncUp(opts);
+        result = await service.syncUp(opts);
       } catch (error) {
         if (
           error instanceof SyncInProgressError ||
@@ -1996,12 +2023,15 @@ const TTInner: ParentComponent = (props) => {
         ) {
           await waitForSyncIdle();
           if (!isCurrent() || syncServiceInstance !== service) return;
-          await service.syncUp(opts);
+          result = await service.syncUp(opts);
         } else {
           throw error;
         }
       }
       if (!isCurrent() || syncServiceInstance !== service) return;
+      if (!result.success) {
+        throw new Error(result.errors.join("; ") || "Sync upload failed");
+      }
       setRemoteSyncDownCompletionVersion((prev) => prev + 1);
     } catch (error) {
       console.error("❌ [ForceSyncUp] Sync up failed:", error);
@@ -2193,6 +2223,7 @@ const TTInner: ParentComponent = (props) => {
       <div
         data-auth-initialized={!rhizome.loading()}
         data-sync-version={remoteSyncDownCompletionVersion()}
+        data-sync-result-version={syncResultVersion()}
         data-sync-success={
           lastSyncSuccess() === null ? "" : String(lastSyncSuccess())
         }

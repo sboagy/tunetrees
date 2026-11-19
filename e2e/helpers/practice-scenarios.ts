@@ -11,6 +11,7 @@ import log from "loglevel";
 import postgres from "postgres";
 import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../../src/lib/db/catalog-instrument-ids.js";
 import type { DailyGoalSettings } from "../../src/lib/goals/config";
+import { setOfflineForTest } from "./sync-error-guard";
 
 log.setLevel("info");
 
@@ -1221,7 +1222,7 @@ export async function setupDeterministicTestParallel(
   const shouldIsolateSync = isAppUrl(currentUrl);
   let setupSucceeded = false;
   if (shouldIsolateSync) {
-    await page.context().setOffline(true);
+    await setOfflineForTest(page.context(), true);
   }
 
   try {
@@ -1250,7 +1251,7 @@ export async function setupDeterministicTestParallel(
           );
         });
       }
-      await page.context().setOffline(false);
+      await setOfflineForTest(page.context(), false);
     }
   }
 
@@ -1682,7 +1683,7 @@ export async function setupForPracticeTestsParallel(
 
   // Always ensure we're online at the start of setup.
   // Browser-context offline state is sticky across tests within a worker.
-  await page.context().setOffline(false);
+  await setOfflineForTest(page.context(), false);
 
   // Avoid racing the app's sync engine while we clear/seed remote tables.
   const currentUrlBeforeSetup = page.url();
@@ -1691,7 +1692,7 @@ export async function setupForPracticeTestsParallel(
     currentUrlBeforeSetup !== "about:blank" &&
     !currentUrlBeforeSetup.startsWith("data:");
   if (shouldIsolateSync) {
-    await page.context().setOffline(true);
+    await setOfflineForTest(page.context(), true);
   }
 
   try {
@@ -1758,7 +1759,7 @@ export async function setupForPracticeTestsParallel(
     }
   } finally {
     if (shouldIsolateSync) {
-      await page.context().setOffline(false);
+      await setOfflineForTest(page.context(), false);
     }
   }
 
@@ -1940,7 +1941,7 @@ export async function setupForRepertoireTestsParallel(
   log.debug(`🔧 [${user.name}] setupForRepertoireTests Starting...`);
 
   // Ensure online state before setup (offline state is sticky across tests).
-  await page.context().setOffline(false);
+  await setOfflineForTest(page.context(), false);
 
   // 1. Clear practice state
   await clearUserTable(user, "practice_record");

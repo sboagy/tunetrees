@@ -6,12 +6,13 @@
  * evolve without causing broad E2E churn.
  */
 
-import { test as base, expect, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import {
   STARTER_TEMPLATES,
   type StarterRepertoireTemplate,
 } from "../../src/lib/db/starter-repertoire-templates";
 import { waitForPracticeViewSettled } from "../helpers/practice-view";
+import { test as base } from "../helpers/sync-test";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 const test = base.extend({
