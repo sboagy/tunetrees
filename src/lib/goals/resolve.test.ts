@@ -44,9 +44,11 @@ import { getBuiltInGoals } from "./builtins";
 import {
   commitGoalPracticeEvaluations,
   type GoalCommitItem,
+  GoalPracticePersistenceError,
   readGoalCommitItems,
 } from "./commit";
 import { canonicalJson } from "./config";
+import { readPracticeSession } from "./practice-session";
 import {
   practiceContextFingerprints,
   prepareGoalPracticePreview,
@@ -1255,10 +1257,26 @@ describe("atomic goal practice submission", () => {
     );
   });
 
+  it("links the displayed event rather than a newer event and uses the current goal", async () => {
+    const receipt = await item();
+    await submit([receipt]);
+    event("newer", "2026-11-17T12:00:00Z");
+    assign(fluencyId, "fluency");
+    const session = readPracticeSession(db, "owner", "rep", stamp).get("tune");
+    expect(session?.event?.id).toBe(receipt.draft.practiceRecordId);
+    expect(
+      session?.definition.config.evaluations.map((choice) => choice.id)
+    ).toContain("effortless");
+    raw.run("UPDATE repertoire_tune SET deleted = 1");
+    expect(readPracticeSession(db, "owner", "rep", stamp).size).toBe(0);
+  });
+
   it("retries persistence after an already committed local transaction", async () => {
     const receipt = await item();
     vi.mocked(persistDb).mockRejectedValueOnce(new Error("Persistence failed"));
-    await expect(submit([receipt])).rejects.toThrow("Persistence failed");
+    await expect(submit([receipt])).rejects.toThrow(
+      GoalPracticePersistenceError
+    );
     expect(events()).toHaveLength(1);
     expect(drafts()).toEqual([]);
     expect((await submit([receipt])).status).toBe("committed");

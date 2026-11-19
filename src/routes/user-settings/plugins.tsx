@@ -29,7 +29,7 @@ import {
   serializeCapabilities,
 } from "@/lib/plugins/capabilities";
 import { runPluginFunction } from "@/lib/plugins/runtime";
-import { DEFAULT_PLUGIN_SCRIPT } from "@/lib/plugins/scheduling-template";
+import { GOAL_PLUGIN_SCRIPT } from "@/lib/plugins/scheduling-template";
 
 interface PluginDraft {
   id: string;
@@ -397,7 +397,7 @@ const PluginsPage: Component = () => {
         userRef: currentUser.id,
         name: "New Plugin",
         description: "",
-        script: DEFAULT_PLUGIN_SCRIPT,
+        script: GOAL_PLUGIN_SCRIPT,
         capabilities: serializeCapabilities({
           ...DEFAULT_CAPABILITIES,
           goals: DEFAULT_GOALS,

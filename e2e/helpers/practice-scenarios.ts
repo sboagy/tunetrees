@@ -112,6 +112,7 @@ export async function seedAddToReviewLocally(
 export async function seedSchedulingPluginLocally(
   page: Page,
   opts?: {
+    goalId?: string;
     script?: string;
     goals?: string[];
     userId?: string;

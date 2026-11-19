@@ -384,8 +384,8 @@ Scheduling plugins run during evaluation, before the staged schedule is written.
 `quickjs-core.ts` owns a separate VM context per invocation, promise-based host
 bridges, guest job draining, and handle cleanup. These use the shared protocol
 in `quickjs-protocol.ts`. A timed-out worker is replaced; replies from its old
-invocations cannot reach its replacement. Plugin failures preserve the practice
-flow's goal-ladder/FSRS fallback. Staging checks request ownership immediately
+invocations cannot reach its replacement. Active practice plugin failures remain
+unsubmitted with a retryable row error; they never substitute a built-in scheduler. Staging checks request ownership immediately
 before SQLite writes so older evaluations cannot overwrite newer selections.
 
 The sandbox protocol also accepts `describeGoalSchedulerV1` and `scheduleGoalV1`
@@ -405,8 +405,8 @@ and named-action mappings through `goals/plugin-settings.ts`. The editor retains
 a reviewed script/declaration snapshot; Save revalidates the declaration and
 rechecks access, code, goal revision and caller lifetime before a local write.
 Reloading actions preserves existing evaluation identities, labels and options;
-missing actions require an explicit replacement. Activation of the goal-aware
-practice UI remains pending.
+missing actions require an explicit replacement. The active practice picker uses
+these effective choices and the goal-aware staging/Submit boundaries.
 For plugins, the staged calculation hash binds the current input fingerprints
 and checked event content. Submit verifies that receipt and commits the reviewed
 result without executing the script again, allowing nondeterministic plugins.
@@ -425,7 +425,7 @@ fractional durations stay outside scheduler state. Legacy learning progress that
 was not stored is initialized to zero with an explicit decoder limitation.
 The existing FSRS service reads its legacy ladder fallback intervals from this
 source. The new calculators feed the guarded staging and Submit boundaries below;
-selected-scheduler activation in the UI remains pending.
+the active UI dispatches through the selected scheduler.
 
 `goals/settings.ts` owns local configuration edits using the same default decoder
 and validation as practice. Built-in and private-goal edits write personal overrides;
@@ -479,8 +479,8 @@ visible through the normal database query. Queue notices expose unavailable-goal
 and minimum shortfalls. Add to
 review creates queue rows directly, without placeholder practice-history events.
 Legacy queue functions remain for test/compatibility callers; they are no longer
-the interactive queue allocation path. Evaluation/staging/Submit activation still
-requires the goal-aware evaluation UI and settings selection integration.
+the interactive queue allocation path. Evaluation, staging and Submit now use
+the goal-aware services.
 
 `preview.ts` calculates from that snapshot and fingerprints its relevant inputs without
 writing. These fingerprints are preparation for, not a substitute for, atomic Submit
@@ -495,16 +495,24 @@ missing. Shared fixtures compare JavaScript, SQLite WASM and Postgres ordering. 
 Postgres practice view already uses the corresponding timestamp/modified/ID order;
 its schema and the sync contract remain unchanged.
 
-`goals/staging.ts` adds the new-format staging boundary, still disconnected from the
-legacy UI/Submit path. It calculates asynchronously, then rechecks the caller lifetime,
+`goals/staging.ts` supplies the active practice staging boundary. It calculates asynchronously, then rechecks the caller lifetime,
 owner-scoped context and original draft in one synchronous SQLite transaction before
 upserting. The synchronous comparison and durable fingerprints share the same input
 projection in `preview.ts`. A changed context returns `stale`; a superseded request
 or changed draft returns `superseded`, without writes. Successful staging preserves
 notes and the pending event UUID, writes complete JSON/compatibility projections and
 persists SQLite. Persistence failures remain visible to the caller with the draft
-retained in memory. Submit performs its own atomic recheck; UI activation must
-wait for cutover conversion and the remaining scheduler/UI integration.
+retained in memory. Submit performs its own atomic recheck. The UI captures only
+selected-queue receipts, blocks overlapping Submit actions, and retains exact
+receipts for a failed persistence retry. A stale input refresh requires another
+Submit; a changed or cleared draft is not overwritten by that refresh.
+
+`goals/practice-session.ts` provides one local queue snapshot for evaluation controls.
+Completed labels use the queue's linked event, while choices use the tune's current
+goal. The shared `PracticeEvaluationCell` serves grid, stacked list and flashcards.
+Its completed-label menu offers Practice again, restoring the existing picker;
+clearing cancels the draft without deleting history or changing the prior completion.
+The active hooks retain per-tune request ownership across asynchronous calculations.
 
 Goal storage now adds nullable display/description/default-config fields and a
 composite `(user_id, goal_id)` settings table. Configurations/overrides use bounded

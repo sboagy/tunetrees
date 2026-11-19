@@ -7,9 +7,8 @@
 
 import { ChevronDown, ChevronRight } from "lucide-solid";
 import { type Component, createEffect, Show } from "solid-js";
-import { getSubmittedEvaluationDisplay } from "./evaluation-display";
 import { GoalBadge } from "./GoalBadge";
-import { RecallEvalComboBox } from "./RecallEvalComboBox";
+import { PracticeEvaluationCell } from "./PracticeEvaluationCell";
 import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 import type { ColumnDef, Table } from "./tanstack-table";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
@@ -1124,8 +1123,7 @@ export function getScheduledColumns(
       accessorFn: (row) => row.recall_eval || "",
       meta: {
         headerLabel: "Evaluation",
-        description:
-          "Your recall rating for this practice (Again/Hard/Good/Easy).",
+        description: "Your evaluation for the tune’s current practice goal.",
       },
       header: () => <StaticHeader title="Evaluation" />,
       enableSorting: false,
@@ -1136,37 +1134,32 @@ export function getScheduledColumns(
         const currentEval = info.getValue() as string;
         const completedAt = row.completed_at;
 
-        // If completed_at is set, show static text (tune already submitted)
-        if (completedAt) {
-          const evaluationDisplay = getSubmittedEvaluationDisplay({
-            latestQuality: row.latest_quality,
-            latestTechnique: row.latest_technique,
-            recallEval: currentEval,
-          });
-
-          return (
-            <span
-              class={`text-sm ${evaluationDisplay.colorClass} italic font-medium`}
-            >
-              {evaluationDisplay.label}
-            </span>
-          );
-        }
-
-        // Otherwise show editable combobox
         return (
-          <RecallEvalComboBox
+          <PracticeEvaluationCell
             tuneId={tuneId}
             value={currentEval}
-            open={callbacks?.getRecallEvalOpen?.(tuneId)}
-            onOpenChange={(isOpen) =>
-              callbacks?.setRecallEvalOpen?.(tuneId, isOpen)
-            }
-            onChange={(value) => {
-              if (callbacks?.onRecallEvalChange) {
-                callbacks.onRecallEvalChange(tuneId, value);
-              }
+            completed={!!completedAt}
+            model={callbacks?.getEvaluationModel?.(tuneId)}
+            legacy={{
+              latestQuality: row.latest_quality,
+              latestTechnique: row.latest_technique,
+              recallEval: currentEval,
             }}
+            open={callbacks?.getRecallEvalOpen?.(tuneId)}
+            onOpenChange={(open) =>
+              callbacks?.setRecallEvalOpen?.(tuneId, open)
+            }
+            onChange={(value) => callbacks?.onRecallEvalChange?.(tuneId, value)}
+            onPracticeAgain={
+              callbacks?.onPracticeAgain
+                ? () => callbacks.onPracticeAgain?.(tuneId)
+                : undefined
+            }
+            onRetry={
+              callbacks?.onRetryEvaluation
+                ? () => callbacks.onRetryEvaluation?.(tuneId)
+                : undefined
+            }
           />
         );
       },

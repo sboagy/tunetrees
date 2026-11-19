@@ -28,7 +28,9 @@ import { TunesGrid } from "./TunesGrid";
 import type { VisibilityState } from "./tanstack-table";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
-export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
+export const TunesGridScheduled: Component<
+  IGridBaseProps & Required<Pick<IGridBaseProps, "getEvaluationModel">>
+> = (props) => {
   // No direct staging here; parent handles DB side-effects.
   const { localDb, repertoireListChanged, remoteSyncDownCompletionVersion } =
     useAuth();
@@ -216,6 +218,9 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           onColumnVisibilityChange={setColumnVisibility}
           cellCallbacks={{
             onRecallEvalChange: handleRecallEvalChange,
+            getEvaluationModel: props.getEvaluationModel,
+            onPracticeAgain: props.onPracticeAgain,
+            onRetryEvaluation: props.onRetryEvaluation,
             getRecallEvalOpen,
             setRecallEvalOpen,
             onGoalChange: props.onGoalChange,

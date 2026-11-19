@@ -18,8 +18,48 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 vi.mock("@/lib/db/client-sqlite", () => ({ persistDb: mocks.persist }));
-vi.mock("@/lib/services/practice-recording", () => ({
-  evaluatePractice: mocks.evaluate,
+vi.mock("@/lib/goals/staging", () => ({
+  stageGoalPracticeEvaluation: async (
+    _db: unknown,
+    input: { tuneId: string; evaluationId: string },
+    current: () => boolean
+  ) => {
+    const result = await mocks.evaluate(_db, "user", {
+      goal: goals.get(input.tuneId),
+    });
+    if (!current()) return { status: "superseded" };
+    stagedRows.set(input.tuneId, {
+      recall_eval: input.evaluationId,
+      interval: result.schedule.interval,
+    });
+    await mocks.persist();
+    return { status: "staged" };
+  },
+  clearGoalPracticeEvaluation: async (
+    _db: unknown,
+    input: { tuneId: string },
+    current: () => boolean
+  ) => {
+    if (!current()) return { status: "superseded" };
+    stagedRows.delete(input.tuneId);
+    await mocks.persist();
+    return { status: "cleared" };
+  },
+}));
+vi.mock("@/lib/goals/resolve", () => ({
+  readGoalRepertoireSnapshot: () => ({
+    members: [
+      { assignment: { tuneRef: "tune" } },
+      { assignment: { tuneRef: "other" } },
+    ],
+    resolveAssignment: ({ goal }: { goal: string }) => ({
+      goalKey: goal,
+      goalId: goal,
+    }),
+  }),
+}));
+vi.mock("@/lib/goals/practice-session", () => ({
+  readPracticeSession: () => new Map(),
 }));
 vi.mock("solid-sonner", () => ({ toast: { error: mocks.error } }));
 function deferred<T>() {
@@ -91,7 +131,7 @@ function createDbFake(): SqliteDatabase {
           where: (predicate: SQL) => ({
             run: () => {
               const { params } = dialect.sqlToQuery(predicate);
-              goals.set(String(params[0]), goal);
+              goals.set(String(params[1]), goal);
             },
           }),
         }),
@@ -128,7 +168,8 @@ beforeEach(async () => {
       currentRepertoireId: repertoire,
       practiceListData: () => practiceRows,
       filteredPracticeList: () => [],
-      goalsMap: () => new Map(),
+      userId: () => "user",
+      windowStart: () => "2026-11-18T00:00:00Z",
       incrementPracticeListStagedChanged: mocks.refresh,
       suppressNextViewRefresh: () => {},
     });
@@ -296,6 +337,13 @@ describe("staging request ownership with synchronous writes", () => {
     await first.task;
     expect(row()).toBeUndefined();
     expect(state.evaluationsCount()).toBe(0);
+  });
+  it("clears the old evaluation error after a successful goal change", async () => {
+    mocks.evaluate.mockRejectedValueOnce(new Error("Plugin failed"));
+    await state.handleRecallEvalChange("tune", "good");
+    expect(state.hasEvaluationErrors()).toBe(true);
+    await state.handleGoalChange("tune", "recall");
+    expect(state.hasEvaluationErrors()).toBe(false);
   });
   it("invalidates scheduling when the goal changes", async () => {
     const first = await begin("good");

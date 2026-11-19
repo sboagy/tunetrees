@@ -1,25 +1,19 @@
-/**
- * Recall Evaluation ComboBox Component
- *
- * Embedded dropdown for selecting practice recall evaluation.
- * Port from: legacy/frontend/app/(main)/pages/practice/components/RowRecallEvalComboBox.tsx
- *
- * Options:
- * - (Not Set) - Default state
- * - Again: need to practice again soon
- * - Hard: difficult recall with effort
- * - Good: satisfactory recall performance
- * - Easy: effortless and confident recall
- *
- * @module components/grids/RecallEvalComboBox
- */
+/** Existing in-row evaluation menu; choices come from the effective goal. */
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { ChevronDown } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For } from "solid-js";
 
+import {
+  type EvaluationChoice,
+  LADDER_ACTION_LABELS,
+} from "../../lib/goals/config";
+import { getSubmittedEvaluationDisplay } from "./evaluation-display";
+
 interface RecallEvalComboBoxProps {
+  choices: readonly EvaluationChoice[];
+  disabled?: boolean;
   tuneId: string;
   value: string;
   onChange: (value: string) => void;
@@ -38,36 +32,38 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
     setSelectedValue(currentRow.value);
   });
 
-  const options = [
+  const options = () => [
     {
       value: "",
       label: "(Not Set)",
-      color: "text-gray-500 dark:text-gray-400",
+      description: "",
+      color: "text-muted-foreground",
     },
-    {
-      value: "again",
-      label: "Again: need to practice again soon",
-      color: "text-red-600 dark:text-red-400",
-    },
-    {
-      value: "hard",
-      label: "Hard: difficult recall with effort",
-      color: "text-orange-600 dark:text-orange-400",
-    },
-    {
-      value: "good",
-      label: "Good: satisfactory recall performance",
-      color: "text-green-600 dark:text-green-400",
-    },
-    {
-      value: "easy",
-      label: "Easy: effortless and confident recall",
-      color: "text-blue-600 dark:text-blue-400",
-    },
+    ...props.choices.map((choice) => ({
+      value: choice.id,
+      label: choice.label,
+      description: [
+        choice.description,
+        choice.action.kind === "fsrs" || choice.action.kind === "plugin"
+          ? ""
+          : LADDER_ACTION_LABELS[choice.action.kind],
+      ]
+        .filter(Boolean)
+        .join(" — "),
+      color:
+        choice.action.kind === "fsrs"
+          ? getSubmittedEvaluationDisplay({
+              latestQuality: choice.action.rating,
+            }).colorClass
+          : "text-foreground",
+    })),
   ];
-
   const selectedOption = () =>
-    options.find((opt) => opt.value === selectedValue()) || options[0];
+    options().find((opt) => opt.value === selectedValue()) ?? {
+      value: selectedValue(),
+      label: "Evaluation unavailable — choose again",
+      color: "text-destructive",
+    };
 
   return (
     <div class="relative inline-block w-full">
@@ -78,32 +74,40 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
         modal={false}
       >
         <DropdownMenu.Trigger
+          disabled={props.disabled}
+          aria-label="Evaluation"
           data-testid={`recall-eval-${props.tuneId}`}
-          class="w-full flex items-center justify-between px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          class="w-full min-h-11 flex items-center justify-between px-3 py-1.5 text-sm border border-input rounded-md bg-background text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           // Prevent the enclosing grid row click handler from treating an
           // evaluation interaction as a row-selection click.
           onClick={(event) => event.stopPropagation()}
         >
           <span class={selectedOption().color}>{selectedOption().label}</span>
-          <ChevronDown class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
+          <ChevronDown
+            class="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2"
+            aria-hidden="true"
+          />
         </DropdownMenu.Trigger>
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content
             data-testid={`recall-eval-menu-${props.tuneId}`}
-            class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-72 overflow-auto"
+            class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-popover text-popover-foreground border border-border rounded shadow-lg max-h-72 overflow-auto"
           >
-            <For each={options}>
+            <For each={options()}>
               {(option) => (
                 <DropdownMenu.Item
                   data-testid={`recall-eval-option-${option.value || "not-set"}`}
-                  class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  class="w-full min-h-11 text-left px-3 py-2 text-sm hover:bg-accent data-[highlighted]:bg-accent cursor-pointer"
                   onSelect={() => {
                     setSelectedValue(option.value);
                     props.onChange(option.value);
                   }}
                 >
                   <span class={option.color}>{option.label}</span>
+                  <span class="block text-xs text-muted-foreground">
+                    {option.description}
+                  </span>
                 </DropdownMenu.Item>
               )}
             </For>

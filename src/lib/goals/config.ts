@@ -1,5 +1,12 @@
 /** Versioned, storage-independent goal definitions shared by seeds and runtime. */
 export type LadderAction = "reset" | "back" | "stay" | "advance";
+/** Shared explanation of ladder effects in settings and practice choice menus. */
+export const LADDER_ACTION_LABELS: Record<LadderAction, string> = {
+  reset: "Restart at the first interval",
+  back: "Move back one interval",
+  stay: "Repeat the current interval",
+  advance: "Advance one interval (repeat the last at the end)",
+};
 export type EvaluationAction =
   | { kind: LadderAction }
   | { kind: "plugin"; actionId: string }

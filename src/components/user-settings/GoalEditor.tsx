@@ -6,6 +6,7 @@ import {
   type EvaluationAction,
   type GoalConfig,
   type GoalScheduler,
+  LADDER_ACTION_LABELS,
   resolveGoalDefinition,
 } from "@/lib/goals/config";
 import {
@@ -17,12 +18,6 @@ import type { EditableGoalDefinition } from "@/lib/goals/settings";
 const inputClass =
   "w-full min-h-11 rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm";
 const ladderActions = ["reset", "back", "stay", "advance"] as const;
-const actionLabels = {
-  reset: "Restart at the first interval",
-  back: "Move back one interval",
-  stay: "Repeat the current interval",
-  advance: "Advance one interval (repeat the last at the end)",
-};
 
 function NumberField(props: {
   label: string;
@@ -590,7 +585,7 @@ export function GoalEditor(props: {
                             <For each={ladderActions}>
                               {(action) => (
                                 <option value={action}>
-                                  {actionLabels[action]}
+                                  {LADDER_ACTION_LABELS[action]}
                                 </option>
                               )}
                             </For>

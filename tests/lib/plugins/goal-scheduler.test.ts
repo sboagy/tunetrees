@@ -11,6 +11,7 @@ import {
 } from "../../../src/lib/plugins/goal-scheduler";
 import { executePlugin } from "../../../src/lib/plugins/quickjs-core";
 import { runPluginFunction } from "../../../src/lib/plugins/runtime";
+import { GOAL_PLUGIN_SCRIPT } from "../../../src/lib/plugins/scheduling-template";
 
 vi.mock("../../../src/lib/plugins/runtime", () => ({
   runPluginFunction: vi.fn(),
@@ -87,6 +88,15 @@ describe("versioned goal plugin execution", () => {
     runtime.dispose();
     vi.resetAllMocks();
     vi.unstubAllEnvs();
+  });
+
+  it("executes the new-plugin editor template through the active goal contract", async () => {
+    const request = input();
+    request.plugin.script = GOAL_PLUGIN_SCRIPT;
+    request.evaluation.actionId = "three-days";
+    const result = await calculateGoalPlugin(request);
+    expect(result.intervalDays).toBe(3);
+    expect(JSON.parse(result.schedulerState).data).toEqual({ count: 1 });
   });
 
   it("preserves a future due instant in New York's repeated DST hour", async () => {

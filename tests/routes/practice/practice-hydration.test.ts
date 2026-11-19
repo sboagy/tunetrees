@@ -59,7 +59,8 @@ it.each([
         getUserId: async () => "user",
         practiceListData: list.practiceRows,
         filteredPracticeList: list.filteredPracticeList,
-        goalsMap: () => new Map(),
+        userId: () => "user",
+        windowStart: () => "2026-11-18T00:00:00Z",
         incrementPracticeListStagedChanged: () => {},
         suppressNextViewRefresh: () => {},
       });

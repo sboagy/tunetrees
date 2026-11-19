@@ -1224,3 +1224,57 @@ must retain its per-tune request-token invalidation; a database delete alone is
 not cancellation. Full unit verification, typecheck, lint, formatting and diff
 checks pass. No browser rerun was performed for these currently disconnected
 service changes. No commit or push in this preparation batch.
+
+
+## Active picker and Submit integration
+
+Preparation was committed locally as `9e12bd68`, without pushing. The following
+working-tree batch activates goal-specific choices, staging and atomic Submit
+together in the grid, stacked list and flashcards. The completed evaluation label
+opens the agreed small Practice again menu; no dialog or permanent preview panel
+has been added. Choice descriptions stay in the menu, and the selected label stays
+compact. Explicit plugin errors remain unsubmitted with a row-level Retry action.
+
+The active Submit controller guards double activation, scopes receipts to the
+selected queue, refreshes stale calculations only if the original draft still
+exists unchanged, and requires another Submit afterward. A typed persistence error
+retains exact receipts after an in-memory commit so Retry cannot duplicate history.
+Queue completion display follows the linked event rather than an unrelated newer
+record. Clearing a repeat draft preserves prior completion and notes.
+
+Verification and remaining boundaries: focused controller/domain tests cover
+request races, persistence retry, stale refresh, canceled drafts, repeat identity
+and linked-event display. Browser coverage is being rerun for desktop/mobile
+Fluency, explicit plugins, offline submission and Practice again. The first mobile
+run exposed a stacked-row overlay intercepting evaluation taps; the evaluation
+wrapper now uses the same interactive stacking layer as the other row controls.
+Full visual/assistive/design-system matrix and transitional artifact removal remain
+open; this batch does not claim the broader UI audit or #931 is complete.
+
+
+Validation update for the active integration batch: all 1,426 unit tests,
+typecheck, lint, format check and diff check pass. Desktop and Mobile Chrome
+FSRS progression passed. The Fluency suite passed all five scenarios on both
+platforms after correcting its record-query projection and using the existing
+responsive Show Submitted helper (the mobile repeat scenario passed its targeted
+rerun). Explicit plugin offline sync, error and timeout behavior are covered.
+The new-plugin editor now seeds the goal scheduler contract, with a real QuickJS
+execution test. The legacy template remains only for transitional service tests.
+
+UI matrix for this batch (C3/E5/F3/R2): desktop/mobile picker, submission,
+repeat/cancel and plugin failure/offline flows pass browser checks. Dark/light,
+320/768 widths, zoom, screen-reader announcements and exhaustive keyboard/focus
+checks remain not tested in this batch and belong to the planned design-system
+pass. No blanket UI-compliance claim is made. CodeRabbit completed with ten findings/questions. Fixed the stacked-list tap
+layer, stale evaluation errors after a successful goal change, and refresh after
+partial restaging failure. The scheduled-grid and flashcard entry points now
+require the effective-goal model, avoiding a silent optional-model path. Existing
+consumers all supply it; legacy Recall choices are deliberately not substituted.
+
+The remaining review questions were checked against the implementation and tests:
+clear's result is intentionally ignored (request lifetime controls cancellation);
+exact persistence retries reuse already committed event IDs; non-persistence
+errors do not retain retry receipts; built-in Fluency selection resolves by name
+and passes browser coverage; owner-private name resolution has domain coverage;
+and the narrow hook tests pass with their existing fakes. Added focused tests for
+failed-goal recovery and partial-refresh visibility. No changes were pushed.

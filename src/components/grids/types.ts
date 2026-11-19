@@ -6,6 +6,7 @@
  */
 
 import type { ITuneOverview } from "../../lib/db/view-types";
+import type { PracticeEvaluationModel } from "../../lib/goals/practice-session";
 
 /**
  * Table purpose identifier - determines which grid variant to use
@@ -94,6 +95,9 @@ export interface IGridBaseProps {
   repertoireId?: string;
   tablePurpose: TablePurpose;
   onTuneSelect?: (tune: ITuneOverview) => void;
+  getEvaluationModel?: (tuneId: string) => PracticeEvaluationModel;
+  onPracticeAgain?: (tuneId: string) => void;
+  onRetryEvaluation?: (tuneId: string) => void;
   onRecallEvalChange?: (tuneId: string, newValue: string) => void;
   onGoalChange?: (tuneId: string, newValue: string | null) => void;
   onScheduledChange?: (tuneId: string, newValue: string | null) => void;
@@ -171,6 +175,9 @@ export interface IGoalOption {
  * Cell editor callback signatures
  */
 export interface ICellEditorCallbacks {
+  getEvaluationModel?: (tuneId: string) => PracticeEvaluationModel;
+  onPracticeAgain?: (tuneId: string) => void;
+  onRetryEvaluation?: (tuneId: string) => void;
   onRecallEvalChange?: (tuneId: string, newValue: string) => void;
   getRecallEvalOpen?: (tuneId: string) => boolean;
   setRecallEvalOpen?: (tuneId: string, open: boolean) => void;

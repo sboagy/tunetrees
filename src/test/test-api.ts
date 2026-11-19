@@ -38,6 +38,11 @@ import {
   type SyncBaselineDiagnostics,
   setSyncBaselineDiagnosticsEnabled,
 } from "@/lib/diagnostics/sync-baseline";
+import { inspectGoalPlugin } from "@/lib/goals/plugin-settings";
+import {
+  readGoalSettingsCatalog,
+  saveGoalSettings,
+} from "@/lib/goals/settings";
 import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
@@ -53,6 +58,7 @@ type SeedAddToReviewInput = {
 };
 
 type SeedSchedulingPluginInput = {
+  goalId?: string;
   script?: string;
   goals?: string[];
   userId?: string;
@@ -299,6 +305,37 @@ async function seedSchedulingPlugin(input: SeedSchedulingPluginInput = {}) {
     .returning();
 
   if (!created) throw new Error("Failed to seed scheduling plugin");
+  if (input.goalId) {
+    const entry = readGoalSettingsCatalog(db, userRef).entries.find(
+      (row) => row.row.id === input.goalId
+    );
+    if (!entry) throw new Error("Missing goal fixture");
+    const selection = await inspectGoalPlugin(db, userRef, created.id);
+    await saveGoalSettings(
+      db,
+      userRef,
+      entry,
+      {
+        ...entry.effective,
+        config: {
+          ...entry.effective.config,
+          scheduler: {
+            id: "plugin",
+            version: 1,
+            pluginId: created.id,
+            options: {},
+          },
+          evaluations: selection.manifest.actions.map((action) => ({
+            id: action.id,
+            label: action.label,
+            description: action.description,
+            action: { kind: "plugin" as const, actionId: action.id },
+          })),
+        },
+      },
+      { reviewedPlugin: selection }
+    );
+  }
   return created;
 }
 
@@ -511,6 +548,10 @@ async function getLatestPracticeRecord(tuneId: string, repertoireId: string) {
   }
   const db = await ensureDb();
   const rows = db.all<{
+    goal_id: string | null;
+    evaluation_id: string | null;
+    scheduler_id: string | null;
+    interval_days: number | null;
     id: string;
     tune_ref: string;
     repertoire_ref: string;
@@ -531,6 +572,7 @@ async function getLatestPracticeRecord(tuneId: string, repertoireId: string) {
     last_modified_at: string;
   }>(sql`
     SELECT 
+      goal_id, evaluation_id, scheduler_id, interval_days,
       id, tune_ref, repertoire_ref, practiced, due, quality,
       interval, repetitions, stability, difficulty, state, step,
       goal, technique, elapsed_days, lapses, sync_version, last_modified_at

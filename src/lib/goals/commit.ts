@@ -372,6 +372,17 @@ function writeItem(
 }
 
 /** New-format batch Submit. No caller should activate this before cutover/UI integration. */
+/** The transaction committed, but its IndexedDB save must be retried. */
+export class GoalPracticePersistenceError extends Error {
+  constructor(cause: unknown) {
+    super(
+      "Practice was recorded locally, but could not be saved. Retry Submit to save it without recording it twice.",
+      { cause }
+    );
+    this.name = "GoalPracticePersistenceError";
+  }
+}
+
 export async function commitGoalPracticeEvaluations(
   db: SqliteDatabase,
   input: {
@@ -447,6 +458,12 @@ export async function commitGoalPracticeEvaluations(
     };
   });
   // Also flush identical retries: a previous local transaction may have failed to persist.
-  if (result.status === "committed") await persistDb();
+  if (result.status === "committed") {
+    try {
+      await persistDb();
+    } catch (error) {
+      throw new GoalPracticePersistenceError(error);
+    }
+  }
   return result;
 }
