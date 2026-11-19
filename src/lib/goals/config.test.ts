@@ -21,6 +21,39 @@ function config(name = "fluency") {
 }
 
 describe("goal definitions and overrides", () => {
+  it("accepts explicit plugin identity and named action mappings", () => {
+    const value = config();
+    value.scheduler = {
+      id: "plugin",
+      version: 1,
+      pluginId: "selected",
+      options: {},
+    };
+    value.evaluations = [
+      {
+        id: "smooth",
+        label: "Smooth",
+        description: "",
+        action: { kind: "plugin", actionId: "advance" },
+      },
+    ];
+    expect(parseGoalConfig(value)).toEqual(value);
+  });
+  it("rejects a plugin choice on a built-in scheduler", () => {
+    const value = config();
+    value.evaluations[0].action = { kind: "plugin", actionId: "advance" };
+    expect(() => parseGoalConfig(value)).toThrow("must match");
+  });
+  it("rejects numeric FSRS choices on a plugin scheduler", () => {
+    const value = config("recall");
+    value.scheduler = {
+      id: "plugin",
+      version: 1,
+      pluginId: "selected",
+      options: {},
+    };
+    expect(() => parseGoalConfig(value)).toThrow("must match");
+  });
   it.each(["x".repeat(17000), "🎵".repeat(5000), "x\n".repeat(6000)])(
     "rejects evaluations exceeding the serialized snapshot budget (%#)",
     (text) => {

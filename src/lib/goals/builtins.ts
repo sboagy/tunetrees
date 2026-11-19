@@ -224,6 +224,10 @@ export function getCustomGoalConfig(
   scheduler: GoalScheduler,
   createChoiceId: () => string = () => crypto.randomUUID()
 ): GoalConfig {
+  if (scheduler.id === "plugin")
+    throw new Error(
+      "Plugin goal choices must come from its named action declaration"
+    );
   const recall = getBuiltInGoals().find((goal) => goal.name === "recall");
   if (!recall) throw new Error("Recall defaults are unavailable");
   const evaluations: EvaluationChoice[] =

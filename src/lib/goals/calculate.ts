@@ -1,5 +1,9 @@
-/** Pure selected-scheduler preview. No DB writes, plugins, or queue mutations. */
+/** Selected-scheduler preview from captured inputs. No DB writes or queue mutations. */
 
+import {
+  calculateGoalPlugin,
+  type GoalPluginInput,
+} from "../plugins/goal-scheduler";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import {
   canonicalJson,
@@ -24,6 +28,7 @@ export interface GoalPracticeInput {
     | (PracticeStateRecord & { practiced: string | null; due: string | null })
     | null;
   legacyGoalId: string | null;
+  plugin?: GoalPluginInput["plugin"] | null;
 }
 
 function eventDate(text: string | null): Date {
@@ -42,6 +47,22 @@ function predecessorForGoal(input: GoalPracticeInput) {
   return previous;
 }
 
+export function nonFsrsCompatibility(intervalDays: number, technique: string) {
+  return {
+    interval: intervalDays === 0 ? 0 : Math.max(1, Math.ceil(intervalDays)),
+    technique,
+    quality: null,
+    stability: null,
+    difficulty: null,
+    repetitions: null,
+    lapses: null,
+    state: null,
+    elapsedDays: null,
+    step: null,
+    easiness: null,
+  };
+}
+
 export async function calculateGoalPractice(input: GoalPracticeInput) {
   const config = parseGoalConfig(input.config);
   if (!input.goalId.trim() || !input.goalLabel.trim())
@@ -55,14 +76,10 @@ export async function calculateGoalPractice(input: GoalPracticeInput) {
     (choice) => choice.id === input.evaluationId
   );
   if (!evaluation) throw new Error("Choose a valid goal evaluation");
-  const previous = predecessorForGoal(input);
   const evaluationSnapshot = serializeEvaluationSnapshot(
     input.goalLabel,
     evaluation
   );
-  const limitations: string[] = [];
-  if (previous?.kind === "unavailable") limitations.push(previous.reason);
-  if (previous?.kind === "fsrs6") limitations.push(...previous.limitations);
   const common = {
     goalId: input.goalId,
     evaluationId: evaluation.id,
@@ -70,6 +87,35 @@ export async function calculateGoalPractice(input: GoalPracticeInput) {
     schedulerVersion: config.scheduler.version,
     practiced: practiced.toISOString(),
   };
+  if (config.scheduler.id === "plugin") {
+    if (
+      !input.plugin ||
+      input.plugin.id !== config.scheduler.pluginId ||
+      evaluation.action.kind !== "plugin"
+    )
+      throw new Error("The selected scheduling plugin is unavailable");
+    const result = await calculateGoalPlugin({
+      plugin: input.plugin,
+      goalId: input.goalId,
+      evaluation: { id: evaluation.id, actionId: evaluation.action.actionId },
+      practiced,
+      options: config.scheduler.options,
+      predecessor: input.predecessor,
+    });
+    return {
+      ...common,
+      ...result,
+      limitations: [],
+      compatibility: nonFsrsCompatibility(
+        result.intervalDays,
+        result.schedulerId
+      ),
+    };
+  }
+  const previous = predecessorForGoal(input);
+  const limitations: string[] = [];
+  if (previous?.kind === "unavailable") limitations.push(previous.reason);
+  if (previous?.kind === "fsrs6") limitations.push(...previous.limitations);
   if (config.scheduler.id === "builtin:interval-ladder") {
     const result = await calculateLadder({
       goalId: input.goalId,
@@ -94,19 +140,7 @@ export async function calculateGoalPractice(input: GoalPracticeInput) {
       schedulerState: canonicalJson(result.state, SCHEDULER_STATE_BYTES),
       continued: result.continued,
       limitations: previous?.kind === "unavailable" ? [previous.reason] : [],
-      compatibility: {
-        interval: result.legacyInterval,
-        technique: "base_interval",
-        quality: null,
-        stability: null,
-        difficulty: null,
-        repetitions: null,
-        lapses: null,
-        state: null,
-        elapsedDays: null,
-        step: null,
-        easiness: null,
-      },
+      compatibility: nonFsrsCompatibility(result.intervalDays, "base_interval"),
     };
   }
   if (evaluation.action.kind !== "fsrs")

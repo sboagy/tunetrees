@@ -30,7 +30,11 @@ export async function calculateLadder(input: {
   const choice = config.evaluations.find(
     (entry) => entry.id === input.evaluationId
   );
-  if (!choice || choice.action.kind === "fsrs")
+  if (
+    !choice ||
+    choice.action.kind === "fsrs" ||
+    choice.action.kind === "plugin"
+  )
     throw new Error("Choose a valid ladder evaluation");
   const practicedMs = input.practiced.getTime();
   if (!Number.isFinite(practicedMs)) throw new Error("Invalid practiced time");

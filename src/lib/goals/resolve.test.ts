@@ -4,6 +4,10 @@ import {
   initSqliteWasm,
 } from "@oosync/runtime/sqlite-wasm-adapter";
 import { drizzle } from "drizzle-orm/sql-js";
+import {
+  newQuickJSAsyncWASMModule,
+  type QuickJSAsyncRuntime,
+} from "quickjs-emscripten";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codegenConfig from "../../../oosync.codegen.config.json";
 import { persistDb } from "../db/client-sqlite";
@@ -21,10 +25,13 @@ import {
   dailyPracticeQueue,
   goal,
   goalUserSettings,
+  plugin,
   practiceRecord,
   repertoireTune,
   tableTransientData,
 } from "../db/schema";
+import { executePlugin } from "../plugins/quickjs-core";
+import * as pluginRuntime from "../plugins/runtime";
 import {
   computeSchedulingWindows,
   generateDailyPracticeQueue,
@@ -711,6 +718,243 @@ describe("atomic goal practice submission", () => {
   const events = () => db.select().from(practiceRecord).all();
   const drafts = () => db.select().from(tableTransientData).all();
   const queue = () => db.select().from(dailyPracticeQueue).get();
+
+  describe("explicit goal plugin integration", () => {
+    let runtime: QuickJSAsyncRuntime;
+    const script = `
+      function describeGoalSchedulerV1() {
+        return { apiVersion: 1, stateVersion: 1, compatibleStateVersions: [1],
+          actions: [{ id: "advance", label: "Advance", description: "Review in six hours" }] };
+      }
+      function scheduleGoalV1(input) {
+        return { due: new Date(Date.parse(input.practiced) + 21600000).toISOString(),
+          state: { count: input.previousState ? input.previousState.data.count + 1 : 1 } };
+      }
+    `;
+    beforeEach(async () => {
+      runtime = (await newQuickJSAsyncWASMModule()).newRuntime();
+      vi.spyOn(pluginRuntime, "runPluginFunction").mockImplementation(
+        (params) =>
+          executePlugin(runtime, { ...params, type: "invoke", id: 1 }, {})
+      );
+      db.insert(plugin)
+        .values({
+          id: "selected",
+          userRef: "owner",
+          name: "My scheduler",
+          script,
+          capabilities: '{"scheduleGoal":true}',
+          lastModifiedAt: stamp,
+        })
+        .run();
+      db.insert(goalUserSettings)
+        .values({
+          userId: "owner",
+          goalId: recall.id,
+          overrides: canonicalJson({
+            scheduler: {
+              id: "plugin",
+              version: 1,
+              pluginId: "selected",
+              options: {},
+            },
+            evaluations: [
+              {
+                id: "smooth",
+                label: "Smooth",
+                description: "Played smoothly",
+                action: { kind: "plugin", actionId: "advance" },
+              },
+            ],
+          }),
+          lastModifiedAt: stamp,
+        })
+        .run();
+    });
+    afterEach(() => runtime.dispose());
+
+    it("stages and submits a real sandbox result with truthful JSON-only state", async () => {
+      const receipt = await item("tune", "smooth");
+      expect(receipt.draft).toMatchObject({
+        schedulerId: "plugin:selected",
+        intervalDays: 0.25,
+        quality: null,
+        stability: null,
+        technique: "plugin:selected",
+      });
+      expect(await submit([receipt])).toMatchObject({ status: "committed" });
+      expect(events()[0]).toMatchObject({
+        schedulerState: receipt.draft.schedulerState,
+        due: "2026-11-16T18:00:00.000Z",
+        intervalDays: 0.25,
+      });
+      expect(queue()?.displayedPracticeRecordId).toBe(
+        receipt.draft.practiceRecordId
+      );
+      expect(drafts()).toHaveLength(0);
+    });
+    it("continues the latest matching plugin state after submission", async () => {
+      await submit([await item("tune", "smooth")]);
+      const preview = await prepareGoalPracticePreview(db, {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "smooth",
+        practiced: new Date("2026-11-17T12:00:00Z"),
+      });
+      expect(preview.continued).toBe(true);
+      expect(JSON.parse(preview.schedulerState).data.count).toBe(2);
+    });
+    it("commits the exact random plugin result that was staged without rerunning it", async () => {
+      raw.run("UPDATE plugin SET script = script || ? WHERE id='selected'", [
+        `
+        function scheduleGoalV1(input) {
+          return { due: new Date(Date.parse(input.practiced) + 21600000).toISOString(),
+            state: { nonce: Math.random() } };
+        }
+      `,
+      ]);
+      const receipt = await item("tune", "smooth");
+      const calls = vi.mocked(pluginRuntime.runPluginFunction).mock.calls
+        .length;
+      expect(await submit([receipt])).toMatchObject({ status: "committed" });
+      expect(pluginRuntime.runPluginFunction).toHaveBeenCalledTimes(calls);
+      expect(events()[0].schedulerState).toBe(receipt.draft.schedulerState);
+    });
+    it("rejects changed staged plugin state even when the caller reloads the changed draft", async () => {
+      const receipt = await item("tune", "smooth");
+      const changed = JSON.parse(receipt.draft.schedulerState!);
+      changed.data.count = 999;
+      raw.run("UPDATE table_transient_data SET scheduler_state=?", [
+        JSON.stringify(changed),
+      ]);
+      receipt.draft = drafts()[0];
+      expect(await submit([receipt])).toMatchObject({ status: "stale" });
+      expect(events()).toHaveLength(0);
+      expect(drafts()).toHaveLength(1);
+    });
+    it("starts fresh in a ladder after a same-goal plugin event", async () => {
+      await submit([await item("tune", "smooth")]);
+      const ladder = getBuiltInGoals().find(
+        (entry) => entry.name === "fluency"
+      )!;
+      raw.run(
+        "UPDATE goal_user_settings SET overrides=? WHERE user_id='owner'",
+        [canonicalJson(ladder.config)]
+      );
+      const preview = await prepareGoalPracticePreview(db, {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: ladder.config.evaluations[0].id,
+        practiced: new Date("2026-11-17T12:00:00Z"),
+      });
+      expect(preview.schedulerId).toBe("builtin:interval-ladder");
+      expect(preview.continued).toBe(false);
+    });
+    it("starts fresh in FSRS after changing a goal's scheduler from plugin to built-in", async () => {
+      await submit([await item("tune", "smooth")]);
+      raw.run("DELETE FROM goal_user_settings WHERE user_id='owner'");
+      const preview = await prepareGoalPracticePreview(db, {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "good",
+        practiced: new Date("2026-11-17T12:00:00Z"),
+      });
+      expect(preview.schedulerId).toBe("builtin:fsrs6");
+      expect(preview.continued).toBe(false);
+    });
+    it("retries a completed submission after the plugin is disabled without rerunning it", async () => {
+      const receipt = await item("tune", "smooth");
+      await submit([receipt]);
+      const invocations = vi.mocked(pluginRuntime.runPluginFunction).mock.calls
+        .length;
+      raw.run("UPDATE plugin SET enabled=0 WHERE id='selected'");
+      expect(await submit([receipt])).toMatchObject({ status: "committed" });
+      expect(pluginRuntime.runPluginFunction).toHaveBeenCalledTimes(
+        invocations
+      );
+      expect(events()).toHaveLength(1);
+      expect(queue()?.exposuresCompleted).toBe(1);
+    });
+    it("invalidates a staged preview when the script changes without a version bump", async () => {
+      const receipt = await item("tune", "smooth");
+      raw.run("UPDATE plugin SET script = script || ? WHERE id='selected'", [
+        "\n// revised",
+      ]);
+      expect(await submit([receipt])).toMatchObject({ status: "stale" });
+      expect(events()).toHaveLength(0);
+      expect(drafts()).toHaveLength(1);
+    });
+    it("rejects a script change during evaluation before staging writes", async () => {
+      vi.mocked(pluginRuntime.runPluginFunction).mockImplementation(
+        async (params) => {
+          const result = await executePlugin(
+            runtime,
+            { ...params, type: "invoke", id: 1 },
+            {}
+          );
+          raw.run(
+            "UPDATE plugin SET script = script || ? WHERE id='selected'",
+            ["\n// revised"]
+          );
+          return result;
+        }
+      );
+      const result = await stageGoalPracticeEvaluation(
+        db,
+        {
+          userId: "owner",
+          repertoireId: "rep",
+          tuneId: "tune",
+          evaluationId: "smooth",
+          practiced: new Date(stamp),
+        },
+        () => true
+      );
+      expect(result.status).toBe("stale");
+      expect(drafts()).toHaveLength(0);
+    });
+    it("keeps the existing draft when a later plugin calculation fails", async () => {
+      const receipt = await item("tune", "smooth");
+      raw.run("UPDATE plugin SET script=? WHERE id='selected'", [
+        "throw new Error('Broken scheduler')",
+      ]);
+      await expect(
+        stageGoalPracticeEvaluation(
+          db,
+          {
+            userId: "owner",
+            repertoireId: "rep",
+            tuneId: "tune",
+            evaluationId: "smooth",
+            practiced: new Date(stamp),
+          },
+          () => true
+        )
+      ).rejects.toThrow("Broken scheduler");
+      expect(drafts()[0]).toEqual(receipt.draft);
+      expect(events()).toHaveLength(0);
+    });
+    it("rejects a private plugin owned by another user", () => {
+      raw.run("UPDATE plugin SET user_ref='other' WHERE id='selected'");
+      expect(context).toThrow("unavailable");
+    });
+    it("permits an explicitly selected public plugin", () => {
+      raw.run(
+        "UPDATE plugin SET user_ref='other', is_public=1 WHERE id='selected'"
+      );
+      expect(context().plugin?.id).toBe("selected");
+    });
+    it("blocks submission if the selected plugin was disabled", async () => {
+      const receipt = await item("tune", "smooth");
+      raw.run("UPDATE plugin SET enabled=0 WHERE id='selected'");
+      await expect(submit([receipt])).rejects.toThrow("unavailable");
+      expect(events()).toHaveLength(0);
+      expect(drafts()).toHaveLength(1);
+    });
+  });
 
   it("atomically records the reviewed event and completes its queue item", async () => {
     const receipt = await item();

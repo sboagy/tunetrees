@@ -1086,3 +1086,43 @@ flow—not deferred to an unspecified cleanup issue.
 - [ ] Validate evaluation previews, stale-input checks, Submit, plugin failures
   and persistence on desktop/mobile; then delete `plugins/scheduling.ts` and
   verify no imports remain. Keep the shared QuickJS runtime.
+
+## Explicit plugin configuration and guarded practice-service integration
+
+Goal configuration now accepts `{ id: "plugin", version: 1, pluginId, options }`
+and evaluation actions `{ kind: "plugin", actionId }`. Built-in and plugin
+actions cannot be mixed. The synchronous resolver reads only the explicitly
+selected, enabled, owner-visible/public scheduling plugin from local SQLite;
+it does not select the newest matching plugin. Missing/private/disabled plugins
+block new calculations without changing the selected goal or substituting FSRS.
+
+The shared calculator now invokes the validated executor. Preview fingerprints
+and transaction-time comparisons include exact script, version, name and
+capabilities. Script edits without a version bump still invalidate staged work.
+The existing staging and Submit services persist truthful plugin identity,
+fractional intervals and authoritative JSON; FSRS-only projections remain null.
+The shared state reader recognizes plugin envelopes so changing back to a built-in
+scheduler starts fresh. No schema or generated artifacts changed.
+
+Exact retries of already committed events still verify repertoire ownership,
+active membership, event content and completed queue attribution, but do not
+require the old plugin to remain enabled. They flush persistence without running
+the plugin again or duplicating events/exposures.
+
+CodeRabbit identified a valid nondeterministic-plugin issue: replaying the script
+at Submit could disagree with the reviewed preview. Plugin staging now binds the
+checked event content and current input fingerprints into its calculation hash.
+Submit checks this receipt and commits the exact staged result without executing
+the plugin again. Built-in replay checks remain unchanged. Event canonicalization
+is shared with exact-retry comparisons rather than duplicated. Tests cover random
+plugin output and rejection of altered staged state. The other review concern,
+switching back to a built-in scheduler, is covered for both FSRS and ladders.
+
+Validation: all 1,389 unit tests pass (including 67 focused integration tests),
+along with typecheck, lint, formatting and diff checks. Coverage includes real SQLite + QuickJS staging,
+submission, continuation, script-edit races, retained drafts on failure, public/
+private visibility, disabling a plugin and completed-event retries. Typecheck
+passes. Settings plugin selection, save-time declaration validation, and active
+practice evaluation/Submit UI activation remain pending. The existing UI still
+uses the transitional orchestration; the removal gate above remains unchecked.
+No local E2E, server restart, migration, deployment, commit or push performed.

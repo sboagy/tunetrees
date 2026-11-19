@@ -189,6 +189,10 @@ export async function createConfiguredGoal(
   definition: EditableGoalDefinition
 ) {
   const valid = resolveGoalDefinition(definition);
+  let defaultTechnique = "base_interval";
+  if (valid.config.scheduler.id === "builtin:fsrs6") defaultTechnique = "fsrs";
+  if (valid.config.scheduler.id === "plugin")
+    defaultTechnique = `plugin:${valid.config.scheduler.pluginId}`;
   const values = {
     id,
     name: `custom:${id}`,
@@ -196,8 +200,7 @@ export async function createConfiguredGoal(
     displayName: valid.displayName,
     description: valid.description,
     defaultConfig: canonicalJson(valid.config),
-    defaultTechnique:
-      valid.config.scheduler.id === "builtin:fsrs6" ? "fsrs" : "base_interval",
+    defaultTechnique,
     baseIntervals:
       valid.config.scheduler.id === "builtin:interval-ladder"
         ? canonicalJson(valid.config.scheduler.intervalsDays)

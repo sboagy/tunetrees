@@ -62,10 +62,11 @@ GRANT SELECT, INSERT, UPDATE ON public.goal_user_settings TO authenticated, serv
 
 CREATE FUNCTION public.guard_goal_settings() RETURNS trigger
 LANGUAGE plpgsql SET search_path = '' AS $$
+DECLARE constraint_violation CONSTANT text := '23514';
 BEGIN
   IF TG_OP = 'UPDATE' AND
     (NEW.user_id IS DISTINCT FROM OLD.user_id OR NEW.goal_id IS DISTINCT FROM OLD.goal_id)
-  THEN RAISE EXCEPTION 'Goal settings identity is immutable' USING ERRCODE = '23514';
+  THEN RAISE EXCEPTION 'Goal settings identity is immutable' USING ERRCODE = constraint_violation;
   END IF;
   -- Include deleted goals: their settings/tombstones must remain syncable.
   -- Do not lock here: SELECT FOR KEY SHARE also applies goal UPDATE RLS,
@@ -73,7 +74,7 @@ BEGIN
   PERFORM 1 FROM public.goal g WHERE g.id = NEW.goal_id
     AND (g.private_for IS NULL OR g.private_for = NEW.user_id);
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Goal is not available to settings owner' USING ERRCODE = '23514';
+    RAISE EXCEPTION 'Goal is not available to settings owner' USING ERRCODE = constraint_violation;
   END IF;
   RETURN NEW;
 END;
@@ -85,24 +86,26 @@ CREATE TRIGGER trg_goal_user_settings_sync AFTER INSERT OR UPDATE OR DELETE
 
 CREATE FUNCTION public.guard_goal_ownership() RETURNS trigger
 LANGUAGE plpgsql SET search_path = '' AS $$
-DECLARE existing_owner uuid;
+DECLARE
+  existing_owner uuid;
+  constraint_violation CONSTANT text := '23514';
 BEGIN
   IF TG_OP = 'UPDATE' AND
     (NEW.id IS DISTINCT FROM OLD.id OR NEW.private_for IS DISTINCT FROM OLD.private_for)
-  THEN RAISE EXCEPTION 'Goal identity and owner are immutable' USING ERRCODE = '23514';
+  THEN RAISE EXCEPTION 'Goal identity and owner are immutable' USING ERRCODE = constraint_violation;
   END IF;
   IF TG_OP = 'INSERT' THEN
     -- Check BEFORE upsert conflict resolution, including when UPDATE omits owner.
     SELECT private_for INTO existing_owner FROM public.goal WHERE id = NEW.id FOR UPDATE;
     IF FOUND AND existing_owner IS DISTINCT FROM NEW.private_for THEN
-      RAISE EXCEPTION 'Cannot take ownership of an existing goal' USING ERRCODE = '23514';
+      RAISE EXCEPTION 'Cannot take ownership of an existing goal' USING ERRCODE = constraint_violation;
     END IF;
   END IF;
   IF NEW.private_for IS NULL AND NOT (
     current_user = 'postgres' AND
     COALESCE(current_setting('tunetrees.goal_seed_write', true), '') = 'on'
   ) THEN
-    RAISE EXCEPTION 'Shared goals may only be written by seed migrations' USING ERRCODE = '23514';
+    RAISE EXCEPTION 'Shared goals may only be written by seed migrations' USING ERRCODE = constraint_violation;
   END IF;
   RETURN NEW;
 END;

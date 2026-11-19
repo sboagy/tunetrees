@@ -1,4 +1,8 @@
 import type { PracticeRecord } from "../db/types";
+import {
+  type GoalPluginState,
+  parseGoalPluginState,
+} from "../plugins/goal-scheduler";
 import { getBuiltInGoals } from "./builtins";
 import {
   type Fsrs6State,
@@ -31,6 +35,7 @@ export type DecodedPracticeState =
       limitations: string[];
     }
   | { kind: "ladder"; goalId: string; state: LadderState; source: "json" }
+  | { kind: "plugin"; goalId: string; state: GoalPluginState; source: "json" }
   | { kind: "unavailable"; goalId: string | null; reason: string };
 
 const recallId = getBuiltInGoals().find((goal) => goal.name === "recall")?.id;
@@ -55,6 +60,12 @@ export function readPracticeState(
         reason: "Unsupported scheduler contract version",
       };
     const value = parseStateJson(row.schedulerState);
+    if (row.schedulerId.startsWith("plugin:")) {
+      const state = parseGoalPluginState(value);
+      if (row.schedulerId !== `plugin:${state.pluginId}`)
+        throw new Error("Goal plugin state identity mismatch");
+      return { kind: "plugin", goalId: row.goalId, state, source: "json" };
+    }
     if (row.schedulerId === "builtin:fsrs6")
       return {
         kind: "fsrs6",

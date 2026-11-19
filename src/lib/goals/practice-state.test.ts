@@ -83,7 +83,10 @@ describe("single practice state reader", () => {
   });
   it("reports an unknown scheduler without interpreting its data as FSRS", () => {
     expect(
-      readPracticeState({ ...modern, schedulerId: "plugin:unknown" }, recallId)
+      readPracticeState(
+        { ...modern, schedulerId: "unsupported:unknown" },
+        recallId
+      )
     ).toMatchObject({ kind: "unavailable" });
   });
   it("rejects missing new goal identity", () => {

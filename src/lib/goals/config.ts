@@ -2,6 +2,7 @@
 export type LadderAction = "reset" | "back" | "stay" | "advance";
 export type EvaluationAction =
   | { kind: LadderAction }
+  | { kind: "plugin"; actionId: string }
   | { kind: "fsrs"; rating: 1 | 2 | 3 | 4 };
 export interface EvaluationChoice {
   id: string;
@@ -16,6 +17,12 @@ export interface DailyGoalSettings {
   delinquencyDays: number;
 }
 export type GoalScheduler =
+  | {
+      id: "plugin";
+      version: 1;
+      pluginId: string;
+      options: Record<string, unknown>;
+    }
   | { id: "builtin:interval-ladder"; version: 1; intervalsDays: number[] }
   | {
       id: "builtin:fsrs6";
@@ -225,6 +232,12 @@ function validateScheduler(value: unknown): asserts value is GoalScheduler {
     object(value) && value.version === 1,
     "Unsupported scheduler version"
   );
+  if (value.id === "plugin") {
+    keys(value, ["id", "version", "pluginId", "options"]);
+    requireValue(label(value.pluginId), "A plugin must be selected");
+    requireValue(object(value.options), "Plugin options must be an object");
+    return;
+  }
   if (value.id === "builtin:interval-ladder") {
     keys(value, ["id", "version", "intervalsDays"]);
     validateIntervals(value.intervalsDays);
@@ -299,6 +312,12 @@ function validateEvaluations(
           typeof choice.action.rating === "number",
         "Invalid FSRS rating"
       );
+    } else if (choice.action.kind === "plugin") {
+      keys(choice.action, ["kind", "actionId"]);
+      requireValue(
+        label(choice.action.actionId),
+        "A named plugin action is required"
+      );
     } else {
       keys(choice.action, ["kind"]);
       requireValue(
@@ -324,7 +343,9 @@ export function parseGoalConfig(value: unknown): GoalConfig {
   requireValue(
     copy.evaluations.every(
       (choice) =>
-        (choice.action.kind === "fsrs") === (scheduler.id === "builtin:fsrs6")
+        (choice.action.kind === "fsrs") ===
+          (scheduler.id === "builtin:fsrs6") &&
+        (choice.action.kind === "plugin") === (scheduler.id === "plugin")
     ),
     "Evaluation actions must match the selected scheduler"
   );

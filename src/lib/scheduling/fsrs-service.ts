@@ -17,15 +17,14 @@
 
 import { sql } from "drizzle-orm";
 import {
-  type Card,
-  createEmptyCard,
-  fsrs,
+  DefaultScheduler,
+  type DefaultSchedulerCard,
   type Grade,
-  generatorParameters,
   Rating,
   State,
   // type RecordLog,
 } from "ts-fsrs";
+import { FSRS6_DEFAULT_WEIGHTS } from "ts-fsrs/models/fsrs-6";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type {
   IUserSchedulingOptions,
@@ -86,7 +85,7 @@ const TECHNIQUE_MODIFIERS = {
  * with Solid signals and stores.
  */
 export class FSRSService implements SchedulingService {
-  private readonly scheduler: ReturnType<typeof fsrs>;
+  private readonly scheduler: ReturnType<typeof DefaultScheduler<"FSRS-6">>;
   private readonly repertoireTuneCount: number | null = null; // populated asynchronously
   /** Accessor for tune count (may be null if not yet loaded) */
   getRepertoireTuneCountCached(): number | null {
@@ -101,7 +100,7 @@ export class FSRSService implements SchedulingService {
     // Parse FSRS weights from JSON string (stored in database)
     const weights = prefs.fsrsWeights
       ? (JSON.parse(prefs.fsrsWeights) as number[])
-      : generatorParameters().w;
+      : [...FSRS6_DEFAULT_WEIGHTS];
 
     // Parse learning/relearning steps (stored as minutes array, convert to step format)
     const learningSteps = prefs.learningSteps
@@ -187,20 +186,21 @@ export class FSRSService implements SchedulingService {
       });
     }
 
-    // v6's compatibility facade retains FSRS-6 and existing stored weights.
+    // Explicitly retain FSRS-6 and existing stored weights.
     // DefaultScheduler defaults to FSRS-7, which requires a separate history migration.
-    this.scheduler = fsrs({
-      w: weights,
+    this.scheduler = DefaultScheduler({
+      version: "FSRS-6",
+      weights,
       // High retention (95%) as default because 'Performance' requires higher recall than 'Facts'
-      request_retention:
+      desiredRetention:
         testRequestRetentionOverride ?? prefs.requestRetention ?? 0.95,
-      maximum_interval: calculatedMaxInterval,
-      enable_fuzz:
+      maximumInterval: calculatedMaxInterval,
+      enableFuzz:
         testEnableFuzzOverride ??
         (prefs.enableFuzzing ? Boolean(prefs.enableFuzzing) : true),
-      enable_short_term: true, // Always enable for new cards
-      learning_steps: learningSteps as `${number}${"m" | "h" | "d"}`[],
-      relearning_steps: relearningSteps as `${number}${"m" | "h" | "d"}`[],
+      enableShortTerm: true, // Always enable for new cards
+      learningSteps: learningSteps as `${number}${"m" | "h" | "d"}`[],
+      relearningSteps: relearningSteps as `${number}${"m" | "h" | "d"}`[],
     });
   }
 
@@ -213,25 +213,33 @@ export class FSRSService implements SchedulingService {
   async processFirstReview(
     input: RecordPracticeInput
   ): Promise<NextReviewSchedule> {
-    const card = createEmptyCard(input.practiced);
+    const scheduler = await this.scheduler;
+    const card = scheduler.newCard({
+      now: input.practiced,
+      cardId: input.tuneRef,
+    });
     const rating = this.qualityToRating(input.quality);
 
-    // Preview all ratings through the FSRS-6 compatibility API.
-    const recordLog = this.scheduler.repeat(card, input.practiced);
-
-    const schedule = recordLog[rating];
+    const schedule = scheduler.review({
+      card,
+      now: input.practiced,
+      grade: rating,
+    });
 
     return {
-      nextDue: schedule.card.due,
+      nextDue: schedule.card.dueAt,
       state: schedule.card.state,
       stability: schedule.card.stability,
       difficulty: schedule.card.difficulty,
       elapsed_days: 0,
-      scheduled_days: schedule.card.scheduled_days,
+      scheduled_days: schedule.card.scheduledDays,
       reps: schedule.card.reps,
-      lapses: schedule.card.lapses,
-      last_review: schedule.card.last_review ?? input.practiced,
-      interval: this.calculateInterval(input.practiced, schedule.card.due),
+      // Preserve the existing policy: only Again from Review increments lapses.
+      lapses:
+        card.lapses +
+        (rating === Rating.Again && card.state === State.Review ? 1 : 0),
+      last_review: schedule.card.lastReviewAt ?? input.practiced,
+      interval: this.calculateInterval(input.practiced, schedule.card.dueAt),
     };
   }
 
@@ -257,16 +265,20 @@ export class FSRSService implements SchedulingService {
     }
 
     // Reconstruct FSRS card from latest practice record
-    const card: Card = {
-      due: new Date(latestRecord.due ?? new Date()),
+    const card: DefaultSchedulerCard<"FSRS-6"> = {
+      cardId: input.tuneRef,
+      scheduleStatus: (["new", "learning", "review", "learning"] as const)[
+        state
+      ],
+      dueAt: new Date(latestRecord.due ?? new Date()),
       stability: latestRecord.stability ?? 0,
       difficulty: latestRecord.difficulty ?? 0,
-      scheduled_days: 0,
-      learning_steps: 0, // Will be managed by FSRS
+      scheduledDays: 0,
+      learningStep: 0, // Will be managed by FSRS
       reps: latestRecord.repetitions ?? 0,
       lapses: latestRecord.lapses ?? 0,
       state,
-      last_review: latestRecord.practiced
+      lastReviewAt: latestRecord.practiced
         ? new Date(latestRecord.practiced)
         : input.practiced,
     };
@@ -274,31 +286,41 @@ export class FSRSService implements SchedulingService {
     const rating = this.qualityToRating(input.quality);
 
     // Process the review
-    const recordLog = this.scheduler.repeat(card, input.practiced);
-    const schedule = recordLog[rating];
+    const scheduler = await this.scheduler;
+    const schedule = scheduler.review({
+      card,
+      now: input.practiced,
+      grade: rating,
+    });
 
     return {
-      nextDue: schedule.card.due,
+      nextDue: schedule.card.dueAt,
       state: schedule.card.state,
       stability: schedule.card.stability,
       difficulty: schedule.card.difficulty,
       elapsed_days: this.getElapsedDays(card, input.practiced),
-      scheduled_days: schedule.card.scheduled_days,
+      scheduled_days: schedule.card.scheduledDays,
       reps: schedule.card.reps,
-      lapses: schedule.card.lapses,
-      last_review: schedule.card.last_review ?? input.practiced,
-      interval: this.calculateInterval(input.practiced, schedule.card.due),
+      // Preserve the existing policy: only Again from Review increments lapses.
+      lapses:
+        card.lapses +
+        (rating === Rating.Again && card.state === State.Review ? 1 : 0),
+      last_review: schedule.card.lastReviewAt ?? input.practiced,
+      interval: this.calculateInterval(input.practiced, schedule.card.dueAt),
     };
   }
 
-  private getElapsedDays(card: Card, practiced: Date): number {
+  private getElapsedDays(
+    card: DefaultSchedulerCard<"FSRS-6">,
+    practiced: Date
+  ): number {
     // v6 removed Card.elapsed_days. Keep our persisted history/plugin field,
     // using the same UTC calendar-day boundaries as v5, not the scheduled due date.
-    if (card.state === State.New || !card.last_review) return 0;
+    if (card.state === State.New || !card.lastReviewAt) return 0;
     const utcDay = (date: Date) =>
       Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
     return Math.floor(
-      (utcDay(practiced) - utcDay(card.last_review)) / 86_400_000
+      (utcDay(practiced) - utcDay(card.lastReviewAt)) / 86_400_000
     );
   }
 

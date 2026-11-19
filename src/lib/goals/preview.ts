@@ -2,6 +2,7 @@ import type { SqliteDatabase } from "../db/client-sqlite";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import { calculateGoalPractice } from "./calculate";
 import { canonicalJson, hashCanonicalJson } from "./config";
+import { practiceEventContent } from "./practice-event-content";
 import { readGoalPracticeContext } from "./resolve";
 
 type Context = ReturnType<typeof readGoalPracticeContext>;
@@ -57,6 +58,7 @@ function practiceContextInputs(context: Context, evaluationId: string) {
     displayName: context.displayName,
     config: context.config,
     goalTuneCount: context.goalTuneCount,
+    plugin: context.plugin,
   };
   return { predecessor, configuration };
 }
@@ -67,7 +69,7 @@ export function practiceContextKey(context: Context, evaluationId: string) {
     context,
     evaluationId
   );
-  return canonicalJson({ predecessor, configuration }, 256 * 1024);
+  return canonicalJson({ predecessor, configuration }, 2 * 1024 * 1024);
 }
 
 export async function practiceContextFingerprints(
@@ -83,8 +85,23 @@ export async function practiceContextFingerprints(
     predecessorFingerprint: predecessor
       ? await hashCanonicalJson(predecessor)
       : null,
-    calculationConfigHash: await hashCanonicalJson(configuration, 128 * 1024),
+    calculationConfigHash: await hashCanonicalJson(
+      configuration,
+      2 * 1024 * 1024
+    ),
   };
+}
+
+/** Bind a checked plugin result to its inputs without requiring deterministic
+ * replay at Submit. This is an integrity checksum, not an authentication token. */
+export function pluginPreviewReceiptHash(
+  inputs: Awaited<ReturnType<typeof practiceContextFingerprints>>,
+  result: Parameters<typeof practiceEventContent>[0]
+) {
+  return hashCanonicalJson(
+    { version: 1, inputs, event: practiceEventContent(result) },
+    256 * 1024
+  );
 }
 
 /** Read/calculate only. Staging must recheck ownership after awaiting this result. */
@@ -113,10 +130,23 @@ export async function prepareGoalPracticePreview(
     goalTuneCount: context.goalTuneCount,
     predecessor: context.predecessor,
     legacyGoalId: context.legacyGoalId,
+    plugin: context.plugin,
   });
+  const fingerprints = await practiceContextFingerprints(
+    context,
+    input.evaluationId
+  );
+  const calculationConfigHash =
+    context.config.scheduler.id === "plugin"
+      ? await pluginPreviewReceiptHash(fingerprints, {
+          ...result,
+          goal: context.goalKey,
+        })
+      : fingerprints.calculationConfigHash;
   return {
     ...result,
-    ...(await practiceContextFingerprints(context, input.evaluationId)),
+    ...fingerprints,
+    calculationConfigHash,
     contextKey: practiceContextKey(context, input.evaluationId),
     goalKey: context.goalKey,
     notices: context.notices,

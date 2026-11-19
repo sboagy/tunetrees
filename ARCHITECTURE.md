@@ -356,8 +356,8 @@ These principles define the product behavior and should be preserved.
 
 TuneTrees uses the FSRS algorithm (`ts-fsrs`):
 
-The app pins ts-fsrs 6.0.0 while retaining the FSRS-6 model through its
-compatibility API. `FSRSService` derives the persisted elapsed-day field from
+The app pins ts-fsrs 6.0.0 and explicitly selects the FSRS-6 model through
+the supported `DefaultScheduler` API. `FSRSService` derives the persisted elapsed-day field from
 actual review timestamps; the library no longer returns that field. Existing
 weights and immutable history remain compatible with older clients. See
 [`ts-fsrs6-migration.md`](docs/development/ts-fsrs6-migration.md) for reviewed
@@ -396,14 +396,24 @@ and validates due dates and bounded JSON state. Script errors propagate without
 fallback. The state envelope records plugin identity, code version, script hash
 and state version; only plugin-declared compatible state versions can continue.
 Both calls use a captured script and the existing VM lifecycle and deadlines.
-Goal configuration and preview/staging/Submit/UI wiring remain pending; this
-executor does not yet activate custom scheduling in the new preview path.
+Goal configuration supports explicit plugin IDs/options and named action mappings.
+The owner-scoped context resolves only that enabled, visible scheduling plugin
+from local SQLite. Preview fingerprints include its exact script and metadata;
+the existing staging/Submit checks reject intervening edits. The executor now
+feeds these service boundaries, but plugin selection in settings and activation
+of the goal-aware practice UI remain pending.
+For plugins, the staged calculation hash binds the current input fingerprints
+and checked event content. Submit verifies that receipt and commits the reviewed
+result without executing the script again, allowing nondeterministic plugins.
+Built-in schedulers retain their calculation replay check. The shared
+`practice-event-content.ts` canonicalization also governs exact event retries.
 
 The #426 domain foundation lives in `src/lib/goals`: `builtins.ts` holds the
 editable built-in definitions, `config.ts` validates JSON and resolves overrides,
-and `calculate.ts` dispatches pure previews to `fsrs.ts` or `ladder.ts` without
-DB writes. `state.ts` validates versioned JSON state for both schedulers;
-`practice-state.ts` decodes new JSON or unambiguous legacy Recall state. New JSON
+and `calculate.ts` dispatches previews to `fsrs.ts`, `ladder.ts`, or the selected
+plugin executor without DB writes. `state.ts` validates built-in JSON state;
+`practice-state.ts` also decodes plugin envelopes through the shared plugin-state
+validator, or unambiguous legacy Recall state. New JSON
 is authoritative; typed FSRS columns are historical decoder inputs or compatibility
 projections, never a fallback for malformed new JSON. Common timestamps and
 fractional durations stay outside scheduler state. Legacy learning progress that
@@ -465,7 +475,7 @@ and minimum shortfalls. Add to
 review creates queue rows directly, without placeholder practice-history events.
 Legacy queue functions remain for test/compatibility callers; they are no longer
 the interactive queue allocation path. Evaluation/staging/Submit activation still
-requires the versioned plugin contract and goal-aware evaluation UI.
+requires the goal-aware evaluation UI and settings selection integration.
 
 `preview.ts` calculates from that snapshot and fingerprints its relevant inputs without
 writing. These fingerprints are preparation for, not a substitute for, atomic Submit

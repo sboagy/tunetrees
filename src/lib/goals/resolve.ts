@@ -1,5 +1,6 @@
 import { and, eq, isNull, or } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
+import { readSelectedSchedulingPlugin } from "../db/queries/plugins";
 import { readPracticeRecordsForTune } from "../db/queries/practice-records";
 import {
   goal,
@@ -141,6 +142,14 @@ export function readGoalPracticeContext(
   )?.assignment;
   if (!assignment) throw new Error("Tune is not active in this repertoire");
   const definition = resolveAssignment(assignment);
+  const plugin =
+    definition.config.scheduler.id === "plugin"
+      ? readSelectedSchedulingPlugin(
+          db,
+          userId,
+          definition.config.scheduler.pluginId
+        )
+      : null;
   const predecessor =
     readPracticeRecordsForTune(db, tuneId, repertoireId)[0] ?? null;
   const legacyGoalId =
@@ -157,6 +166,7 @@ export function readGoalPracticeContext(
     repertoireId,
     tuneId,
     ...definition,
+    plugin,
     predecessor,
     legacyGoalId,
     goalTuneCount,

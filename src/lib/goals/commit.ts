@@ -7,21 +7,38 @@ import {
   repertoireTune,
   tableTransientData,
 } from "../db/schema";
+import { parseGoalPluginState } from "../plugins/goal-scheduler";
 import { shouldClearConsumedScheduledOverride } from "../services/practice-recording";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
-import { canonicalJson } from "./config";
+import { nonFsrsCompatibility } from "./calculate";
+import { practiceEventContent as eventContent } from "./practice-event-content";
 import {
+  pluginPreviewReceiptHash,
   practiceContextFingerprints,
   practiceContextKey,
   prepareGoalPracticePreview,
 } from "./preview";
-import { readGoalPracticeContext } from "./resolve";
+import { readGoalPracticeContext, readGoalRepertoireSnapshot } from "./resolve";
 import { practiceDraftWhere as draftWhere } from "./staging";
+import { parseStateJson } from "./state";
 
 type Draft = typeof tableTransientData.$inferSelect;
-type Event = typeof practiceRecord.$inferSelect;
 type Queue = typeof dailyPracticeQueue.$inferSelect;
 type Preview = Awaited<ReturnType<typeof prepareGoalPracticePreview>>;
+type CommitPreview = Pick<
+  Preview,
+  | "goalKey"
+  | "goalId"
+  | "evaluationId"
+  | "evaluationSnapshot"
+  | "schedulerId"
+  | "schedulerVersion"
+  | "schedulerState"
+  | "practiced"
+  | "due"
+  | "intervalDays"
+  | "compatibility"
+>;
 
 export interface GoalCommitItem {
   queueRowId: string;
@@ -29,51 +46,33 @@ export interface GoalCommitItem {
   draft: Draft;
 }
 
-/** Compare authoritative event meaning; transport metadata and typed projections are not state. */
-function eventContent(
-  row: Pick<
-    Event,
-    | "goalId"
-    | "goal"
-    | "evaluationId"
-    | "evaluationSnapshot"
-    | "schedulerId"
-    | "schedulerVersion"
-    | "schedulerState"
-    | "practiced"
-    | "due"
-    | "intervalDays"
-  >
-) {
-  if (
-    !row.goalId ||
-    !row.evaluationId ||
-    !row.evaluationSnapshot ||
-    !row.schedulerId ||
-    !row.schedulerVersion ||
-    !row.schedulerState ||
-    !row.practiced ||
-    !row.due ||
-    row.intervalDays === null
-  )
-    throw new Error(
-      "Legacy or incomplete preview must be recalculated and reviewed"
-    );
-  return canonicalJson(
-    {
-      goalId: row.goalId,
-      goal: row.goal,
-      evaluationId: row.evaluationId,
-      evaluationSnapshot: JSON.parse(row.evaluationSnapshot),
-      schedulerId: row.schedulerId,
-      schedulerVersion: row.schedulerVersion,
-      schedulerState: JSON.parse(row.schedulerState),
-      practiced: normalizePracticeTimestamp(row.practiced),
-      due: normalizePracticeTimestamp(row.due),
-      intervalDays: row.intervalDays,
-    },
-    128 * 1024
-  );
+const requiredDraftFields = [
+  "practiceRecordId",
+  "goal",
+  "goalId",
+  "evaluationId",
+  "evaluationSnapshot",
+  "schedulerId",
+  "schedulerVersion",
+  "schedulerState",
+  "practiced",
+  "due",
+  "intervalDays",
+] as const;
+
+type CompleteDraft = Draft & {
+  [K in (typeof requiredDraftFields)[number]]: NonNullable<Draft[K]>;
+};
+
+/** Legacy drafts may lack event fields. Validate before consuming them, and
+ * expose that guarantee to TypeScript rather than using non-null assertions. */
+function assertCompleteDraft(draft: Draft): asserts draft is CompleteDraft {
+  for (const field of requiredDraftFields) {
+    if (draft[field] === null || draft[field] === undefined)
+      throw new Error(
+        "Legacy or incomplete preview must be recalculated and reviewed"
+      );
+  }
 }
 
 function readQueue(db: SqliteDatabase, item: GoalCommitItem): Queue {
@@ -115,12 +114,7 @@ function readExisting(db: SqliteDatabase, draft: Draft) {
 
 async function prepareItem(db: SqliteDatabase, item: GoalCommitItem) {
   const draft = item.draft;
-  const context = readGoalPracticeContext(
-    db,
-    draft.userId,
-    draft.repertoireId,
-    draft.tuneId
-  );
+  assertCompleteDraft(draft);
   const queue = readQueue(db, item);
   const stored = db
     .select()
@@ -130,6 +124,7 @@ async function prepareItem(db: SqliteDatabase, item: GoalCommitItem) {
   eventContent(draft);
   const existing = readExisting(db, draft);
   if (existing) {
+    assertRetryScope(db, draft);
     // A completed retry must not reapply an old due date or increment queue counters.
     if (queue.displayedPracticeRecordId !== existing.id || !queue.completedAt)
       throw new Error(
@@ -137,6 +132,12 @@ async function prepareItem(db: SqliteDatabase, item: GoalCommitItem) {
       );
     return { item, queue, existing, contextKey: null, preview: null };
   }
+  const context = readGoalPracticeContext(
+    db,
+    draft.userId,
+    draft.repertoireId,
+    draft.tuneId
+  );
   assertNoTimeCollision(db, draft);
   if (JSON.stringify(stored) !== JSON.stringify(draft)) return null;
   // Transient note fields have no durable note-write path in this boundary yet.
@@ -147,7 +148,7 @@ async function prepareItem(db: SqliteDatabase, item: GoalCommitItem) {
     );
   if (
     context.predecessor?.practiced &&
-    normalizePracticeTimestamp(draft.practiced!) <
+    normalizePracticeTimestamp(draft.practiced) <
       normalizePracticeTimestamp(context.predecessor.practiced)
   )
     throw new Error(
@@ -160,12 +161,25 @@ async function prepareItem(db: SqliteDatabase, item: GoalCommitItem) {
     context,
     draft.evaluationId
   );
+  const expectedHash =
+    context.config.scheduler.id === "plugin"
+      ? await pluginPreviewReceiptHash(fingerprints, draft)
+      : fingerprints.calculationConfigHash;
   if (
     fingerprints.predecessorRecordId !== draft.predecessorRecordId ||
     fingerprints.predecessorFingerprint !== draft.predecessorFingerprint ||
-    fingerprints.calculationConfigHash !== draft.calculationConfigHash
+    expectedHash !== draft.calculationConfigHash
   )
     return null;
+  if (context.config.scheduler.id === "plugin") {
+    return {
+      item,
+      queue,
+      existing: undefined,
+      contextKey: practiceContextKey(context, draft.evaluationId),
+      preview: checkedPluginPreview(draft),
+    };
+  }
   const preview = await prepareGoalPracticePreview(db, {
     userId: draft.userId,
     repertoireId: draft.repertoireId,
@@ -190,8 +204,56 @@ async function prepareItem(db: SqliteDatabase, item: GoalCommitItem) {
   };
 }
 
+/** Only used after the stored draft, current inputs and result checksum match.
+ * Commit the exact checked result, regenerating non-authoritative projections. */
+function checkedPluginPreview(draft: Draft): CommitPreview {
+  assertCompleteDraft(draft);
+  const state = parseGoalPluginState(parseStateJson(draft.schedulerState));
+  if (
+    draft.schedulerVersion !== 1 ||
+    draft.schedulerId !== `plugin:${state.pluginId}`
+  )
+    throw new Error("Expected a checked plugin result");
+  const practiced = normalizePracticeTimestamp(draft.practiced);
+  const due = normalizePracticeTimestamp(draft.due);
+  const intervalDays =
+    (new Date(due).getTime() - new Date(practiced).getTime()) / 86400000;
+  if (
+    !Number.isFinite(intervalDays) ||
+    intervalDays < 0 ||
+    intervalDays !== draft.intervalDays
+  )
+    throw new Error("Invalid plugin result interval");
+  return {
+    goalKey: draft.goal,
+    goalId: draft.goalId,
+    evaluationId: draft.evaluationId,
+    evaluationSnapshot: draft.evaluationSnapshot,
+    schedulerId: draft.schedulerId,
+    schedulerVersion: draft.schedulerVersion,
+    schedulerState: draft.schedulerState,
+    practiced: draft.practiced,
+    due: draft.due,
+    intervalDays,
+    compatibility: nonFsrsCompatibility(intervalDays, draft.schedulerId),
+  };
+}
+
+/** Persistence-only retry needs ownership, not the continued availability of
+ * the scheduler that produced an already committed, exactly matching event. */
+function assertRetryScope(db: SqliteDatabase, draft: Draft) {
+  const { members } = readGoalRepertoireSnapshot(
+    db,
+    draft.userId,
+    draft.repertoireId
+  );
+  if (!members.some(({ assignment }) => assignment.tuneRef === draft.tuneId))
+    throw new Error("Tune is not active in this repertoire");
+}
+
 function assertNoTimeCollision(db: SqliteDatabase, draft: Draft) {
-  const practiced = normalizePracticeTimestamp(draft.practiced!);
+  assertCompleteDraft(draft);
+  const practiced = normalizePracticeTimestamp(draft.practiced);
   const collision = readPracticeRecordsForTune(
     db,
     draft.tuneId,
@@ -210,13 +272,14 @@ function writeItem(
   db: SqliteDatabase,
   item: GoalCommitItem,
   queue: Queue,
-  preview: Preview,
+  preview: CommitPreview,
   now: string
 ) {
   const draft = item.draft;
+  assertCompleteDraft(draft);
   db.insert(practiceRecord)
     .values({
-      id: draft.practiceRecordId!,
+      id: draft.practiceRecordId,
       repertoireRef: draft.repertoireId,
       tuneRef: draft.tuneId,
       goal: preview.goalKey,
@@ -304,22 +367,24 @@ export async function commitGoalPracticeEvaluations(
     for (const entry of prepared) {
       const { item } = entry;
       const draft = item.draft;
+      assertCompleteDraft(draft);
+      if (JSON.stringify(readQueue(db, item)) !== JSON.stringify(entry.queue))
+        return { status: "stale" as const };
+      const existing = readExisting(db, draft);
+      if (entry.existing) {
+        assertRetryScope(db, draft);
+        if (!existing) return { status: "stale" as const };
+        continue;
+      }
       const context = readGoalPracticeContext(
         db,
         userId,
         repertoireId,
         draft.tuneId
       );
-      if (JSON.stringify(readQueue(db, item)) !== JSON.stringify(entry.queue))
-        return { status: "stale" as const };
-      const existing = readExisting(db, draft);
-      if (entry.existing) {
-        if (!existing) return { status: "stale" as const };
-        continue;
-      }
       if (
         existing ||
-        practiceContextKey(context, draft.evaluationId!) !== entry.contextKey ||
+        practiceContextKey(context, draft.evaluationId) !== entry.contextKey ||
         JSON.stringify(
           db.select().from(tableTransientData).where(draftWhere(draft)).get()
         ) !== JSON.stringify(draft)
@@ -334,7 +399,10 @@ export async function commitGoalPracticeEvaluations(
     }
     return {
       status: "committed" as const,
-      eventIds: items.map(({ draft }) => draft.practiceRecordId!),
+      eventIds: items.map(({ draft }) => {
+        assertCompleteDraft(draft);
+        return draft.practiceRecordId;
+      }),
     };
   });
   // Also flush identical retries: a previous local transaction may have failed to persist.
