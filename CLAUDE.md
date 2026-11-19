@@ -2,6 +2,10 @@
 
 Repository-specific architecture, tech stack details, and scoped patterns live in the root `AGENTS.md` and `*/AGENTS.md` files. Read `ARCHITECTURE.md` before touching sync/codegen boundaries, runtime data flow, generated artifacts, or repository responsibilities.
 
+## Mandatory UI contract
+
+Before constructing, changing, or auditing UI, read `docs/design/tunetrees-design-system.md` and `src/AGENTS.md`. The design system is the sole repository authority for user-facing appearance, behavior, accessibility, and responsive rules. Follow its rule IDs and §12 acceptance protocol; report untested cases. Existing code and component defaults do not override it. Keep policy there, not in this file.
+
 ## Tech Stack
 
 - Frontend: SolidJS + TypeScript (Vite)
@@ -89,5 +93,4 @@ Any file whose header says `AUTO-GENERATED`, `GENERATED`, or `DO NOT EDIT` is of
 | Architecture / repo-boundary | `ARCHITECTURE.md` → `AGENTS.md` → scoped `AGENTS.md` |
 | Sync changes | `oosync/AGENTS.md` → `src/lib/sync/*` → generated artifacts |
 | DB schema changes | `drizzle/` → regenerate schema → verify sync + views |
-| UI changes | `src/AGENTS.md` — keep E2E selectors stable |
-| Design system | `docs/design/tunetrees-design-system.md` |
+| UI changes / audits | `docs/design/tunetrees-design-system.md` → `src/AGENTS.md`; preserve stable E2E selectors |

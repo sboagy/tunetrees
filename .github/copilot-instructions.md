@@ -2,7 +2,7 @@
 
 This file intentionally contains only global execution guardrails.
 
-Repository-specific architecture, tech stack details, and patterns (including sync adapters/codegen boundaries) live in the root `AGENTS.md` and scoped `*/AGENTS.md` files.
+Repository-specific architecture, tech stack details, and patterns (including sync adapters/codegen boundaries) live in the root `AGENTS.md` and scoped `*/AGENTS.md` files. For UI construction, changes, or audits, first read `docs/design/tunetrees-design-system.md` and `src/AGENTS.md`; follow the design system’s rules and acceptance protocol rather than inferring policy from existing code.
 
 ## 0. Analysis Before Action
 

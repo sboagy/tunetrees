@@ -117,8 +117,8 @@ If no backward-compatible solution is obvious, do not quietly generate a destruc
 
 ## UI Principles (Pointers)
 
-- UI is table-centric and performance-oriented; see `src/AGENTS.md`.
-- Visual grammar, action vocabulary, and button/icon semantics live in `docs/design/tunetrees-design-system.md`.
+- Table-centric UI policy: `docs/design/tunetrees-design-system.md` V1/T1. Performance implementation constraints: `src/AGENTS.md`.
+- Before constructing, changing, or auditing UI, read `docs/design/tunetrees-design-system.md`. It is the sole repository authority for user-facing appearance, behavior, accessibility, responsive rules, and audit acceptance. Follow its rule IDs and §12 verification protocol; existing code is not an exception. Keep UI policy there and implementation constraints in `src/AGENTS.md`.
 - Do not introduce React patterns (no React hooks, no React-only libraries in app code paths).
 
 ## Testing & Local Dev Conventions
@@ -133,4 +133,4 @@ If no backward-compatible solution is obvious, do not quietly generate a destruc
 - Architecture / repo-boundary changes: start with `ARCHITECTURE.md`, then this file, then the relevant scoped `AGENTS.md`.
 - Sync changes: start with `oosync/AGENTS.md`, then `src/lib/sync/*`, then generated artifacts.
 - DB schema changes: check `drizzle/` + regenerate schema contract, then verify sync + views.
-- UI changes: follow `src/AGENTS.md` and ensure E2E selectors remain stable.
+- UI changes/audits: read `docs/design/tunetrees-design-system.md`, then `src/AGENTS.md`; verify applicable rules and preserve stable E2E selectors.
