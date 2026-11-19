@@ -1,6 +1,7 @@
 // spec: e2e/tests/notes-references-test-plan.md
 
 import { expect } from "@playwright/test";
+import { TEST_TUNE_BANISH_ID } from "../../tests/fixtures/test-data";
 import {
   configureMockGoogleDriveByos,
   saveMockGoogleStorageSettings,
@@ -38,11 +39,13 @@ test.describe("REFS-001: References CRUD Operations", () => {
 
     // Search for and select Banish Misfortune tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
-    await page.waitForTimeout(500); // Wait for filter to apply
-
-    // Catalog search results are not stable enough to key this suite off a row index.
-    const tuneRow = ttPage.getRows("catalog").first();
-    await expect(tuneRow).toBeVisible({ timeout: 5000 });
+    // Private fixture tunes can share this title. Only the public catalog tune
+    // has the baseline reference assumed by this suite; never select by order.
+    const tuneRow = ttPage.getTuneRowById(
+      TEST_TUNE_BANISH_ID,
+      ttPage.catalogGrid
+    );
+    await expect(tuneRow).toBeVisible({ timeout: 30000 });
     await tuneRow.click();
 
     // On mobile, expand the sidebar (collapsed by default)
@@ -53,6 +56,9 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await expect(
       page.getByRole("heading", { name: "Banish Misfortune" })
     ).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(ttPage.referencesCount).toHaveText(/^1 reference$/i, {
       timeout: 10000,
     });
   });
