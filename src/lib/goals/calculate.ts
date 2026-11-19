@@ -4,6 +4,7 @@ import {
   calculateGoalPlugin,
   type GoalPluginInput,
 } from "../plugins/goal-scheduler";
+import { ensureMinimumNextDay } from "../utils/practice-date";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import {
   canonicalJson,
@@ -89,8 +90,7 @@ export async function calculateGoalPractice(input: GoalPracticeInput) {
   };
   if (config.scheduler.id === "plugin") {
     if (
-      !input.plugin ||
-      input.plugin.id !== config.scheduler.pluginId ||
+      input.plugin?.id !== config.scheduler.pluginId ||
       evaluation.action.kind !== "plugin"
     )
       throw new Error("The selected scheduling plugin is unavailable");
@@ -160,8 +160,12 @@ export async function calculateGoalPractice(input: GoalPracticeInput) {
           }
         : null,
   });
-  // Quantize once before preview/serialization; never clamp to tomorrow.
-  const due = new Date(Math.floor(result.due.getTime() / 1000) * 1000);
+  // Apply the per-goal due-date policy once, before preview and serialization.
+  // FSRS state remains the model output; ladder/plugin schedules are unaffected.
+  const scheduledDue = config.scheduler.allowSameDayReviews
+    ? result.due
+    : ensureMinimumNextDay(result.due, practiced);
+  const due = new Date(Math.floor(scheduledDue.getTime() / 1000) * 1000);
   const intervalDays = (due.getTime() - practiced.getTime()) / 86400000;
   if (!Number.isFinite(intervalDays) || intervalDays < 0)
     throw new Error("Invalid scheduled interval");

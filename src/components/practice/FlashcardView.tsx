@@ -17,6 +17,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-solid";
 import type { Accessor, Component } from "solid-js";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { useUserSettingsDialog } from "../../contexts/UserSettingsDialogContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
 import type { PracticeEvaluationModel } from "../../lib/goals/practice-session";
@@ -41,6 +42,7 @@ export interface FlashcardViewProps {
 
 export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+  const { isOpen: settingsOpen } = useUserSettingsDialog();
   const [currentIndex, setCurrentIndex] = createSignal(0);
   const [isRevealed, setIsRevealed] = createSignal(false);
   // Auth context currently only needed if future features require local staging directly
@@ -127,11 +129,12 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   const handleKeyDown = (e: KeyboardEvent) => {
     const target = e.target;
     if (
+      settingsOpen() ||
       e.defaultPrevented ||
       e.isComposing ||
       (target instanceof Element &&
         target.closest(
-          "input, textarea, select, button, [contenteditable=true], [role=menu]"
+          "input:not([type=checkbox]), textarea, select, [contenteditable=true], dialog, [role=dialog], [role=alertdialog], [role=menu], [role=menuitem], [aria-haspopup][aria-expanded=true]"
         ))
     )
       return;
@@ -145,6 +148,13 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
         goToNext();
         break;
       case " ": // Spacebar
+        // Space activates a focused button; arrows and rating digits still act
+        // as flashcard shortcuts after a toolbar or navigation button is used.
+        if (
+          target instanceof Element &&
+          target.closest("button, input[type=checkbox]")
+        )
+          return;
         e.preventDefault();
         toggleReveal();
         break;

@@ -62,6 +62,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
     options().find((opt) => opt.value === selectedValue()) ?? {
       value: selectedValue(),
       label: "Evaluation unavailable — choose again",
+      description: "",
       color: "text-destructive",
     };
 
@@ -82,7 +83,12 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
           // evaluation interaction as a row-selection click.
           onClick={(event) => event.stopPropagation()}
         >
-          <span class={selectedOption().color}>{selectedOption().label}</span>
+          <span class={selectedOption().color}>
+            {selectedOption().label}
+            {selectedOption().description
+              ? `: ${selectedOption().description}`
+              : ""}
+          </span>
           <ChevronDown
             class="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2"
             aria-hidden="true"

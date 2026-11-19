@@ -40,6 +40,8 @@ export type GoalScheduler =
       learningStepsMinutes: number[];
       relearningStepsMinutes: number[];
       fuzz: boolean;
+      /** Missing means false: preserve the existing next-day minimum. */
+      allowSameDayReviews?: boolean;
     };
 export interface GoalConfig {
   version: 1;
@@ -260,6 +262,7 @@ function validateScheduler(value: unknown): asserts value is GoalScheduler {
     "learningStepsMinutes",
     "relearningStepsMinutes",
     "fuzz",
+    "allowSameDayReviews",
   ]);
   requireValue(
     Array.isArray(value.weights) &&
@@ -285,6 +288,11 @@ function validateScheduler(value: unknown): asserts value is GoalScheduler {
     );
   }
   requireValue(typeof value.fuzz === "boolean", "Fuzz must be boolean");
+  requireValue(
+    value.allowSameDayReviews === undefined ||
+      typeof value.allowSameDayReviews === "boolean",
+    "Allow same-day reviews must be boolean"
+  );
 }
 function validateEvaluations(
   value: unknown

@@ -138,6 +138,28 @@ test.describe("GOALS-001: Goals settings", () => {
     });
   });
 
+  test("persists the per-goal same-day FSRS option", async ({ page }) => {
+    await openSettingsTab(page, "goals");
+    const editRecall = page.getByTestId(
+      "goal-edit-00000000-0000-0000-0000-000000000001"
+    );
+    await editRecall.click();
+    await page.getByText("Advanced FSRS settings", { exact: true }).click();
+    const sameDay = page.getByTestId("goal-allow-same-day-reviews");
+    await expect(sameDay).not.toBeChecked();
+    await sameDay.check();
+    await page.getByTestId("goal-save").click();
+    await expect(page.getByTestId("goal-editor")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await page.reload();
+    await openSettingsTab(page, "goals");
+    await editRecall.click();
+    await page.getByText("Advanced FSRS settings", { exact: true }).click();
+    await expect(sameDay).toBeChecked();
+  });
+
   test("C: selects named plugin actions and preserves personal labels after offline save", async ({
     page,
     context,

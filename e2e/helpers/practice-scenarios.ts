@@ -1631,6 +1631,22 @@ async function clearUserTable(
   }
 }
 
+async function seedGoalDailySettings(
+  user: TestUser,
+  settings: { goalId: string; daily: Partial<DailyGoalSettings> }[] = []
+): Promise<void> {
+  if (!settings.length) return;
+  const { supabase } = await getTestUserClient(user.email.split(".")[0]);
+  const { error } = await supabase.from("goal_user_settings").upsert(
+    settings.map(({ goalId, daily }) => ({
+      user_id: user.userId,
+      goal_id: goalId,
+      overrides: JSON.stringify({ daily }),
+    }))
+  );
+  if (error) throw new Error(`Failed to seed goal settings: ${error.message}`);
+}
+
 /**
  * PARALLEL-SAFE PRACTICE SETUP
  * Works with any test user - safe for parallel execution
@@ -1640,6 +1656,7 @@ export async function setupForPracticeTestsParallel(
   user: TestUser,
   opts?: {
     repertoireTunes?: string[];
+    goalDailySettings?: { goalId: string; daily: Partial<DailyGoalSettings> }[];
     startTab?: "practice" | "repertoire" | "catalog";
     /**
      * If provided, marks all repertoireTunes as scheduled this many days ago.
@@ -1709,6 +1726,7 @@ export async function setupForPracticeTestsParallel(
       "user_genre_selection",
     ]);
     await normalizeUserRepertoireRow(user);
+    await seedGoalDailySettings(user, opts?.goalDailySettings);
 
     if (repertoireTunes.length > 0) {
       await seedUserRepertoire(user, repertoireTunes, true);
@@ -1958,18 +1976,7 @@ export async function setupForRepertoireTestsParallel(
   ]);
   await normalizeUserRepertoireRow(user);
 
-  if (opts.goalDailySettings?.length) {
-    const { supabase } = await getTestUserClient(user.email.split(".")[0]);
-    const { error } = await supabase.from("goal_user_settings").upsert(
-      opts.goalDailySettings.map(({ goalId, daily }) => ({
-        user_id: user.userId,
-        goal_id: goalId,
-        overrides: JSON.stringify({ daily }),
-      }))
-    );
-    if (error)
-      throw new Error(`Failed to seed goal settings: ${error.message}`);
-  }
+  await seedGoalDailySettings(user, opts.goalDailySettings);
 
   await seedUserRepertoire(user, repertoireTunes);
   await seedUserTuneSets(user, tuneSets);

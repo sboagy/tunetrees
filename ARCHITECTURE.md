@@ -378,6 +378,13 @@ Key tables:
 - `repertoire_tune`: current scheduling state per tune within a repertoire.
 - `daily_practice_queue`: frozen daily queue snapshot used to present the day's work.
 
+Goal-selected FSRS calculations apply the per-goal `allowSameDayReviews` due-date
+policy before staging. Missing/false preserves the shared next-day minimum;
+true retains short FSRS intervals. Model state is unchanged by this policy, and
+`interval_days` measures the final due timestamp minus practice time. Ladder and
+plugin calculations retain fractional intervals independently. Same-day repeats
+remain explicit Practice again actions on the frozen daily queue.
+
 Scheduling plugins run during evaluation, before the staged schedule is written.
 `src/lib/plugins/quickjs-host.ts` owns worker deadlines and reply routing;
 `quickjs-worker.ts` owns message validation and runtime initialization;

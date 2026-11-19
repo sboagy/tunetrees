@@ -1278,3 +1278,56 @@ errors do not retain retry receipts; built-in Fluency selection resolves by name
 and passes browser coverage; owner-private name resolution has domain coverage;
 and the narrow hook tests pass with their existing fakes. Added focused tests for
 failed-goal recovery and partial-refresh visibility. No changes were pushed.
+
+
+## Regression follow-up after the full E2E run
+
+The 61 reported failures were largely cascading evaluation-picker failures: the
+active integration had removed the existing selected `label: description` text.
+That presentation is restored using each goal's labels/descriptions. Flashcard
+shortcuts now work when the mode switch or navigation button retains focus,
+without intercepting text editing, open menus, or Space activation on a control.
+The rapid rating-change test waits for the asynchronous picker to be enabled.
+
+Scheduling fixtures now use real per-goal settings instead of obsolete global
+FSRS test overrides, and the explicit plugin contract instead of automatic plugin
+matching. The repeated-Easy growth assertions and plugin's exact 17-day result
+remain intact. The Again test verifies the exact 25-hour due-date floor plus the
+new integer ceiling projection, rather than mistaking the compatibility column
+for the actual duration.
+
+Approved during this regression review: each FSRS goal exposes **Allow reviews
+later the same day** in Advanced settings, off by default. The optional
+`scheduler.allowSameDayReviews` field uses existing configuration JSON; absent is
+off, with no schema migration. Off applies the existing shared next-day helper;
+on preserves short FSRS intervals. Model state is unchanged, and same-day repeats
+remain manual Practice again actions. Ladder/plugin sub-day outcomes are unchanged.
+This decision is also recorded in `_notes/426_goals_plan.md`.
+
+Validation: 1,437 unit tests pass, including both timing policies and missing-field
+configuration support. Typecheck and lint pass. Desktop/mobile settings tests
+verify the unchecked default and persistence after enabling/reloading. Earlier
+reruns passed 122 affected/serial-descendant tests, then 27 targeted scheduling and
+keyboard tests (two existing skips), and six offline/PWA tests. The broader
+scheduling run passed 50 tests with two existing skips and one plugin-timeout
+failure after a page reload discarded the in-flight request. With source files
+left unchanged during the final rerun, all 33 keyboard/Fluency tests passed
+(two existing skips), including that timeout on both platforms and the new
+Settings keyboard-isolation regression. All six offline/PWA tests passed again
+against the final rebuilt preview bundle. A fresh complete E2E suite remains for
+the developer's confirmation; these results are focused reruns, not a claim that
+the entire suite ran clean in one pass. The broader visual/assistive UI matrix
+remains unverified.
+
+CodeRabbit's first review raised two questions: explicit plugin selection and the
+repeated-Easy cap. The seed helper saves the plugin selection via goal settings;
+the test now passes on both platforms. A daily maximum of one allows a 150-day cap
+and the required growth; obsolete global-override/fuzz test branches were removed.
+No commits or pushes have been made in this follow-up.
+
+CodeRabbit's second review found background flashcard shortcuts could operate
+while Settings was open. The guard now checks the shared Settings context and
+ignores dialog targets, with desktop/mobile browser coverage. Its three other
+questions are covered: configuration accepts missing/boolean values and rejects
+non-booleans; editor changes preserve the scheduler object via spreads; calculation
+tests verify 25-hour versus ten-minute results for the same first Good evaluation.

@@ -154,6 +154,24 @@ function SchedulerFields(props: {
                 values={fsrs()!.weights}
                 onChange={(weights) => updateFsrs({ weights })}
               />
+              <label class="flex min-h-11 items-center gap-2">
+                <input
+                  type="checkbox"
+                  data-testid="goal-allow-same-day-reviews"
+                  aria-describedby="goal-same-day-help"
+                  checked={fsrs()!.allowSameDayReviews ?? false}
+                  onChange={(e) =>
+                    updateFsrs({ allowSameDayReviews: e.currentTarget.checked })
+                  }
+                />
+                <span>Allow reviews later the same day</span>
+              </label>
+              <p id="goal-same-day-help" class="text-sm text-muted-foreground">
+                Keep FSRS’s short intervals. Additional same-day practice uses
+                Practice again; tunes do not automatically re-enter today’s
+                queue. When off, the next review is scheduled no earlier than
+                tomorrow.
+              </p>
               <NumberList
                 name="learning-steps"
                 label="Learning steps (minutes; empty for none)"

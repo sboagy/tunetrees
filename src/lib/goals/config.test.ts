@@ -21,6 +21,25 @@ function config(name = "fluency") {
 }
 
 describe("goal definitions and overrides", () => {
+  it.each([{}, { allowSameDayReviews: false }, { allowSameDayReviews: true }])(
+    "accepts the FSRS same-day setting %j",
+    (setting) => {
+      const value = config("recall");
+      if (value.scheduler.id !== "builtin:fsrs6")
+        throw new Error("Expected FSRS");
+      value.scheduler = { ...value.scheduler, ...setting };
+      expect(parseGoalConfig(value)).toEqual(value);
+    }
+  );
+  it("rejects a non-boolean FSRS same-day setting", () => {
+    const value = config("recall");
+    expect(() =>
+      parseGoalConfig({
+        ...value,
+        scheduler: { ...value.scheduler, allowSameDayReviews: "true" },
+      })
+    ).toThrow("must be boolean");
+  });
   it("accepts explicit plugin identity and named action mappings", () => {
     const value = config();
     value.scheduler = {

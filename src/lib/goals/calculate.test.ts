@@ -5,6 +5,7 @@ import type {
   PrefsSpacedRepetition,
 } from "../db/types";
 import { FSRSService } from "../scheduling/fsrs-service";
+import { ensureMinimumNextDay } from "../utils/practice-date";
 import { getBuiltInGoals } from "./builtins";
 import { calculateGoalPractice, type GoalPracticeInput } from "./calculate";
 import { canonicalJson } from "./config";
@@ -110,7 +111,12 @@ describe("goal-selected calculations with JSON state", () => {
         quality: rating,
         practiced: new Date(result.practiced),
       });
-      expect(result.due).toBe(old.nextDue.toISOString());
+      expect(result.due).toBe(
+        ensureMinimumNextDay(
+          old.nextDue,
+          new Date(result.practiced)
+        ).toISOString()
+      );
       expect(JSON.parse(result.schedulerState)).toMatchObject({
         stability: old.stability,
         difficulty: old.difficulty,
@@ -141,7 +147,12 @@ describe("goal-selected calculations with JSON state", () => {
         },
         legacy(status)
       );
-      expect(result.due).toBe(old.nextDue.toISOString());
+      expect(result.due).toBe(
+        ensureMinimumNextDay(
+          old.nextDue,
+          new Date(result.practiced)
+        ).toISOString()
+      );
       expect(JSON.parse(result.schedulerState)).toMatchObject({
         stability: old.stability,
         difficulty: old.difficulty,
@@ -184,9 +195,26 @@ describe("goal-selected calculations with JSON state", () => {
     expect(fromJson.schedulerState).toBe(fromLegacy.schedulerState);
     expect(fromJson.due).toBe(fromLegacy.due);
   });
+  it.each([{}, { allowSameDayReviews: false }])(
+    "preserves the next-day floor with %j",
+    async (setting) => {
+      const input = options();
+      if (input.config.scheduler.id !== "builtin:fsrs6")
+        throw new Error("Expected FSRS");
+      input.config.scheduler = { ...input.config.scheduler, ...setting };
+      const result = await calculateGoalPractice(input);
+      expect(result.due).toBe("2026-11-17T13:00:00.000Z");
+      expect(result.intervalDays).toBe(25 / 24);
+      expect(JSON.parse(result.schedulerState).learningSteps).toBe(1);
+    }
+  );
   it("persists learning progress across same-day reviews", async () => {
     const input = options();
+    if (input.config.scheduler.id !== "builtin:fsrs6")
+      throw new Error("Expected FSRS");
+    input.config.scheduler.allowSameDayReviews = true;
     const first = await calculateGoalPractice(input); // Good advances to the second learning step.
+    expect(first.due).toBe("2026-11-16T12:10:00.000Z");
     expect(JSON.parse(first.schedulerState).learningSteps).toBe(1);
     const second = await calculateGoalPractice({
       ...input,
