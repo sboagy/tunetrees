@@ -231,6 +231,9 @@ before invoking the callback is outside this consumer-side guard.
 A service operation may perform an upload/download followed by another download.
 Full-pull completion metadata retains the first full pull's generation across both
 engine requests and resets at the service callback, including failed operations.
+Genre-filter lookup failures propagate from the request-override provider to the
+sync service. They must not become a null override and a successful cursor advance;
+startup uses the service's existing bounded retries to obtain the intended catalog.
 Anonymous onboarding includes `goal` and `goal_user_settings` in both its initial
 restricted pull and its genre-filtered catalog pull, so starter queue allocation
 uses downloaded definitions and personal settings without authoring shared goals locally.
@@ -529,11 +532,21 @@ repertoire-wide limited history, queue candidate selection and local practice vi
 It converts whole seconds to UTC separately from the six-digit fraction to avoid
 SQLite millisecond rounding. Analysis selects the latest event before filtering
 stability or due dates, so older eligible events cannot stand in for newer events.
-Analysis scopes history to the requested repertoire before ranking. Queue candidate
+Analysis scopes history to the requested repertoire before ranking. Retention reads
+valid FSRS state through the shared History decoder (JSON is authoritative),
+excluding newer ladder/plugin or malformed state rather than reviving old FSRS
+columns. Its current curve remains an explicitly labeled approximation; model-specific
+retention and elapsed-time handling are tracked in #953. Queue candidate
 generation rejects malformed non-null timestamps; display queries rank them as
 missing. Shared fixtures compare JavaScript, SQLite WASM and Postgres ordering. The main
 Postgres practice view already uses the corresponding timestamp/modified/ID order;
 its schema and the sync contract remain unchanged.
+
+`goals/assignment.ts` is the shared Practice/Repertoire assignment boundary. It
+validates all selected members and the target goal, writes its ID and key, and
+clears incompatible performance drafts in one synchronous transaction. Notes,
+submitted history, due dates and queue membership survive. An unchanged effective
+goal keeps its draft. SQLite persistence follows the transaction and can be retried.
 
 `goals/staging.ts` supplies the active practice staging boundary. It calculates asynchronously, then rechecks the caller lifetime,
 owner-scoped context and original draft in one synchronous SQLite transaction before
@@ -545,7 +558,11 @@ persists SQLite. Persistence failures remain visible to the caller with the draf
 retained in memory. Submit performs its own atomic recheck. The UI captures only
 selected-queue receipts, blocks overlapping Submit actions, and retains exact
 receipts for a failed persistence retry. A stale input refresh requires another
-Submit; a changed or cleared draft is not overwritten by that refresh.
+Submit; a changed or cleared draft is not overwritten by that refresh. Conflicts
+retain drafts and link to Practice History. Legacy notes blocking submission are
+shown for explicit copy/save-elsewhere-and-clear recovery; clearing rechecks the
+shown text and never submits automatically. Ladder menu estimates invoke the same
+preview calculator on demand without staging or running plugins during render.
 
 `goals/practice-session.ts` provides one local queue snapshot for evaluation controls.
 Completed labels use the queue's linked event, while choices use the tune's current

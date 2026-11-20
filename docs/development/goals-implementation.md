@@ -1747,3 +1747,71 @@ CodeRabbit reviewed all four Lighthouse follow-up files and reported zero
 findings. No post-review code changes were needed. The local performance and
 static/unit results above still apply; authenticated/offline E2E and remote CI
 remain pending.
+
+
+## Remaining functional gaps (2026-11-20, ready for review)
+
+The user confirmed hosted Lighthouse CI passes for `67a9d503` and authorized a
+consolidated functional batch before the broader UI review.
+
+- Repertoire and Practice goal changes now share an atomic assignment operation.
+  Both stable ID and key are saved; incompatible evaluations are cleared while
+  notes, history, due dates and queue membership are preserved. Bulk targets are
+  validated before writing. Repertoire reports the outcome inline.
+- Analysis decodes the latest event through the shared History state reader,
+  including JSON-only FSRS state and excluding ladder/plugin compatibility columns.
+  Overdue analysis no longer requires FSRS stability. The retention approximation
+  is explicitly labeled; [#953](https://github.com/sboagy/tunetrees/issues/953), in
+  **Invited Alpha**, tracks model-specific retention and elapsed-time calculations.
+- Ladder choices show menu-only due estimates using the staging calculator.
+  Opening the menu writes nothing; the estimate is labeled “If practiced now”.
+- Submission conflicts preserve drafts and offer the affected tune's History link.
+  Blocking legacy notes remain visible, can be copied, and require acknowledgment
+  before clearing. Clearing checks that the note text has not changed and leaves
+  the evaluation unsubmitted. No automatic overwrite or timestamp adjustment.
+
+Validation completed for this uncommitted batch:
+
+- Typecheck, lint, formatting check and diff whitespace check passed.
+- All 1,453 unit tests passed (109 files).
+- 27 focused Playwright checks passed (setup plus desktop/mobile Goals settings
+  and Fluency suites). New coverage verifies menu estimates without staging,
+  copying/preserving/explicitly clearing notes, and UUID/timestamp conflicts that
+  preserve both the draft and existing event and expose the History link.
+- CodeRabbit completed with five findings. Fixed incompatible staged goals
+  surviving Recall fallback, with a regression test. Repertoire feedback now
+  resets on scope changes and rejects stale completions. The remaining concerns
+  were already guarded: keyed recovery rendering remounts acknowledgment state,
+  changed note text is rejected, and unchanged-goal retries still persist.
+  Added explicit persistence-retry coverage.
+- Self-review also covered leaving malformed old goal configurations and loading
+  estimates for a programmatically opened picker.
+
+The focused test launcher used its managed Vite/Worker servers and stopped them
+afterward; no database reset was requested. Full local E2E and remote CI for this
+batch remain pending. No commit or push.
+Broad visual/keyboard/theme review remains separate (design-system Q1–Q3); these
+changes address E3–E5/B1/C3 behavior, not whole-surface UI compliance. Existing
+native bulk-goal confirmation remains an identified broader UI-review item.
+
+### Catalog startup failure found in full local E2E
+
+The private-badge check passed, but the public Banish Misfortune row was absent.
+The trace recorded a 502 from `get_effective_genres_for_user`; the auth provider
+caught that failure, returned null overrides, and reported initial sync success.
+The sync-error guard independently rejected the unrecovered RPC error.
+
+The override provider now propagates failures to the existing sync-service retry
+loop instead of letting a failed lookup advance the initial sync cursor. No badge
+assertions or sync-guard enforcement were weakened. Added provider retry coverage
+and a browser regression that injects one 502 on the final clean-client startup,
+then requires a successful RPC and both public/private ownership results without
+a subsequent test-triggered reload or sync.
+
+All 33 auth unit tests, typecheck, targeted Biome checks, and diff check pass.
+After retrying 1Password authorization, all 23 focused Catalog Playwright checks
+passed (setup plus desktop/mobile), including the original badge case and injected
+502 recovery with the sync-error guard enabled. No commit/push.
+
+The user subsequently confirmed the full local E2E run passed and authorized
+committing and pushing this functional/recovery batch on 2026-11-20.

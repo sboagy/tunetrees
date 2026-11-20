@@ -40,6 +40,7 @@ import {
   normalizePracticeTimestamp,
   orderPracticeHistory,
 } from "../utils/practice-history";
+import { changePracticeGoals } from "./assignment";
 import { getBuiltInGoals } from "./builtins";
 import {
   commitGoalPracticeEvaluations,
@@ -58,10 +59,12 @@ import { readPracticeSession } from "./practice-session";
 import {
   practiceContextFingerprints,
   prepareGoalPracticePreview,
+  prepareLadderDuePreviews,
 } from "./preview";
 import { readGoalPracticeContext, resolveGoalReference } from "./resolve";
 import {
   clearGoalPracticeEvaluation,
+  clearReviewedDraftNotes,
   stageGoalPracticeEvaluation,
 } from "./staging";
 
@@ -321,6 +324,146 @@ function duringCalculation(action: () => void) {
   );
 }
 
+describe("goal assignment changes", () => {
+  const input = () => ({
+    userId: "owner",
+    repertoireId: "rep",
+    tuneIds: ["tune"],
+    goal: "fluency",
+  });
+  it("changes both identity fields without enqueuing or rescheduling a tune", async () => {
+    event("history");
+    raw.run(
+      "UPDATE repertoire_tune SET scheduled = '2026-12-01T12:00:00Z' WHERE repertoire_ref = 'rep'"
+    );
+    const before = db.select().from(practiceRecord).all();
+    await changePracticeGoals(db, input(), () => true);
+    expect(context()).toMatchObject({ goalId: fluencyId, goalKey: "fluency" });
+    expect(
+      raw.exec(
+        "SELECT goal_id, goal, scheduled FROM repertoire_tune WHERE repertoire_ref='rep'"
+      )[0].values
+    ).toEqual([[fluencyId, "fluency", "2026-12-01T12:00:00Z"]]);
+    expect(db.select().from(practiceRecord).all()).toEqual(before);
+    expect(db.select().from(dailyPracticeQueue).all()).toEqual([]);
+  });
+  it("clears incompatible evaluation state but preserves draft notes", async () => {
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "good",
+        practiced: new Date(stamp),
+      },
+      () => true
+    );
+    raw.run("UPDATE table_transient_data SET note_private='Keep my note'");
+    expect(await changePracticeGoals(db, input(), () => true)).toMatchObject({
+      clearedEvaluations: 1,
+    });
+    expect(db.select().from(tableTransientData).get()).toMatchObject({
+      notePrivate: "Keep my note",
+      evaluationId: null,
+      schedulerState: null,
+    });
+  });
+  it("does not clear a staged evaluation when the effective goal is unchanged", async () => {
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "good",
+        practiced: new Date(stamp),
+      },
+      () => true
+    );
+    const before = db.select().from(tableTransientData).get();
+    await changePracticeGoals(db, { ...input(), goal: "recall" }, () => true);
+    expect(db.select().from(tableTransientData).get()).toEqual(before);
+  });
+  it("clears a deleted goal's draft when selecting the effective Recall fallback", async () => {
+    await changePracticeGoals(db, input(), () => true);
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "effortless",
+        practiced: new Date(stamp),
+      },
+      () => true
+    );
+    raw.run("UPDATE table_transient_data SET note_private='Keep my note'");
+    raw.run("UPDATE goal SET deleted=1 WHERE id=?", [fluencyId]);
+    expect(
+      await changePracticeGoals(db, { ...input(), goal: "recall" }, () => true)
+    ).toMatchObject({ clearedEvaluations: 1 });
+    expect(db.select().from(tableTransientData).get()).toMatchObject({
+      evaluationId: null,
+      notePrivate: "Keep my note",
+    });
+  });
+  it("persists an unchanged-goal retry after the first save fails", async () => {
+    vi.mocked(persistDb).mockRejectedValueOnce(new Error("disk unavailable"));
+    await expect(changePracticeGoals(db, input(), () => true)).rejects.toThrow(
+      "disk unavailable"
+    );
+    expect(context().goalId).toBe(fluencyId);
+    vi.mocked(persistDb).mockClear();
+    await changePracticeGoals(db, input(), () => true);
+    expect(persistDb).toHaveBeenCalledOnce();
+    expect(context().goalId).toBe(fluencyId);
+  });
+  it("can leave a goal whose scheduler configuration is invalid", async () => {
+    raw.run("UPDATE goal SET default_config='{}' WHERE id=?", [recall.id]);
+    await changePracticeGoals(db, input(), () => true);
+    expect(context().goalId).toBe(fluencyId);
+  });
+  it("rejects a bulk change containing an inactive tune before changing any assignment", async () => {
+    await expect(
+      changePracticeGoals(
+        db,
+        { ...input(), tuneIds: ["tune", "second"] },
+        () => true
+      )
+    ).rejects.toThrow("not active");
+    expect(context().goalKey).toBe("recall");
+  });
+  it("rolls back draft clearing if the assignment update fails", async () => {
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "good",
+        practiced: new Date(stamp),
+      },
+      () => true
+    );
+    const before = db.select().from(tableTransientData).get();
+    raw.run(
+      "CREATE TRIGGER reject_goal BEFORE UPDATE ON repertoire_tune BEGIN SELECT RAISE(ABORT, 'assignment rejected'); END"
+    );
+    await expect(changePracticeGoals(db, input(), () => true)).rejects.toThrow(
+      "assignment rejected"
+    );
+    expect(db.select().from(tableTransientData).get()).toEqual(before);
+    expect(context().goalKey).toBe("recall");
+  });
+  it("rejects a goal that is no longer available instead of silently assigning Recall", async () => {
+    await expect(
+      changePracticeGoals(db, { ...input(), goal: "missing" }, () => true)
+    ).rejects.toThrow("unavailable");
+    expect(context().goalKey).toBe("recall");
+  });
+});
+
 describe("goal preview staging", () => {
   const input = () => ({
     userId: "owner",
@@ -330,6 +473,56 @@ describe("goal preview staging", () => {
     practiced: new Date(stamp),
   });
   const draft = () => db.select().from(tableTransientData).get();
+
+  it("clears only reviewed notes without changing a staged evaluation", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    raw.run(
+      "UPDATE table_transient_data SET note_private='Keep me', purpose='Practice purpose'"
+    );
+    const before = draft();
+    if (!before) throw new Error("Missing draft");
+    await clearReviewedDraftNotes(db, before, () => true);
+    expect(draft()).toMatchObject({
+      evaluationId: before.evaluationId,
+      schedulerState: before.schedulerState,
+      practiceRecordId: before.practiceRecordId,
+      notePrivate: null,
+      purpose: "Practice purpose",
+    });
+  });
+  it("refuses to clear notes changed since recovery displayed them", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    const before = draft();
+    if (!before) throw new Error("Missing draft");
+    raw.run("UPDATE table_transient_data SET note_private='New text'");
+    await expect(
+      clearReviewedDraftNotes(db, before, () => true)
+    ).rejects.toThrow("Draft notes changed");
+    expect(draft()?.notePrivate).toBe("New text");
+  });
+  it("allows persistence retry after a note clear failed to save", async () => {
+    await stageGoalPracticeEvaluation(db, input(), () => true);
+    raw.run("UPDATE table_transient_data SET note_private='Saved elsewhere'");
+    const before = draft();
+    if (!before) throw new Error("Missing draft");
+    vi.mocked(persistDb).mockRejectedValueOnce(new Error("disk full"));
+    await expect(
+      clearReviewedDraftNotes(db, before, () => true)
+    ).rejects.toThrow("disk full");
+    await clearReviewedDraftNotes(db, before, () => true);
+    expect(draft()?.notePrivate).toBeNull();
+  });
+  it("calculates menu dates using the staging calculator without creating drafts", async () => {
+    assign(fluencyId, "fluency");
+    const estimates = await prepareLadderDuePreviews(db, input());
+    const preview = await prepareGoalPracticePreview(db, {
+      ...input(),
+      evaluationId: "effortless",
+    });
+    expect(estimates.effortless).toBe(preview.due);
+    expect(draft()).toBeUndefined();
+    expect(db.select().from(practiceRecord).all()).toEqual([]);
+  });
 
   it("stores a complete checked first preview without changing history or queue", async () => {
     const result = await stageGoalPracticeEvaluation(db, input(), () => true);
@@ -1511,6 +1704,51 @@ describe("repertoire history SQL consumers", () => {
     expect(
       (await getStalenessData(db, "rep")).map((bucket) => bucket.count)
     ).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it("counts overdue ladder events without FSRS compatibility fields", async () => {
+    event("ladder");
+    raw.run(
+      "UPDATE practice_record SET due='2000-01-01', stability=NULL, goal='fluency'"
+    );
+    expect(
+      (await getStalenessData(db, "rep")).map((bucket) => bucket.count)
+    ).toEqual([0, 0, 0, 0, 1]);
+  });
+
+  it("reads JSON-only FSRS stability for Analysis", async () => {
+    const preview = await prepareGoalPracticePreview(db, {
+      userId: "owner",
+      repertoireId: "rep",
+      tuneId: "tune",
+      evaluationId: "good",
+      practiced: new Date(stamp),
+    });
+    event("json");
+    raw.run(
+      "UPDATE practice_record SET goal_id=?, scheduler_id=?, scheduler_version=1, scheduler_state=?, stability=NULL",
+      [recall.id, preview.schedulerId, preview.schedulerState]
+    );
+    const curve = await getFsrsRetentionCurve(db, "rep");
+    expect(curve).toHaveLength(61);
+    expect(curve[1].retention).toBeCloseTo(
+      0.9 ** (1 / JSON.parse(preview.schedulerState).stability)
+    );
+  });
+
+  it("never falls back to compatibility stability for malformed JSON", async () => {
+    event("broken");
+    raw.run(
+      "UPDATE practice_record SET goal_id=?, scheduler_id='builtin:fsrs6', scheduler_version=1, scheduler_state='{}'",
+      [recall.id]
+    );
+    expect(await getFsrsRetentionCurve(db, "rep")).toEqual([]);
+  });
+
+  it("excludes legacy ladder events even when they contain FSRS-looking columns", async () => {
+    event("ladder");
+    raw.run("UPDATE practice_record SET goal='fluency'");
+    expect(await getFsrsRetentionCurve(db, "rep")).toEqual([]);
   });
 
   it("does not resurrect FSRS stability from an older goal after a ladder event", async () => {

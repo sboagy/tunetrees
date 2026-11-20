@@ -51,6 +51,162 @@ test.describe("Fluency scheduling", () => {
     await expect(tt.getRowFluencyButton(row)).toBeVisible({ timeout: 10000 });
   });
 
+  test("shows ladder due estimates without staging an evaluation", async ({
+    page,
+    testUser,
+  }) => {
+    await page.getByTestId(`recall-eval-${TEST_TUNE_BANISH_ID}`).click();
+    await expect(
+      page.getByTestId("recall-eval-option-effortless")
+    ).toContainText("If practiced now: due", { timeout: 10000 });
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getPracticeDraft(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toBeNull();
+    await page.keyboard.press("Escape");
+    await expect(tt.submitEvaluationsButton).toBeDisabled({ timeout: 10000 });
+  });
+
+  test("preserves draft notes on failed Submit and clears only after explicit recovery", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    await selectEvaluation(page, "effortless");
+    const draft = await page.evaluate(
+      async ({ rep, tune }) =>
+        window.__ttTestApi?.seedPracticeSubmissionRecovery({
+          repertoireId: rep,
+          tuneId: tune,
+          kind: "notes",
+        }),
+      { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+    );
+    await tt.submitEvaluationsButton.click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("recovery-private-note")).toHaveValue(
+      "Private text to preserve",
+      { timeout: 10000 }
+    );
+    await expect(page.getByTestId("recovery-public-note")).toHaveValue(
+      "Public text to preserve",
+      { timeout: 10000 }
+    );
+    await expect(page.getByTestId("recovery-clear-notes")).toBeDisabled({
+      timeout: 10000,
+    });
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getPracticeDraft(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toEqual(draft);
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getDistinctPracticeRecordCount(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toBe(0);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.getByTestId("recovery-copy-notes").click();
+    await expect(page.getByTestId("practice-submit-recovery")).toContainText(
+      "Copied.",
+      { timeout: 10000 }
+    );
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+      "Private text to preserve"
+    );
+    await page.getByTestId("recovery-notes-saved").check();
+    await page.getByTestId("recovery-clear-notes").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("practice-submit-error")).toContainText(
+      "Draft notes cleared",
+      { timeout: 10000 }
+    );
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getPracticeDraft(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toMatchObject({
+      practiceRecordId: draft?.practiceRecordId,
+      evaluationId: "effortless",
+      notePrivate: null,
+      notePublic: null,
+    });
+    await submitAndWaitForPracticeSettled(page, tt);
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getDistinctPracticeRecordCount(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toBe(1);
+  });
+
+  for (const kind of ["time-conflict", "id-conflict"] as const) {
+    test(`preserves ${kind} practice and the draft with a History recovery link`, async ({
+      page,
+      testUser,
+    }) => {
+      await selectEvaluation(page, "effortless");
+      const draft = await page.evaluate(
+        async ({ rep, tune, kind }) =>
+          window.__ttTestApi?.seedPracticeSubmissionRecovery({
+            repertoireId: rep,
+            tuneId: tune,
+            kind,
+          }),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID, kind }
+      );
+      const recorded = await queryLatestPracticeRecord(
+        page,
+        TEST_TUNE_BANISH_ID,
+        testUser.repertoireId
+      );
+      await tt.submitEvaluationsButton.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await expect(page.getByTestId("practice-submit-recovery")).toContainText(
+        "Your draft is preserved",
+        { timeout: 10000 }
+      );
+      await expect(
+        page.getByTestId("recovery-practice-history")
+      ).toHaveAttribute(
+        "href",
+        `/tunes/${TEST_TUNE_BANISH_ID}/practice-history`,
+        { timeout: 10000 }
+      );
+      expect(
+        await queryLatestPracticeRecord(
+          page,
+          TEST_TUNE_BANISH_ID,
+          testUser.repertoireId
+        )
+      ).toEqual(recorded);
+      expect(
+        await page.evaluate(
+          async ({ rep, tune }) =>
+            window.__ttTestApi?.getPracticeDraft(rep, tune),
+          { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+        )
+      ).toEqual(draft);
+      expect(
+        await page.evaluate(
+          async ({ rep, tune }) =>
+            window.__ttTestApi?.getDistinctPracticeRecordCount(rep, tune),
+          { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+        )
+      ).toBe(1);
+    });
+  }
+
   test("submits a goal-specific ladder evaluation and preserves it on reload", async ({
     page,
     testUser,

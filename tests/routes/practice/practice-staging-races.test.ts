@@ -45,17 +45,20 @@ vi.mock("@/lib/goals/staging", () => ({
     return { status: "cleared" };
   },
 }));
-vi.mock("@/lib/goals/resolve", () => ({
-  readGoalRepertoireSnapshot: () => ({
-    members: [
-      { assignment: { tuneRef: "tune" } },
-      { assignment: { tuneRef: "other" } },
-    ],
-    resolveAssignment: ({ goal }: { goal: string }) => ({
-      goalKey: goal,
-      goalId: goal,
-    }),
-  }),
+vi.mock("@/lib/goals/assignment", () => ({
+  changePracticeGoals: async (
+    _db: unknown,
+    input: { tuneIds: string[]; goal: string },
+    current: () => boolean
+  ) => {
+    if (!current()) return { status: "superseded" };
+    for (const tuneId of input.tuneIds) {
+      goals.set(tuneId, input.goal);
+      stagedRows.delete(tuneId);
+    }
+    await mocks.persist();
+    return { status: "changed", clearedEvaluations: 0 };
+  },
 }));
 vi.mock("@/lib/goals/practice-session", () => ({
   readPracticeSession: () => new Map(),

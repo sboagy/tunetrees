@@ -46,6 +46,17 @@ export interface GoalCommitItem {
   draft: Draft;
 }
 
+/** Recoverable conflicts retain the original draft for explicit user action. */
+export class GoalPracticeRecoveryError extends Error {
+  readonly kind: "conflict" | "notes";
+  readonly draft: Draft;
+  constructor(message: string, kind: "conflict" | "notes", draft: Draft) {
+    super(message);
+    this.kind = kind;
+    this.draft = draft;
+  }
+}
+
 /** Capture the selected queue's reviewed drafts, not drafts from other dates or
  * hidden queues. Retain this receipt for persistence retries after Submit. */
 export function readGoalCommitItems(
@@ -149,7 +160,11 @@ function readExisting(db: SqliteDatabase, draft: Draft) {
       existing.tuneRef !== draft.tuneId ||
       eventContent(existing) !== eventContent(draft))
   )
-    throw new Error("Practice event ID conflicts with different content");
+    throw new GoalPracticeRecoveryError(
+      "Practice event ID conflicts with different content",
+      "conflict",
+      draft
+    );
   return existing;
 }
 
@@ -184,8 +199,10 @@ async function prepareItem(db: SqliteDatabase, item: GoalCommitItem) {
   // Transient note fields have no durable note-write path in this boundary yet.
   // Never delete user text merely because its practice evaluation was submitted.
   if (draft.notePrivate !== null || draft.notePublic !== null)
-    throw new Error(
-      "Save or explicitly clear draft notes before submitting practice"
+    throw new GoalPracticeRecoveryError(
+      "Save or explicitly clear draft notes before submitting practice",
+      "notes",
+      draft
     );
   if (
     context.predecessor?.practiced &&
@@ -306,7 +323,11 @@ function assertNoTimeCollision(db: SqliteDatabase, draft: Draft) {
       normalizePracticeTimestamp(row.practiced) === practiced
   );
   if (collision)
-    throw new Error("Another practice event already uses this practiced time");
+    throw new GoalPracticeRecoveryError(
+      "Another practice event already uses this practiced time",
+      "conflict",
+      draft
+    );
 }
 
 function writeItem(

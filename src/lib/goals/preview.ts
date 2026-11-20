@@ -152,3 +152,50 @@ export async function prepareGoalPracticePreview(
     notices: context.notices,
   };
 }
+
+/** Menu-only estimates: same calculator as staging, no draft writes. */
+export async function prepareLadderDuePreviews(
+  db: SqliteDatabase,
+  input: {
+    userId: string;
+    repertoireId: string;
+    tuneId: string;
+    practiced: Date;
+  }
+): Promise<Record<string, string>> {
+  const context = readGoalPracticeContext(
+    db,
+    input.userId,
+    input.repertoireId,
+    input.tuneId
+  );
+  if (context.config.scheduler.id !== "builtin:interval-ladder") return {};
+  const previews = await Promise.all(
+    context.config.evaluations.map(async (choice) => {
+      const preview = await prepareGoalPracticePreview(db, {
+        ...input,
+        evaluationId: choice.id,
+      });
+      return { choice, preview };
+    })
+  );
+  const current = readGoalPracticeContext(
+    db,
+    input.userId,
+    input.repertoireId,
+    input.tuneId
+  );
+  for (const { choice, preview } of previews) {
+    if (
+      preview.contextKey !== practiceContextKey(context, choice.id) ||
+      preview.contextKey !== practiceContextKey(current, choice.id)
+    ) {
+      throw new Error(
+        "Scheduling inputs changed. Reopen the menu to refresh estimates."
+      );
+    }
+  }
+  return Object.fromEntries(
+    previews.map(({ choice, preview }) => [choice.id, preview.due])
+  );
+}

@@ -84,6 +84,7 @@ export function readPracticeSession(
 
 export interface PracticeEvaluationModel {
   choices: readonly EvaluationChoice[];
+  loadDuePreviews?: () => Promise<Record<string, string>>;
   completed: boolean;
   submittedLabel?: string;
   error?: string;

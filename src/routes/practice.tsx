@@ -23,6 +23,7 @@ import { TunesGridScheduled } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import { FlashcardView, PracticeControlBanner } from "../components/practice";
+import { PracticeSubmitRecovery } from "../components/practice/PracticeSubmitRecovery";
 import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../lib/auth/AuthContext";
@@ -244,6 +245,8 @@ const PracticePage: Component = () => {
 
   const {
     submitError,
+    recovery,
+    clearReviewedNotes,
     handleSubmitEvaluations,
     handleAddTunes,
     handleQueueReset: resetQueue,
@@ -429,6 +432,15 @@ const PracticePage: Component = () => {
           data-testid="practice-submit-error"
         >
           {submitError()}{" "}
+          <Show when={recovery()} keyed>
+            {(problem) => (
+              <PracticeSubmitRecovery
+                recovery={problem}
+                pending={submissionPending() || isStaging()}
+                onClearNotes={clearReviewedNotes}
+              />
+            )}
+          </Show>
           <Button
             variant="outline"
             disabled={submissionPending() || isStaging()}

@@ -1085,7 +1085,9 @@ const TTInner: ParentComponent = (props) => {
             error
           );
         }
-        return null;
+        // A missing filter is not a successful unfiltered sync. Propagate the
+        // failure so SyncService retries without advancing its initial cursor.
+        throw error;
       }
     };
 

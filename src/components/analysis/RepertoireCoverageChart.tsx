@@ -69,6 +69,23 @@ export const RepertoireCoverageChart: Component<Props> = (props) => {
     };
   };
 
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: "65%",
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        enabled: true,
+        callbacks: {
+          label: (ctx) =>
+            ` ${ctx.label}: ${ctx.parsed} tune${ctx.parsed === 1 ? "" : "s"}`,
+        },
+      },
+    },
+  } satisfies import("chart.js").ChartOptions &
+    Pick<import("chart.js").DoughnutControllerChartOptions, "cutout">;
+
   return (
     <Card data-testid="repertoire-coverage-chart">
       <CardHeader class="pb-2">
@@ -107,26 +124,7 @@ export const RepertoireCoverageChart: Component<Props> = (props) => {
                     <span class="text-2xl font-bold">{totalTunes()}</span>
                     <span class="text-xs text-muted-foreground">tunes</span>
                   </div>
-                  <DonutChart
-                    data={data()}
-                    options={
-                      {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: "65%",
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: {
-                            enabled: true,
-                            callbacks: {
-                              label: (ctx) =>
-                                ` ${ctx.label}: ${ctx.parsed} tune${ctx.parsed === 1 ? "" : "s"}`,
-                            },
-                          },
-                        },
-                      } as import("chart.js").ChartOptions<"doughnut">
-                    }
-                  />
+                  <DonutChart data={data()} options={chartOptions} />
                 </div>
 
                 {/* Legend */}

@@ -1,8 +1,8 @@
 /**
  * FSRS Retention Chart
  *
- * Area chart showing predicted average memory retention over the next 60 days
- * across all tunes in the repertoire, using the FSRS forgetting curve R(t,S)=0.9^(t/S).
+ * Area chart showing an approximate forgetting curve for FSRS-reviewed tunes.
+ * The current approximation uses stability but not elapsed time since review.
  *
  * @module components/analysis/FsrsRetentionChart
  */
@@ -39,7 +39,7 @@ export const FsrsRetentionChart: Component<Props> = (props) => {
       labels: data.map((p) => (p.day % 10 === 0 ? `Day ${p.day}` : "")),
       datasets: [
         {
-          label: "Predicted Retention",
+          label: "Estimated retention",
           data: data.map((p) => Math.round(p.retention * 100)),
           fill: true,
           tension: 0.4,
@@ -55,10 +55,12 @@ export const FsrsRetentionChart: Component<Props> = (props) => {
     <Card data-testid="fsrs-retention-chart">
       <CardHeader class="pb-2">
         <CardTitle class="text-base font-semibold">
-          FSRS Retention Curve
+          FSRS retention estimate
         </CardTitle>
         <CardDescription>
-          Predicted average retention over the next 60 days
+          Approximate curve for FSRS-reviewed tunes, starting at review time.
+          Excludes ladder/plugin events; does not account for time since
+          practice.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -115,9 +117,10 @@ export const FsrsRetentionChart: Component<Props> = (props) => {
           </Match>
           <Match when={!curve.loading && !chartData()}>
             <div class="flex h-48 flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground">
-              <span>No FSRS data yet</span>
+              <span>No valid FSRS state for the latest reviews</span>
               <span class="text-xs">
-                Practice some tunes with FSRS to see the curve
+                Only active tunes whose latest review has valid FSRS state
+                contribute
               </span>
             </div>
           </Match>

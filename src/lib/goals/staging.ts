@@ -5,10 +5,12 @@ import { practiceContextKey, prepareGoalPracticePreview } from "./preview";
 import { readGoalPracticeContext, readGoalRepertoireSnapshot } from "./resolve";
 
 type StageInput = Parameters<typeof prepareGoalPracticePreview>[1];
+type PracticeDraftIdentity = Pick<
+  StageInput,
+  "userId" | "repertoireId" | "tuneId"
+>;
 
-export function practiceDraftWhere(
-  input: Pick<StageInput, "userId" | "repertoireId" | "tuneId">
-) {
+export function practiceDraftWhere(input: PracticeDraftIdentity) {
   return and(
     eq(tableTransientData.userId, input.userId),
     eq(tableTransientData.repertoireId, input.repertoireId),
@@ -111,7 +113,7 @@ export async function stageGoalPracticeEvaluation(
  * it must not reuse the invalidated staging request's token. */
 export async function clearGoalPracticeEvaluation(
   db: SqliteDatabase,
-  input: Pick<StageInput, "userId" | "repertoireId" | "tuneId">,
+  input: PracticeDraftIdentity,
   isCurrent: () => boolean
 ) {
   if (!isCurrent()) return { status: "superseded" as const };
@@ -122,6 +124,18 @@ export async function clearGoalPracticeEvaluation(
   );
   if (!members.some(({ assignment }) => assignment.tuneRef === input.tuneId))
     throw new Error("Tune is not active in this repertoire");
+  clearPracticeEvaluationDraft(db, input);
+  // Also persist an empty retry after a previous in-memory clear failed to save.
+  await persistDb();
+  return { status: "cleared" as const };
+}
+
+/** Synchronous draft mutation for callers composing an atomic goal change.
+ * Ownership/membership must already have been checked by the caller. */
+export function clearPracticeEvaluationDraft(
+  db: Pick<SqliteDatabase, "select" | "update" | "delete">,
+  input: PracticeDraftIdentity
+) {
   const where = practiceDraftWhere(input);
   const draft = db.select().from(tableTransientData).where(where).get();
   if (draft) {
@@ -166,7 +180,50 @@ export async function clearGoalPracticeEvaluation(
         .run();
     }
   }
-  // Also persist an empty retry after a previous in-memory clear failed to save.
+  return Boolean(draft?.evaluationId || draft?.recallEval);
+}
+
+/** Explicit recovery only: never discard text that changed after it was shown. */
+export async function clearReviewedDraftNotes(
+  db: SqliteDatabase,
+  expected: typeof tableTransientData.$inferSelect,
+  isCurrent: () => boolean
+) {
+  if (!isCurrent()) return;
+  const snapshot = readGoalRepertoireSnapshot(
+    db,
+    expected.userId,
+    expected.repertoireId
+  );
+  if (
+    !snapshot.members.some(
+      ({ assignment }) => assignment.tuneRef === expected.tuneId
+    )
+  )
+    throw new Error("Tune is not active in this repertoire");
+  db.transaction((tx) => {
+    const where = practiceDraftWhere(expected);
+    const current = tx.select().from(tableTransientData).where(where).get();
+    const alreadyCleared =
+      current?.notePrivate === null && current.notePublic === null;
+    if (
+      !current ||
+      (!alreadyCleared &&
+        (current.notePrivate !== expected.notePrivate ||
+          current.notePublic !== expected.notePublic))
+    )
+      throw new Error(
+        "Draft notes changed. Submit again to review the current notes before clearing."
+      );
+    tx.update(tableTransientData)
+      .set({
+        notePrivate: null,
+        notePublic: null,
+        lastModifiedAt: new Date().toISOString(),
+        syncVersion: sql.raw(`${tableTransientData.syncVersion.name} + 1`),
+      })
+      .where(where)
+      .run();
+  });
   await persistDb();
-  return { status: "cleared" as const };
 }

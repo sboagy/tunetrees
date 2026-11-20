@@ -30,6 +30,7 @@ import {
   reference,
   repertoireTune,
   rhythmPatterns,
+  tableTransientData,
   userProfile,
 } from "@/lib/db/schema";
 import {
@@ -1069,6 +1070,81 @@ async function seedSetlistsScenario(input: SeedSetlistsScenarioInput) {
   };
 }
 
+/** Recovery fixtures modify only the current test user's already-staged draft. */
+async function getPracticeDraft(repertoireId: string, tuneId: string) {
+  const db = await ensureDb();
+  const userId = await resolveUserId(db);
+  return (
+    db
+      .select()
+      .from(tableTransientData)
+      .where(
+        and(
+          eq(tableTransientData.userId, userId),
+          eq(tableTransientData.repertoireId, repertoireId),
+          eq(tableTransientData.tuneId, tuneId)
+        )
+      )
+      .get() ?? null
+  );
+}
+async function seedPracticeSubmissionRecovery(input: {
+  repertoireId: string;
+  tuneId: string;
+  kind: "notes" | "time-conflict" | "id-conflict";
+}) {
+  const db = await ensureDb();
+  const draft = await getPracticeDraft(input.repertoireId, input.tuneId);
+  if (
+    !draft?.practiceRecordId ||
+    !draft.practiced ||
+    !draft.due ||
+    draft.intervalDays === null
+  )
+    throw new Error("Stage an evaluation before seeding recovery");
+  if (input.kind === "notes") {
+    db.update(tableTransientData)
+      .set({
+        notePrivate: "Private text to preserve",
+        notePublic: "Public text to preserve",
+      })
+      .where(
+        and(
+          eq(tableTransientData.userId, draft.userId),
+          eq(tableTransientData.repertoireId, input.repertoireId),
+          eq(tableTransientData.tuneId, input.tuneId)
+        )
+      )
+      .run();
+  } else {
+    db.insert(practiceRecord)
+      .values({
+        id:
+          input.kind === "id-conflict" ? draft.practiceRecordId : generateId(),
+        tuneRef: input.tuneId,
+        repertoireRef: input.repertoireId,
+        practiced: draft.practiced,
+        due:
+          input.kind === "id-conflict"
+            ? new Date(Date.parse(draft.due) + 86400000).toISOString()
+            : draft.due,
+        intervalDays:
+          draft.intervalDays + (input.kind === "id-conflict" ? 1 : 0),
+        goal: draft.goal,
+        goalId: draft.goalId,
+        evaluationId: draft.evaluationId,
+        evaluationSnapshot: draft.evaluationSnapshot,
+        schedulerId: draft.schedulerId,
+        schedulerVersion: draft.schedulerVersion,
+        schedulerState: draft.schedulerState,
+        lastModifiedAt: new Date().toISOString(),
+      })
+      .run();
+  }
+  await persistDb();
+  return await getPracticeDraft(input.repertoireId, input.tuneId);
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -1106,6 +1182,8 @@ declare global {
       seedSchedulingPlugin: (input?: SeedSchedulingPluginInput) => Promise<{
         id: string;
       }>;
+      getPracticeDraft: typeof getPracticeDraft;
+      seedPracticeSubmissionRecovery: typeof seedPracticeSubmissionRecovery;
       seedPracticeHistory: (input: {
         repertoireId: string;
         tuneId: string;
@@ -1508,6 +1586,8 @@ if (globalThis.window !== undefined) {
       },
       refreshPracticeQueue,
       seedSchedulingPlugin,
+      getPracticeDraft,
+      seedPracticeSubmissionRecovery,
       seedPracticeHistory: async ({
         repertoireId,
         tuneId,

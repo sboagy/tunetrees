@@ -3,7 +3,7 @@
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { ChevronDown } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, For } from "solid-js";
+import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 
 import {
   type EvaluationChoice,
@@ -13,6 +13,7 @@ import { getSubmittedEvaluationDisplay } from "./evaluation-display";
 
 interface RecallEvalComboBoxProps {
   choices: readonly EvaluationChoice[];
+  loadDuePreviews?: () => Promise<Record<string, string>>;
   disabled?: boolean;
   tuneId: string;
   value: string;
@@ -25,6 +26,52 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   props
 ) => {
   const [selectedValue, setSelectedValue] = createSignal(props.value);
+  const [duePreviews, setDuePreviews] = createSignal<Record<string, string>>(
+    {}
+  );
+  const [previewStatus, setPreviewStatus] = createSignal("");
+  const [localOpen, setLocalOpen] = createSignal(false);
+  let previewRequest = 0;
+  onCleanup(() => {
+    previewRequest++;
+  });
+  const handleOpenChange = (open: boolean) => {
+    setLocalOpen(open);
+    props.onOpenChange?.(open);
+  };
+  const refreshDuePreviews = async (open: boolean) => {
+    const request = ++previewRequest;
+    setDuePreviews({});
+    setPreviewStatus("");
+    if (!open || !props.loadDuePreviews) return;
+    const tuneId = props.tuneId,
+      choices = props.choices;
+    const current = () =>
+      request === previewRequest &&
+      props.tuneId === tuneId &&
+      props.choices === choices;
+    setPreviewStatus("Calculating due-time estimates…");
+    try {
+      const result = await props.loadDuePreviews();
+      if (!current()) return;
+      setDuePreviews(result);
+      setPreviewStatus("");
+    } catch {
+      if (current())
+        setPreviewStatus(
+          "Due-time estimates unavailable. Reopen the menu to retry."
+        );
+    }
+  };
+
+  createEffect(
+    on(
+      () => [props.open ?? localOpen(), props.tuneId, props.choices] as const,
+      ([open]) => {
+        refreshDuePreviews(open);
+      }
+    )
+  );
 
   createEffect(() => {
     // Re-sync when the virtualized row is reused for a different tune.
@@ -70,7 +117,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
     <div class="relative inline-block w-full">
       <DropdownMenu
         open={props.open}
-        onOpenChange={props.onOpenChange}
+        onOpenChange={handleOpenChange}
         // Non-modal prevents aggressive focus stealing which can contribute to closes
         modal={false}
       >
@@ -100,6 +147,11 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
             data-testid={`recall-eval-menu-${props.tuneId}`}
             class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-popover text-popover-foreground border border-border rounded shadow-lg max-h-72 overflow-auto"
           >
+            <Show when={previewStatus()}>
+              <output class="block px-3 py-2 text-xs text-muted-foreground">
+                {previewStatus()}
+              </output>
+            </Show>
             <For each={options()}>
               {(option) => (
                 <DropdownMenu.Item
@@ -114,6 +166,17 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
                   <span class="block text-xs text-muted-foreground">
                     {option.description}
                   </span>
+                  <Show when={duePreviews()[option.value]}>
+                    {(due) => (
+                      <span class="block text-xs text-muted-foreground">
+                        If practiced now: due{" "}
+                        {new Date(due()).toLocaleString(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </span>
+                    )}
+                  </Show>
                 </DropdownMenu.Item>
               )}
             </For>

@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => ({
   selectRows: vi.fn(),
   insert: vi.fn(),
   repair: vi.fn(),
+  genreOverrides: vi.fn(),
   start: vi.fn(),
   snapshot: vi.fn(),
   selected: vi.fn(),
@@ -77,7 +78,7 @@ vi.mock("../../../src/lib/diagnostics/sync-baseline", () => ({
 vi.mock("../../../src/lib/sync/genre-filter", () => ({
   repairPendingMediaAssetSyncState: mocks.repair,
   repairPendingSetlistSyncState: async () => ({}),
-  buildGenreFilterOverrides: async () => ({}),
+  buildGenreFilterOverrides: mocks.genreOverrides,
 }));
 vi.mock("../../../src/lib/db/queries/user-genre-selection", () => ({
   getUserGenreSelection: mocks.selected,
@@ -157,6 +158,7 @@ beforeEach(() => {
   mocks.down.mockResolvedValue(result);
   mocks.up.mockResolvedValue(result);
   mocks.repair.mockResolvedValue({});
+  mocks.genreOverrides.mockReset().mockResolvedValue({});
   mocks.snapshot.mockResolvedValue(undefined);
   mocks.close.mockResolvedValue(undefined);
   mocks.clear.mockResolvedValue(undefined);
@@ -186,6 +188,27 @@ afterEach(() => {
 });
 
 describe("provider sync completion lifetime", () => {
+  it("propagates a genre lookup failure and retries the initial filter on the next operation", async () => {
+    setUser({ ...user, email: "owner-a@example.test" });
+    mocks.selectRows.mockResolvedValue([{ id: user.id }]);
+    mount();
+    await started();
+    const failure = new Error("Genre lookup: HTTP 502");
+    mocks.genreOverrides.mockRejectedValueOnce(failure);
+    await expect(workerConfig.requestOverridesProvider()).rejects.toBe(failure);
+    const overrides = { collectionsOverride: { selectedGenres: ["ITRAD"] } };
+    mocks.genreOverrides.mockResolvedValueOnce(overrides);
+    await expect(workerConfig.requestOverridesProvider()).resolves.toEqual(
+      overrides
+    );
+    expect(mocks.genreOverrides).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isInitialSync: true,
+        userId: user.id,
+      })
+    );
+  });
+
   it("clears recovery after full upload/download followed by incremental download", async () => {
     setUser({ ...user, email: "owner-a@example.test" });
     mocks.selectRows.mockResolvedValue([{ id: user.id }]);

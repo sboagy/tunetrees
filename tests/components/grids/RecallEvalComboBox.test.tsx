@@ -57,3 +57,21 @@ it("does not add a separator to the unset choice", () => {
   );
   expect(screen.getByTestId("recall-eval-tune").textContent).not.toContain(":");
 });
+
+it("calculates estimates for an initially open controlled menu without selecting a choice", async () => {
+  const load = vi.fn().mockResolvedValue({ good: "2026-11-22T12:00:00Z" });
+  const change = vi.fn();
+  render(() => (
+    <RecallEvalComboBox
+      tuneId="tune"
+      choices={choices}
+      value=""
+      onChange={change}
+      open={true}
+      loadDuePreviews={load}
+    />
+  ));
+  expect(await screen.findByText(/If practiced now: due/)).toBeDefined();
+  expect(load).toHaveBeenCalledOnce();
+  expect(change).not.toHaveBeenCalled();
+});

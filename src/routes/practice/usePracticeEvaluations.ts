@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   type Accessor,
   createEffect,
@@ -10,10 +10,11 @@ import {
 import { toast } from "solid-sonner";
 import type { ITuneOverview } from "../../components/grids/types";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
-import { repertoireTune, tableTransientData } from "../../lib/db/schema";
+import { tableTransientData } from "../../lib/db/schema";
+import { changePracticeGoals } from "../../lib/goals/assignment";
 import type { PracticeEvaluationModel } from "../../lib/goals/practice-session";
 import { readPracticeSession } from "../../lib/goals/practice-session";
-import { readGoalRepertoireSnapshot } from "../../lib/goals/resolve";
+import { prepareLadderDuePreviews } from "../../lib/goals/preview";
 import {
   clearGoalPracticeEvaluation,
   stageGoalPracticeEvaluation,
@@ -358,38 +359,16 @@ export function usePracticeEvaluations(
         if (!db || !repertoireId || !userIdValue)
           throw new Error("Practice data is not ready");
         props.suppressNextViewRefresh("repertoire");
-        const snapshot = readGoalRepertoireSnapshot(
+        const changed = await changePracticeGoals(
           db,
-          userIdValue,
-          repertoireId
-        );
-        const definition = snapshot.resolveAssignment({ goalId: null, goal });
-        if (
-          !snapshot.members.some(
-            ({ assignment }) => assignment.tuneRef === tuneId
-          )
-        )
-          throw new Error("Tune is not active in this repertoire");
-        db.update(repertoireTune)
-          .set({
-            goal: definition.goalKey,
-            goalId: definition.goalId,
-            lastModifiedAt: new Date().toISOString(),
-            syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
-          })
-          .where(
-            and(
-              eq(repertoireTune.repertoireRef, repertoireId),
-              eq(repertoireTune.tuneRef, tuneId)
-            )
-          )
-          .run();
-        await clearGoalPracticeEvaluation(
-          db,
-          { userId: userIdValue, tuneId, repertoireId },
+          { userId: userIdValue, tuneIds: [tuneId], repertoireId, goal },
           request.isCurrent
         );
         if (request.isCurrent()) {
+          if (changed.status === "changed" && changed.clearedEvaluations > 0)
+            toast.info(
+              "Goal changed. The previous pending evaluation was cleared; notes and submitted history were kept."
+            );
           if (!requests().has(`evaluation:${tuneId}`)) {
             attempted.delete(tuneId);
             setErrors((prev) => {
@@ -438,6 +417,30 @@ export function usePracticeEvaluations(
         override === undefined ? !!row?.draft?.evaluationId : !!override;
       return {
         choices: row?.definition.config.evaluations ?? [],
+        loadDuePreviews:
+          row?.definition.config.scheduler.id === "builtin:interval-ladder"
+            ? async () => {
+                const db = props.localDb(),
+                  userId = props.userId(),
+                  repertoireId = props.currentRepertoireId();
+                if (!db || !userId || !repertoireId)
+                  throw new Error("Practice data is not ready");
+                const result = await prepareLadderDuePreviews(db, {
+                  userId,
+                  repertoireId,
+                  tuneId,
+                  practiced: new Date(),
+                });
+                if (
+                  disposed ||
+                  props.localDb() !== db ||
+                  props.userId() !== userId ||
+                  props.currentRepertoireId() !== repertoireId
+                )
+                  throw new Error("Practice context changed. Reopen the menu.");
+                return result;
+              }
+            : undefined,
         completed:
           !!row?.queue.completedAt && !repeating().has(tuneId) && !hasDraft,
         submittedLabel,

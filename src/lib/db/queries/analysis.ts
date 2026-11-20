@@ -19,9 +19,11 @@ import {
   lt,
   sql,
 } from "drizzle-orm";
+import { readHistoryEvent } from "../../goals/practice-history";
+import { readGoalRepertoireSnapshot } from "../../goals/resolve";
 import type { SqliteDatabase } from "../client-sqlite";
 import { latestPracticeRecordIdsForRepertoire } from "../practice-history-sql";
-import { practiceRecord, repertoireTune, tune } from "../schema";
+import { practiceRecord, repertoire, repertoireTune, tune } from "../schema";
 
 function latestPracticeFilter(repertoireId: string) {
   // Unlike a query-builder subquery, a raw SQL expression needs its own parentheses.
@@ -157,7 +159,6 @@ export async function getStalenessData(
       and(
         eq(practiceRecord.repertoireRef, repertoireId),
         latestPracticeFilter(repertoireId),
-        isNotNull(practiceRecord.stability),
         isNotNull(practiceRecord.due),
         lt(practiceRecord.due, today)
       )
@@ -215,26 +216,41 @@ export async function getFsrsRetentionCurve(
   db: SqliteDatabase,
   repertoireId: string
 ): Promise<RetentionPoint[]> {
+  const owner = db
+    .select()
+    .from(repertoire)
+    .where(
+      and(eq(repertoire.repertoireId, repertoireId), eq(repertoire.deleted, 0))
+    )
+    .get();
+  if (!owner) return [];
+  const { goals, members } = readGoalRepertoireSnapshot(
+    db,
+    owner.userRef,
+    repertoireId
+  );
+  const activeTuneIds = new Set(
+    members.map(({ assignment }) => assignment.tuneRef)
+  );
   // Select the latest event first; a newer non-FSRS event must not revive old stability.
   const rows = await db
-    .select({
-      tuneRef: practiceRecord.tuneRef,
-      stability: practiceRecord.stability,
-      practiced: practiceRecord.practiced,
-    })
+    .select()
     .from(practiceRecord)
     .where(
       and(
         eq(practiceRecord.repertoireRef, repertoireId),
-        latestPracticeFilter(repertoireId),
-        isNotNull(practiceRecord.stability)
+        latestPracticeFilter(repertoireId)
       )
     );
-
-  // SQL has already selected one latest event per tune, before stability filtering.
-  const stabilities = rows.flatMap((row) =>
-    row.stability !== null && row.stability > 0 ? [row.stability] : []
-  );
+  // Share History's authoritative JSON decoding and owner-scoped legacy identity.
+  // Invalid new state is unavailable; stale compatibility columns are never a fallback.
+  const stabilities = rows.flatMap((row) => {
+    if (!activeTuneIds.has(row.tuneRef)) return [];
+    const { state } = readHistoryEvent(row, goals, owner.userRef);
+    return state.kind === "fsrs6" && state.state.stability > 0
+      ? [state.state.stability]
+      : [];
+  });
 
   if (stabilities.length === 0) {
     // No data: return empty curve so the UI can render its empty state.

@@ -34,6 +34,7 @@ export function PracticeEvaluationCell(props: {
             tuneId={props.tuneId}
             value={props.value}
             choices={props.model?.choices ?? []}
+            loadDuePreviews={props.model?.loadDuePreviews}
             disabled={props.model?.pending || props.model?.unavailable}
             onChange={props.onChange}
             open={props.open}

@@ -5,6 +5,7 @@ import {
   commitGoalPracticeEvaluations,
   type GoalCommitItem,
   GoalPracticePersistenceError,
+  GoalPracticeRecoveryError,
   readGoalCommitItems,
 } from "../../lib/goals/commit";
 import { runGoalQueueCommand } from "../../lib/goals/queue-commands";
@@ -12,7 +13,10 @@ import {
   offerGoalQueueSaveRecovery,
   reportGoalQueueNotices,
 } from "../../lib/goals/queue-feedback";
-import { stageGoalPracticeEvaluation } from "../../lib/goals/staging";
+import {
+  clearReviewedDraftNotes,
+  stageGoalPracticeEvaluation,
+} from "../../lib/goals/staging";
 import {
   formatAsWindowStart,
   getPracticeDate,
@@ -36,6 +40,8 @@ export interface PracticeSubmitProps {
 
 export interface PracticeSubmitState {
   submitError: Accessor<string>;
+  recovery: Accessor<GoalPracticeRecoveryError | null>;
+  clearReviewedNotes: () => Promise<void>;
   handleSubmitEvaluations: () => Promise<void>;
   handleAddTunes: (count: number) => Promise<void>;
   handleQueueReset: () => Promise<void>;
@@ -88,6 +94,14 @@ export function usePracticeSubmit(
   props: PracticeSubmitProps
 ): PracticeSubmitState {
   const [submitError, setSubmitError] = createSignal("");
+  const [recoveryState, setRecoveryState] = createSignal<{
+    error: GoalPracticeRecoveryError;
+    current: () => boolean;
+  } | null>(null);
+  const recovery = () => {
+    const state = recoveryState();
+    return state?.current() ? state.error : null;
+  };
   let pending = false;
   let disposed = false;
   let retry:
@@ -128,6 +142,7 @@ export function usePracticeSubmit(
     pending = true;
     props.onSubmittingChange(true);
     setSubmitError("");
+    setRecoveryState(null);
     const clearSubmitted = props.prepareClearEvaluations();
     let attemptedItems: GoalCommitItem[] = [];
     try {
@@ -196,6 +211,8 @@ export function usePracticeSubmit(
           items: attemptedItems,
         };
       if (current()) {
+        if (error instanceof GoalPracticeRecoveryError)
+          setRecoveryState({ error, current });
         // Refresh even when a later calculation/save fails: earlier drafts in
         // the batch may already contain new previews that need user review.
         props.incrementPracticeListStagedChanged();
@@ -205,6 +222,40 @@ export function usePracticeSubmit(
             : "Could not submit practice. Retry."
         );
       }
+    } finally {
+      pending = false;
+      if (!disposed) props.onSubmittingChange(false);
+    }
+  };
+
+  const clearReviewedNotes = async () => {
+    const state = recoveryState(),
+      db = props.localDb();
+    if (
+      pending ||
+      props.isStaging() ||
+      !db ||
+      !state?.current() ||
+      state.error.kind !== "notes"
+    )
+      return;
+    pending = true;
+    props.onSubmittingChange(true);
+    try {
+      await clearReviewedDraftNotes(db, state.error.draft, state.current);
+      if (!state.current()) return;
+      setRecoveryState(null);
+      setSubmitError(
+        "Draft notes cleared. Review your evaluations, then Submit again."
+      );
+      props.incrementPracticeListStagedChanged();
+    } catch (error) {
+      if (state.current())
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : "Could not clear notes. Retry."
+        );
     } finally {
       pending = false;
       if (!disposed) props.onSubmittingChange(false);
@@ -345,6 +396,8 @@ export function usePracticeSubmit(
 
   return {
     submitError,
+    recovery,
+    clearReviewedNotes,
     handleSubmitEvaluations,
     handleAddTunes,
     handleQueueReset,

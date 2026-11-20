@@ -10,7 +10,6 @@
  */
 
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
-import { and, eq } from "drizzle-orm";
 import {
   type Component,
   createEffect,
@@ -36,7 +35,6 @@ import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEdit
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { useCurrentTuneSet } from "../lib/context/CurrentTuneSetContext";
-import { persistDb } from "../lib/db/client-sqlite";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import {
   getBatchedTuneSetItemRefs,
@@ -44,8 +42,8 @@ import {
 } from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import * as schema from "../lib/db/schema";
-import { repertoireTune } from "../lib/db/schema";
 import { STARTER_TEMPLATES } from "../lib/db/starter-repertoire-templates";
+import { changePracticeGoals } from "../lib/goals/assignment";
 import { useStarterRepertoire } from "../lib/hooks/useStarterRepertoire";
 import { log } from "../lib/logger";
 
@@ -76,6 +74,7 @@ const RepertoirePage: Component = () => {
     repertoireListChanged,
     catalogListChanged,
     incrementRepertoireListChanged,
+    incrementPracticeListStagedChanged,
     suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
@@ -438,6 +437,22 @@ const RepertoirePage: Component = () => {
     navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
+  const [goalChangeFeedback, setGoalChangeFeedback] = createSignal("");
+  const [goalChangeFailed, setGoalChangeFailed] = createSignal(false);
+  let goalChangeVersion = 0;
+  createEffect(
+    on(
+      () => [localDb(), userId(), currentRepertoireId()],
+      () => {
+        goalChangeVersion++;
+        setGoalChangeFeedback("");
+      }
+    )
+  );
+  onCleanup(() => {
+    goalChangeVersion++;
+  });
+
   // Handle goal change: update single row, or bulk-update all selected rows.
   const handleGoalChange = async (tuneId: string, goal: string | null) => {
     const db = localDb();
@@ -465,27 +480,45 @@ const RepertoirePage: Component = () => {
     };
     const targetIds: string[] = getTargetIds();
 
+    const ownerId = userId();
+    if (!ownerId) return;
+    const version = ++goalChangeVersion;
+    const isCurrent = () =>
+      version === goalChangeVersion &&
+      localDb() === db &&
+      userId() === ownerId &&
+      currentRepertoireId() === repertoireId;
+    setGoalChangeFeedback("Saving goal…");
+    setGoalChangeFailed(false);
     try {
       suppressNextViewRefresh("repertoire");
-      await db.transaction(async (tx) => {
-        for (const tid of targetIds) {
-          await tx
-            .update(repertoireTune)
-            .set({ goal: goal ?? null })
-            .where(
-              and(
-                eq(repertoireTune.tuneRef, tid),
-                eq(repertoireTune.repertoireRef, repertoireId)
-              )
-            );
-        }
-      });
-      // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
-      // Auto-persist runs every 30s, but user might refresh before that fires
-      await persistDb();
+      const result = await changePracticeGoals(
+        db,
+        {
+          userId: ownerId,
+          repertoireId,
+          tuneIds: targetIds,
+          goal,
+        },
+        isCurrent
+      );
+      if (!isCurrent() || result.status !== "changed") return;
       incrementRepertoireListChanged();
+      incrementPracticeListStagedChanged();
+      setGoalChangeFeedback(
+        result.clearedEvaluations > 0
+          ? "Goal saved. Pending evaluations for changed goals were cleared; notes, due dates, and history were kept."
+          : "Goal saved. Due dates and history were kept; queue membership is unchanged."
+      );
     } catch (err) {
       console.error("[RepertoirePage] Failed to update goal:", err);
+      if (!isCurrent()) return;
+      incrementRepertoireListChanged();
+      incrementPracticeListStagedChanged();
+      setGoalChangeFailed(true);
+      setGoalChangeFeedback(
+        "Could not finish saving the goal. Select the intended goal again to retry."
+      );
     }
   };
 
@@ -552,7 +585,7 @@ const RepertoirePage: Component = () => {
           availableGenres={availableGenres()}
           loading={{ genres: allGenres.loading }}
           selectedRowsCount={selectedRowsCount()}
-          table={tableInstance() || undefined}
+          table={tableInstance() ?? undefined}
           repertoireId={currentRepertoireId() || undefined}
           filterAnyTuneSet={filterAnyTuneSet()}
           onAnyTuneSetFilterChange={(enabled) => {
@@ -571,6 +604,20 @@ const RepertoirePage: Component = () => {
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
+      </Show>
+
+      <Show when={goalChangeFeedback()}>
+        <div
+          class="px-3 py-2 text-sm"
+          classList={{ "text-destructive": goalChangeFailed() }}
+        >
+          <Show
+            when={goalChangeFailed()}
+            fallback={<output>{goalChangeFeedback()}</output>}
+          >
+            <span role="alert">{goalChangeFeedback()}</span>
+          </Show>
+        </div>
       </Show>
 
       {/* Grid wrapper - overflow-hidden constrains grid height */}
