@@ -556,8 +556,8 @@ baseline restores likewise apply the generated goal seed afterward, via both
 Supabase seed configuration and Rhizome’s seed-directory discovery. The goal
 seed check keeps these restore inputs aligned with the typed defaults. SQLite v28
 uses the guarded rebuild/full-pull path. Active evaluation and daily allocation
-read per-goal settings; the old Spaced Repetition settings panel still awaits removal. Goals owns
-daily settings and a shared read-only calendar summary. Old Scheduling Options
+read per-goal settings. Goals owns Advanced FSRS options, daily settings and a
+shared read-only calendar summary. Old Scheduling Options and Spaced Repetition
 links resolve to Goals; inactive weekly rules/exceptions remain stored unchanged. See
 [`goals-implementation.md`](docs/development/goals-implementation.md) for the
 checkpoint boundary and remaining integration work.

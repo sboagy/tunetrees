@@ -126,7 +126,10 @@ function SchedulerFields(props: {
       <Show when={fsrs()}>
         {(_fsrs) => (
           <details class="rounded border border-border p-3">
-            <summary class="cursor-pointer min-h-11">
+            <summary
+              class="cursor-pointer min-h-11"
+              data-testid="goal-fsrs-advanced"
+            >
               Advanced FSRS settings
             </summary>
             <div class="space-y-3">

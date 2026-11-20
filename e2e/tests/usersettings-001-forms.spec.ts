@@ -8,7 +8,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * USERSETTINGS-001: User Settings Forms
  * Priority: High
  *
- * Tests that user settings forms (Goals, Spaced Repetition, Account)
+ * Tests that user settings forms (Goals, Account)
  * render correctly, validate input, and submit successfully.
  */
 
@@ -109,71 +109,29 @@ test.describe("USERSETTINGS-001: Goal daily settings", () => {
   });
 });
 
-test.describe("USERSETTINGS-001: Spaced Repetition Form", () => {
-  test.beforeEach(async ({ page, testUser }) => {
-    ttPage = new TuneTreesPage(page);
-    currentTestUser = testUser;
-
+test.describe("USERSETTINGS-001: Legacy FSRS settings link", () => {
+  test("opens Goals with per-goal FSRS controls", async ({
+    page,
+    testUser,
+  }) => {
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [],
     });
-
-    // Navigate to User Settings > Scheduling Options
-    await ttPage.userMenuButton.click();
-    await page.waitForTimeout(500);
-    await ttPage.userSettingsButton.click();
-    await page.waitForTimeout(500);
-    const ua = await page.evaluate(() => navigator.userAgent);
-    const isMobileChrome = /Android.*Chrome\/\d+/i.test(ua);
-    if (isMobileChrome) {
-      await page.waitForTimeout(800);
-      await ttPage.settingsMenuToggle.click();
-    }
-
-    await page.waitForTimeout(500);
-    await ttPage.userSettingsSpacedRepetitionButton.click();
-    await page.waitForTimeout(500);
-  });
-
-  test("should display spaced repetition form", async ({ page }) => {
+    await page.goto("/user-settings/spaced-repetition");
     await expect(
-      page.getByRole("heading", { name: "Spaced Repetition", level: 3 })
-    ).toBeVisible({ timeout: 5000 });
-
+      page.getByRole("heading", { name: "Goals", exact: true })
+    ).toBeVisible({ timeout: 15000 });
+    await page
+      .getByTestId("goal-edit-00000000-0000-0000-0000-000000000001")
+      .click();
+    await new TuneTreesPage(page).goalFsrsAdvanced.click();
     await expect(
-      page.getByText(/Configure your spaced repetition algorithm/i)
-    ).toBeVisible();
-  });
-
-  test("should display all form fields", async ({ page }) => {
-    await page.waitForTimeout(1000);
-
-    await expect(page.getByLabel("Algorithm Type")).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByLabel("Target Retention Rate")).toBeVisible({
-      timeout: 5000,
-    });
-  });
-
-  test.fixme("should show FSRS fields when FSRS algorithm selected", async ({
-    page,
-  }) => {
-    await page.waitForTimeout(1000);
-
-    const algorithmSelect = page.getByLabel("Algorithm Type");
-
-    // Select FSRS
-    await algorithmSelect.click();
-    await page.waitForTimeout(500);
-    await page.getByRole("option", { name: "FSRS" }).click();
-    await page.waitForTimeout(500);
-
-    // FSRS Initial Weights field should be visible
-    await expect(page.getByLabel("FSRS Initial Weights")).toBeVisible({
-      timeout: 3000,
-    });
+      page.getByLabel("Desired retention (0–1)", { exact: true })
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByLabel("Algorithm Type", { exact: true })
+    ).toHaveCount(0);
   });
 });
 
@@ -314,7 +272,7 @@ test.describe("USERSETTINGS-001: Navigation", () => {
     });
     await expect(
       page.getByTestId("settings-tab-spaced-repetition")
-    ).toBeVisible({ timeout: 10000 });
+    ).toHaveCount(0);
     await expect(page.getByTestId("settings-tab-account")).toBeVisible({
       timeout: 10000,
     });
@@ -341,12 +299,6 @@ test.describe("USERSETTINGS-001: Navigation", () => {
     await page.getByTestId("settings-tab-goals").click();
     await expect(
       page.getByRole("heading", { name: "Goals", level: 3 })
-    ).toBeVisible({ timeout: 10000 });
-
-    // Click Spaced Repetition
-    await openSidebarAndClick("settings-tab-spaced-repetition");
-    await expect(
-      page.getByRole("heading", { name: "Spaced Repetition", level: 3 })
     ).toBeVisible({ timeout: 10000 });
 
     // Click Account

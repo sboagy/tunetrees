@@ -181,9 +181,9 @@ export class TuneTreesPage {
   readonly userSettingsButton: Locator;
 
   readonly userSettingsCatalogSyncButton: Locator;
-  readonly userSettingsSpacedRepetitionButton: Locator;
   readonly userSettingsAccountButton: Locator;
   readonly userSettingsAvatarButton: Locator;
+  readonly goalFsrsAdvanced: Locator;
 
   readonly settingsMenuToggle: Locator;
   readonly addTuneDialog: Locator;
@@ -519,11 +519,9 @@ export class TuneTreesPage {
     this.userSettingsCatalogSyncButton = page.getByTestId(
       "settings-tab-catalog-sync"
     );
-    this.userSettingsSpacedRepetitionButton = page.getByTestId(
-      "settings-tab-spaced-repetition"
-    );
     this.userSettingsAccountButton = page.getByTestId("settings-tab-account");
     this.userSettingsAvatarButton = page.getByTestId("settings-tab-avatar");
+    this.goalFsrsAdvanced = page.getByTestId("goal-fsrs-advanced");
 
     this.settingsMenuToggle = page.getByTestId("settings-menu-toggle");
 

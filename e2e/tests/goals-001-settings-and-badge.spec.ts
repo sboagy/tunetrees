@@ -27,7 +27,6 @@ async function openSettingsTab(
     | "appearance"
     | "catalog-sync"
     | "scheduling-options"
-    | "spaced-repetition"
     | "plugins"
     | "goals"
     | "account"
@@ -145,7 +144,7 @@ test.describe("GOALS-001: Goals settings", () => {
       "goal-edit-00000000-0000-0000-0000-000000000001"
     );
     await editRecall.click();
-    await page.getByText("Advanced FSRS settings", { exact: true }).click();
+    await ttPage.goalFsrsAdvanced.click();
     const sameDay = page.getByTestId("goal-allow-same-day-reviews");
     await expect(sameDay).not.toBeChecked();
     await sameDay.check();
@@ -157,7 +156,7 @@ test.describe("GOALS-001: Goals settings", () => {
     await page.reload();
     await openSettingsTab(page, "goals");
     await editRecall.click();
-    await page.getByText("Advanced FSRS settings", { exact: true }).click();
+    await ttPage.goalFsrsAdvanced.click();
     await expect(sameDay).toBeChecked();
   });
 

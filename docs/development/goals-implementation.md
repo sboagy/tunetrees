@@ -1613,3 +1613,36 @@ one real-SQLite race regression was added. CodeRabbit reviewed the nine changed
 code/test files with zero findings. Architecture/checkpoint documentation was
 updated separately. No E2E run was performed for this cleanup batch, and nothing
 has been committed or pushed.
+
+## Retire global FSRS settings UI (2026-11-19)
+
+The preceding orchestration cleanup is committed locally as `98137cf6`, without
+pushing. This follow-on batch removes the obsolete Spaced Repetition form and
+its sidebar entry from both Settings shells. Existing route and programmatic
+entry points open Goals, where each FSRS goal already owns its Advanced settings.
+No schema, saved preference, scheduler calculation or migration behavior changes.
+Legacy preference storage remains available to the coordinated cutover.
+
+Replaced tests of the removed global form with a legacy-link regression that
+opens Recall's Advanced controls. Navigation coverage now checks that the obsolete
+tab is absent. The Advanced disclosure has a stable test ID and page-object
+locator, also used by the existing same-day option persistence test.
+
+CodeRabbit raised three items. Applied the selector improvement. The retention
+question is covered by `prepareLegacyRecallSettings` and its existing regression
+preserving `0.85`; removal of the unused form does not change active scheduler
+inputs. The missing-Recall question is covered by the shared generated goal seed
+(retained by per-user cleanup), full local resync, and passing desktop/mobile
+legacy-link checks; no extra per-test copy of shared goals was introduced.
+
+Validation: typecheck, lint, formatting, and all 1,491 unit tests pass. The focused
+Settings suite passed all 23 tests (including setup) on desktop/mobile. The targeted
+post-review rerun passed after 1Password authorization: all five tests (four
+desktop/mobile cases plus setup) passed, covering the new selector and existing
+same-day option persistence. Changes remain uncommitted and unpushed.
+
+UI verification scope: navigation consolidation and old entry points (G3/C1),
+reusing existing Goals/Advanced controls (F4/R2). Desktop/mobile navigation and
+entry-point behavior passed automated checks. Theme, keyboard/focus, zoom and
+broader design-system acceptance are not tested in this batch and remain part of
+the separately planned goals UI review; this is not a whole-UI compliance claim.

@@ -67,13 +67,20 @@ export function useUserSettingsDialog(): UserSettingsDialogContextValue {
 /** Default tab shown when no tab is specified on open. */
 const DEFAULT_TAB: UserSettingsTab = "goals";
 
+/** Old settings entry points resolve to the consolidated goal editor. */
+function normalizeSettingsTab(tab: UserSettingsTab): UserSettingsTab {
+  return tab === "scheduling-options" || tab === "spaced-repetition"
+    ? "goals"
+    : tab;
+}
+
 export const UserSettingsDialogProvider: ParentComponent = (props) => {
   const [isOpen, setIsOpen] = createSignal(false);
   const [currentTab, setCurrentTab] =
     createSignal<UserSettingsTab>(DEFAULT_TAB);
 
   const openUserSettings = (tab?: UserSettingsTab) => {
-    if (tab) setCurrentTab(tab === "scheduling-options" ? "goals" : tab);
+    if (tab) setCurrentTab(normalizeSettingsTab(tab));
     setIsOpen(true);
   };
 
@@ -82,7 +89,7 @@ export const UserSettingsDialogProvider: ParentComponent = (props) => {
   };
 
   const navigateToTab = (tab: UserSettingsTab) => {
-    setCurrentTab(tab === "scheduling-options" ? "goals" : tab);
+    setCurrentTab(normalizeSettingsTab(tab));
   };
 
   return (

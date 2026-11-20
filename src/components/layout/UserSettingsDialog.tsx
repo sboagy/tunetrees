@@ -38,9 +38,6 @@ const CatalogSyncPage = lazy(
 const SchedulingOptionsPage = lazy(
   () => import("@/routes/user-settings/scheduling-options")
 );
-const SpacedRepetitionPage = lazy(
-  () => import("@/routes/user-settings/spaced-repetition")
-);
 const PluginsPage = lazy(() => import("@/routes/user-settings/plugins"));
 const AccountPage = lazy(() => import("@/routes/user-settings/account"));
 const AvatarPage = lazy(() => import("@/routes/user-settings/avatar"));
@@ -58,7 +55,6 @@ const sidebarNavItems: NavItem[] = [
   { title: "Storage provider", tab: "storage-provider" },
   { title: "Appearance", tab: "appearance" },
   { title: "Catalog & Sync", tab: "catalog-sync" },
-  { title: "Spaced Repetition", tab: "spaced-repetition" },
   { title: "Plugins", tab: "plugins" },
   { title: "Goals", tab: "goals" },
   { title: "Account", tab: "account" },
@@ -83,9 +79,6 @@ const TabContent: Component<{ tab: UserSettingsTab }> = (props) => (
       </Match>
       <Match when={props.tab === "scheduling-options"}>
         <SchedulingOptionsPage />
-      </Match>
-      <Match when={props.tab === "spaced-repetition"}>
-        <SpacedRepetitionPage />
       </Match>
       <Match when={props.tab === "plugins"}>
         <PluginsPage />
