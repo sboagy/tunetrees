@@ -1583,3 +1583,33 @@ no database/browser changes and no commit or push.
 The developer subsequently confirmed the full local E2E run passed after this
 review and authorized committing/pushing this checkpoint. Remote CI for the new
 commit remains pending.
+
+## Transitional scheduling orchestration removal (2026-11-19)
+
+Removed `services/practice-recording.ts`, `services/practice-staging.ts` and
+`plugins/scheduling.ts`. Repository-wide caller searches showed the active UI
+already uses goal-aware staging/Submit. Only unused `stageEvaluation` and
+`commitStaged` test-API methods retained the old path; both declarations and
+implementations were removed rather than creating another compatibility adapter.
+The obsolete hydration mock and implicit-plugin output tests were removed too.
+The named-action plugin executor's validation/error/no-fallback coverage remains.
+
+Moved the old mocked commit-race regression into the real SQLite goal Submit
+suite: a same-rating draft staged while an earlier submission awaits device
+persistence survives, and the original event/queue link remains correct. Existing
+stale-input, failure/retry, plugin and repeat-practice tests remain. No application
+UI, schema, generated contract, backend data or browser storage changed.
+
+This completes removal of the parallel staging/recording/plugin orchestration,
+not the entire transitional-artifact merge gate. Remaining cleanup includes the
+old FSRS service/constants/comparison tests, legacy queue helpers, the Spaced
+Repetition panel, and remaining legacy plugin APIs in the developer test runner.
+The shared QuickJS runtime and legacy *data decoder* are still required.
+Production migration execution and broader UI review remain separate.
+
+Validation: repository typecheck, lint, format:check and all 1,491 remaining unit
+tests pass. The count decreased by seven: eight obsolete tests were removed and
+one real-SQLite race regression was added. CodeRabbit reviewed the nine changed
+code/test files with zero findings. Architecture/checkpoint documentation was
+updated separately. No E2E run was performed for this cleanup batch, and nothing
+has been committed or pushed.

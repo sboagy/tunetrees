@@ -441,9 +441,11 @@ is authoritative; typed FSRS columns are historical decoder inputs or compatibil
 projections, never a fallback for malformed new JSON. Common timestamps and
 fractional durations stay outside scheduler state. Legacy learning progress that
 was not stored is initialized to zero with an explicit decoder limitation.
-The existing FSRS service reads its legacy ladder fallback intervals from this
-source. The new calculators feed the guarded staging and Submit boundaries below;
-the active UI dispatches through the selected scheduler.
+The calculators feed the active guarded staging and Submit boundaries below.
+The superseded practice-recording, practice-staging and implicit plugin scheduling
+modules have been removed, together with unused test-API entrypoints. The shared
+QuickJS runtime remains. The older FSRS service still supplies comparison tests
+and rating constants; removing that residual dependency is separate cleanup.
 
 `goals/settings.ts` owns local configuration edits using the same default decoder
 and validation as practice. Built-in and private-goal edits write personal overrides;
@@ -453,8 +455,8 @@ visible replacement, moves owned assignments atomically, and preserves due dates
 history and frozen queue attribution; pending drafts block deletion. SQLite writes
 complete before persistence, so a failed disk save can be retried without repeating
 the mutation. The Goals editor exposes these definitions and grid pickers show
-personal labels/descriptions. Legacy queue/evaluation callers and global scheduling
-settings still require the coordinated activation described below.
+personal labels/descriptions. Legacy queue helpers and global scheduling settings
+still require final cleanup; active evaluation already uses per-goal settings.
 
 Administrative data-conversion code lives under `scripts/`, outside browser entry
 points. Shared defaults, validation and owner-scoped goal identity resolution stay
@@ -553,8 +555,8 @@ refresh reapplies generated defaults after importing production rows. Local/CI
 baseline restores likewise apply the generated goal seed afterward, via both
 Supabase seed configuration and Rhizome’s seed-directory discovery. The goal
 seed check keeps these restore inputs aligned with the typed defaults. SQLite v28
-uses the guarded rebuild/full-pull path. Legacy FSRS evaluation preferences remain active until the event/plugin UI
-integration checkpoint; daily allocation now reads per-goal settings. Goals owns
+uses the guarded rebuild/full-pull path. Active evaluation and daily allocation
+read per-goal settings; the old Spaced Repetition settings panel still awaits removal. Goals owns
 daily settings and a shared read-only calendar summary. Old Scheduling Options
 links resolve to Goals; inactive weekly rules/exceptions remain stored unchanged. See
 [`goals-implementation.md`](docs/development/goals-implementation.md) for the
@@ -564,21 +566,21 @@ Practice-event storage (SQLite v29) adds nullable goal/evaluation/scheduler iden
 bounded JSON TEXT snapshots/state, and fractional `interval_days`. Staging adds
 predecessor/config fingerprints and a stable prospective event UUID; queue rows gain
 allocation and displayed-event references. Queue allocation metadata is now written
-by the queue UI; event identity/state and displayed-event commit links still await
-the new evaluation/Submit UI. Legacy integer interval projections remain intact. Postgres
+by the queue UI; the active evaluation/Submit path writes event identity/state
+and displayed-event commit links. Legacy integer interval projections remain intact. Postgres
 serializes inserts sharing a practice natural key, rejects different event UUIDs at
 that key when either event uses the new format, and permits only transport metadata
 updates to submitted new-format events. Legacy-only upserts remain compatible.
 The same event UUID/content can be retried. `src/lib/goals/commit.ts` implements the
-new-format batch Submit boundary, currently disconnected from the UI. The shared
+new-format batch Submit boundary used by the active practice UI. The shared
 manual-schedule consumption policy lives in `services/scheduled-override.ts`, so
 this boundary does not import legacy recording/plugin orchestration. It validates
 reviewed draft receipts against current predecessor/configuration, then synchronously
 rechecks ownership, queue and draft snapshots before atomically writing events,
 current due dates, queue completion/display links and draft removal. Stale previews
 require review; event identity/time conflicts fail explicitly. Identical completed
-retries flush persistence without reapplying schedules or queue counters. Cutover
-conversion and selected-scheduler UI activation remain pending.
+retries flush persistence without reapplying schedules or queue counters.
+Production cutover execution remains pending.
 
 This domain logic is independent of oosync. oosync moves the rows; TuneTrees services decide what those rows mean.
 

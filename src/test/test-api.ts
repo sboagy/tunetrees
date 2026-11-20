@@ -1280,31 +1280,6 @@ declare global {
       setBaselineDiagnosticsEnabled: (enabled: boolean) => void;
       getBaselineDiagnostics: () => SyncBaselineDiagnostics;
       dispose: () => Promise<void>;
-      // Staging & committing helpers
-      stageEvaluation: (
-        tuneId: string,
-        repertoireId: string,
-        evaluation: string,
-        goal?: string,
-        technique?: string
-      ) => Promise<{
-        quality: number;
-        easiness: number | null;
-        difficulty: number | null;
-        stability: number | null;
-        interval: number;
-        step: number | null;
-        repetitions: number;
-        practiced: string;
-        due: string;
-        state: number;
-        goal: string;
-        technique: string;
-      }>;
-      commitStaged: (
-        repertoireId: string,
-        windowStartUtc?: string
-      ) => Promise<{ success: boolean; count: number; error?: string }>;
       getPracticeListStaged: (
         repertoireId: string,
         tuneIds?: string[]
@@ -1725,41 +1700,6 @@ if (globalThis.window !== undefined) {
       getDistinctPracticeRecordCount,
       getAllQueueWindows,
       getTunesByTitles,
-      stageEvaluation: async (
-        tuneId: string,
-        repertoireId: string,
-        evaluation: string,
-        goal?: string,
-        technique?: string
-      ) => {
-        const { stagePracticeEvaluation } = await import(
-          "@/lib/services/practice-staging"
-        );
-        const db = await ensureDb();
-        const userRef = await resolveUserId(db);
-        return await stagePracticeEvaluation(
-          db,
-          userRef,
-          repertoireId,
-          tuneId,
-          evaluation,
-          goal,
-          technique
-        );
-      },
-      commitStaged: async (repertoireId: string, windowStartUtc?: string) => {
-        const { commitStagedEvaluations } = await import(
-          "@/lib/services/practice-recording"
-        );
-        const db = await ensureDb();
-        const userRef = await resolveUserId(db);
-        return await commitStagedEvaluations(
-          db,
-          userRef,
-          repertoireId,
-          windowStartUtc
-        );
-      },
       getPracticeListStaged: async (
         repertoireId: string,
         tuneIds?: string[]

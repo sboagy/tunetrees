@@ -8,7 +8,6 @@ import { usePracticeListData } from "@/routes/practice/usePracticeListData";
 
 const { getPracticeList } = vi.hoisted(() => ({ getPracticeList: vi.fn() }));
 vi.mock("@/lib/db/queries/practice", () => ({ getPracticeList }));
-vi.mock("@/lib/services/practice-staging", () => ({}));
 vi.mock("solid-sonner", () => ({ toast: { error: vi.fn() } }));
 let dispose: () => void;
 afterEach(() => {

@@ -17,7 +17,7 @@ export function practiceDraftWhere(
 }
 
 /**
- * New-format staging boundary; deliberately not connected to the legacy Submit UI.
+ * Goal-aware staging boundary used by the active practice evaluation UI.
  * isCurrent must cover the caller's auth/database lifetime and evaluation request.
  * All async calculations finish before the synchronous recheck/write transaction.
  */

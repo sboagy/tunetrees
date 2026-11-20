@@ -1191,6 +1191,44 @@ describe("atomic goal practice submission", () => {
     });
   });
 
+  it("preserves a same-rating draft staged while Submit persistence is pending", async () => {
+    const receipt = await item();
+    let finishPersistence!: () => void;
+    let notifyPersisting!: () => void;
+    const persisting = new Promise<void>((resolve) => {
+      notifyPersisting = resolve;
+    });
+    vi.mocked(persistDb).mockImplementationOnce(() => {
+      notifyPersisting();
+      return new Promise<void>((resolve) => {
+        finishPersistence = resolve;
+      });
+    });
+    const committing = submit([receipt]);
+    // Wait for the real transaction to finish before staging another evaluation.
+    // Only the device persistence boundary is controlled; SQLite writes are real.
+    await persisting;
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "good",
+        practiced: new Date("2026-11-17T12:00:00Z"),
+      },
+      () => true
+    );
+    const newer = drafts();
+    expect(newer).toHaveLength(1);
+    finishPersistence();
+    expect((await committing).status).toBe("committed");
+    expect(drafts()).toEqual(newer);
+    expect(events()).toHaveLength(1);
+    expect(events()[0].id).toBe(receipt.draft.practiceRecordId);
+    expect(queue()?.displayedPracticeRecordId).toBe(events()[0].id);
+  });
+
   it("preserves a newer draft when retrying an older completed submission", async () => {
     const receipt = await item();
     await submit([receipt]);
