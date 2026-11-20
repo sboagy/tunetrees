@@ -1,5 +1,4 @@
 import { expect, type Page } from "@playwright/test";
-import { DEFAULT_PLUGIN_SCRIPT } from "../../src/lib/plugins/scheduling-template";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
@@ -36,29 +35,27 @@ test("delivers normal dedicated-worker messages", async ({ page }) => {
   expect(result).toEqual({ title: "Worker reached" });
 });
 
-test("runs Fluency history through the real async bridge", async ({ page }) => {
-  const result = await page.evaluate(async (script) => {
+test("runs goal scheduling through the real async bridge", async ({ page }) => {
+  const result = await page.evaluate(async () => {
     if (!window.__ttTestApi) throw new Error("Test API missing");
     return window.__ttTestApi.runPlugin({
-      script,
-      functionName: "createScheduler",
-      methodName: "processReview",
-      payload: {
-        input: {
-          practiced: "2026-01-20T12:00:00Z",
-          quality: 3,
-          repertoireRef: "r",
-          tuneRef: "t",
+      script: `async function scheduleGoalV1(input) {
+        const rows = await queryDb("history");
+        return { due: new Date(Date.parse(input.practiced) + rows.length * 86400000).toISOString(), state: { count: rows.length } };
+      }`,
+      functionName: "scheduleGoalV1",
+      payload: { practiced: "2026-01-20T12:00:00Z" },
+      bridge: {
+        queryDb: async (query: string) => {
+          if (query !== "history") throw new Error("Unexpected bridge query");
+          return [{ quality: 3 }, { quality: 3 }];
         },
-        fallback: { interval: 21 },
       },
-      bridge: { queryDb: async () => [{ quality: 3 }, { quality: 3 }] },
     });
-  }, DEFAULT_PLUGIN_SCRIPT);
+  });
   expect(result).toMatchObject({
-    interval: 4,
-    scheduledDays: 4,
-    nextDue: "2026-01-24T12:00:00.000Z",
+    due: "2026-01-22T12:00:00.000Z",
+    state: { count: 2 },
   });
 });
 

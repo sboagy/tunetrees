@@ -318,17 +318,6 @@ export async function executePlugin(
     });
     qjs.setProp(qjs.global, "queryDb", queryHandle);
     queryHandle.dispose();
-    const fsrsHandle = track(qjs.newObject());
-    for (const method of ["processFirstReview", "processReview"] as const) {
-      const fn = asyncFunction(method, async (payload) => {
-        if (!bridge.fsrsScheduler)
-          throw new Error("fsrsScheduler not available");
-        return bridge.fsrsScheduler[method](payload);
-      });
-      qjs.setProp(fsrsHandle, method, fn);
-      fn.dispose();
-    }
-    qjs.setProp(qjs.global, "fsrsScheduler", fsrsHandle);
     const fetchHandle = asyncFunction("fetchUrl", async (url, rawOptions) => {
       if (typeof url !== "string")
         throw new TypeError("fetchUrl expects a URL string");
@@ -371,28 +360,10 @@ export async function executePlugin(
     fetchHandle.dispose();
 
     track(qjs.unwrapResult(qjs.evalCode(message.script)));
-    let receiver = qjs.global;
-    let fn = track(qjs.getProp(qjs.global, message.functionName));
+    const receiver = qjs.global;
+    const fn = track(qjs.getProp(qjs.global, message.functionName));
     if (qjs.typeof(fn) !== "function")
       throw new Error(`Plugin did not define ${message.functionName}()`);
-    if (message.functionName === "createScheduler") {
-      const context = track(qjs.newObject());
-      qjs.setProp(context, "fsrsScheduler", fsrsHandle);
-      qjs.setProp(
-        context,
-        "queryDb",
-        track(qjs.getProp(qjs.global, "queryDb"))
-      );
-      receiver = track(
-        qjs.unwrapResult(qjs.callFunction(fn, qjs.global, context))
-      );
-      if (!message.methodName) throw new Error("Missing scheduler method name");
-      fn = track(qjs.getProp(receiver, message.methodName));
-      if (qjs.typeof(fn) !== "function")
-        throw new Error(
-          `Scheduler missing ${message.methodName}() implementation`
-        );
-    }
     const value = track(
       qjs.unwrapResult(
         qjs.callFunction(

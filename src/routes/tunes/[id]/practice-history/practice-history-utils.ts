@@ -1,6 +1,6 @@
 import type { ChartData } from "chart.js";
 import type { PracticeRecord } from "@/lib/db/types";
-import { FSRS_QUALITY_MAP } from "@/lib/scheduling/fsrs-service";
+import { FSRS_QUALITY_MAP } from "@/lib/goals/ratings";
 import {
   normalizePracticeTimestamp,
   orderPracticeHistory,

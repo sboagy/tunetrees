@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PracticeRecord } from "../../../src/lib/db/types";
-import { FSRS_QUALITY_MAP } from "../../../src/lib/scheduling/fsrs-service";
+import { FSRS_QUALITY_MAP } from "../../../src/lib/goals/ratings";
 import {
   buildPracticeHistoryQualityChart,
   buildPracticeHistoryStabilityChart,

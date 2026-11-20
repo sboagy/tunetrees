@@ -1076,12 +1076,12 @@ as independently re-reviewed by CodeRabbit.
 PR is considered complete, during activation of the new evaluation/staging/Submit
 flow—not deferred to an unspecified cleanup issue.
 
-- [ ] Replace its active caller in `services/practice-recording.ts` with the
+- [x] Replace its active caller in `services/practice-recording.ts` with the
   goal-aware flow, including explicit plugin selection and recoverable errors.
-- [ ] If legacy `createScheduler` scripts remain supported, isolate only the
-  required API translation in a named adapter with explicit numeric mappings.
-  Do not preserve implicit plugin selection or the old fallback orchestration.
-- [ ] Move relevant behavior coverage to the new executor/adapter and remove
+- [x] Retire legacy `createScheduler` support. Goal settings require the versioned
+  declaration and named actions before selection; no implicit plugin selection,
+  factory adapter or fallback orchestration remains.
+- [x] Move relevant behavior coverage to the new executor and remove
   obsolete `scheduling-output.test.ts` coverage with the implementation it tests.
 - [ ] Validate evaluation previews, stale-input checks, Submit, plugin failures
   and persistence on desktop/mobile; then delete `plugins/scheduling.ts` and
@@ -1646,3 +1646,67 @@ reusing existing Goals/Advanced controls (F4/R2). Desktop/mobile navigation and
 entry-point behavior passed automated checks. Theme, keyboard/focus, zoom and
 broader design-system acceptance are not tested in this batch and remain part of
 the separately planned goals UI review; this is not a whole-UI compliance claim.
+
+
+## Remaining legacy-code cleanup (2026-11-19)
+
+The Settings batch above is committed locally as `bbda1df8`, without pushing.
+This cleanup removes the obsolete FSRS service/interface, parallel queue allocator,
+legacy plugin factory and host FSRS bridge. The shared QuickJS runtime remains;
+its supported entry points are import and the two versioned goal-scheduler calls.
+The developer Test Runner now offers those same calls and a matching example
+payload. Goal settings already inspect the versioned declaration before saving a
+plugin selection; old factory-only scripts require replacement, not silent fallback.
+
+Queue navigation remains in `services/practice-queue.ts`; all queue mutations use
+the active goal service. History rating constants moved unchanged to
+`goals/ratings.ts`. Legacy data decoding, migration inputs and compatibility
+columns remain necessary and are not removed by this runtime cleanup. No schema,
+generated artifact, saved data or migration behavior changed.
+
+The old numerical FSRS snapshots were renamed without changing their contents.
+They now run against the active FSRS calculator, preserving numerical comparison
+coverage without keeping a second production implementation. Removed duplicate
+parity checks, obsolete compatibility-field writer tests and old allocator tests;
+the active JSON commit and goal queue suites retain persistence, race, allocation,
+ownership, stale-input and retry coverage.
+
+The bucket E2E fixture was still using the old allocator through an unused
+add-to-review seed API. It now uses the active Refresh boundary, with an explicit
+minimum/maximum of nine to include all nine fixture tunes. Classification and
+count assertions remain; ordering asserts due/recent overdue/old overdue/new,
+as required by the agreed backlog-before-new policy. No synthetic practice
+history is inserted by the replacement helper.
+
+CodeRabbit's first review raised four checks. The rating map remains exactly
+1=Again, 2=Hard, 3=Good, 4=Easy. Versioned plugin selection is already mandatory.
+The obsolete seed helper was removed; the replacement Refresh uses explicit
+scheduled dates before historical due dates, as specified by the active allocator.
+Added a real-VM test of the developer runner's default goal payload without a host
+bridge. Full browser verification of this batch is reserved for the user's local
+E2E run before pushing. Final validation/review results are recorded below.
+
+Validation: all 1,435 unit tests, repository typecheck, lint, format:check and
+diff whitespace checks pass. The FSRS snapshot contents are byte-for-byte
+unchanged. The unit count decreased by 56 after removing obsolete/duplicate
+coverage and adding the direct template invocation regression. This cleanup is
+uncommitted; both earlier local commits remain unpushed. No E2E tests or server
+restarts were performed in this batch.
+
+Final CodeRabbit pass included the revised bucket fixture and raised six checks.
+Applied its bridge-test improvement: reject any query other than the expected
+history request. Traced the runner's parsed JSON payload through direct invocation
+and JSON result display; it matches the tested template contract. Queue allocation
+uses one increasing order index across buckets, Refresh rebuilds incomplete rows
+from explicit scheduled dates, and normalized window matching preserves completed
+rows. Existing goal selection requires the versioned declaration; this batch
+removes the leftover developer/runtime factory API, not an active goal executor.
+Those checks did not require production changes. The E2E bridge assertion is
+typechecked but awaits the user's browser run along with the rest of this batch.
+
+2026-11-20 handoff: the user reports that the full local E2E run passed.
+Subsequent SonarQube fixes nest the three Practice History filter controls inside
+ their labels (retaining IDs and layout); Biome sorted the starter-repertoire test
+imports. Typecheck and focused Biome checks pass after those changes. Browser
+checks were not repeated for the label/import-only follow-up. The user authorized
+committing and pushing this cleanup together with the two preceding local commits.

@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ITuneOverview } from "@/components/grids/types";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import { repertoireTune } from "@/lib/db/schema";
-import type { NextReviewSchedule } from "@/lib/db/types";
 import { usePracticeEvaluations } from "@/routes/practice/usePracticeEvaluations";
 
 const mocks = vi.hoisted(() => ({
@@ -71,25 +70,10 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
-function schedule(interval: number): { schedule: NextReviewSchedule } {
-  const now = new Date();
-  const due = new Date(now);
-  due.setDate(due.getDate() + interval);
-  return {
-    schedule: {
-      nextDue: due,
-      last_review: now,
-      interval,
-      state: 2,
-      stability: 3,
-      difficulty: 4,
-      elapsed_days: 1,
-      scheduled_days: interval,
-      reps: 2,
-      lapses: 0,
-    },
-  };
+function schedule(interval: number) {
+  return { schedule: { interval } };
 }
+
 let practiceRows: ITuneOverview[];
 let stagedRows: Map<string, { recall_eval: string; interval: number }>;
 let goals: Map<string, string | null>;

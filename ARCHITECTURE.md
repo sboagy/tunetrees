@@ -368,7 +368,7 @@ These principles define the product behavior and should be preserved.
 TuneTrees uses the FSRS algorithm (`ts-fsrs`):
 
 The app pins ts-fsrs 6.0.0 and explicitly selects the FSRS-6 model through
-the supported `DefaultScheduler` API. `FSRSService` derives the persisted elapsed-day field from
+the supported `DefaultScheduler` API. `goals/fsrs.ts` derives the persisted elapsed-day field from
 actual review timestamps; the library no longer returns that field. Existing
 weights and immutable history remain compatible with older clients. See
 [`ts-fsrs6-migration.md`](docs/development/ts-fsrs6-migration.md) for reviewed
@@ -406,9 +406,9 @@ invocations cannot reach its replacement. Active practice plugin failures remain
 unsubmitted with a retryable row error; they never substitute a built-in scheduler. Staging checks request ownership immediately
 before SQLite writes so older evaluations cannot overwrite newer selections.
 
-The sandbox protocol also accepts `describeGoalSchedulerV1` and `scheduleGoalV1`
-for the new goal-aware contract, separate from the legacy `createScheduler`
-factory. `plugins/goal-scheduler.ts` validates the compatibility declaration,
+The sandbox protocol supports `parseImport`, `describeGoalSchedulerV1` and
+`scheduleGoalV1`. The legacy scheduler factory and host FSRS bridge have been
+removed; the developer Test Runner uses the same supported API. `plugins/goal-scheduler.ts` validates the compatibility declaration,
 restricts continuation to the supplied latest event with matching goal/plugin,
 and validates due dates and bounded JSON state. Script errors propagate without
 fallback. The state envelope records plugin identity, code version, script hash
@@ -444,8 +444,9 @@ was not stored is initialized to zero with an explicit decoder limitation.
 The calculators feed the active guarded staging and Submit boundaries below.
 The superseded practice-recording, practice-staging and implicit plugin scheduling
 modules have been removed, together with unused test-API entrypoints. The shared
-QuickJS runtime remains. The older FSRS service still supplies comparison tests
-and rating constants; removing that residual dependency is separate cleanup.
+QuickJS runtime remains. The older FSRS service has been removed; rating constants
+live in `goals/ratings.ts`, and unchanged numerical compatibility snapshots exercise
+the active goal calculator.
 
 `goals/settings.ts` owns local configuration edits using the same default decoder
 and validation as practice. Built-in and private-goal edits write personal overrides;
@@ -455,8 +456,9 @@ visible replacement, moves owned assignments atomically, and preserves due dates
 history and frozen queue attribution; pending drafts block deletion. SQLite writes
 complete before persistence, so a failed disk save can be retried without repeating
 the mutation. The Goals editor exposes these definitions and grid pickers show
-personal labels/descriptions. Legacy queue helpers and global scheduling settings
-still require final cleanup; active evaluation already uses per-goal settings.
+personal labels/descriptions. All queue mutations use `goals/queue.ts`;
+`services/practice-queue.ts` only reads queue windows for navigation. The global
+Spaced Repetition panel has been retired in favor of per-goal Advanced settings.
 
 Administrative data-conversion code lives under `scripts/`, outside browser entry
 points. Shared defaults, validation and owner-scoped goal identity resolution stay

@@ -1,11 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  IUserSchedulingOptions,
-  PracticeRecord,
-  PrefsSpacedRepetition,
-} from "../db/types";
-import { FSRSService } from "../scheduling/fsrs-service";
-import { ensureMinimumNextDay } from "../utils/practice-date";
+import { describe, expect, it } from "vitest";
+import type { PracticeRecord } from "../db/types";
 import { getBuiltInGoals } from "./builtins";
 import { calculateGoalPractice, type GoalPracticeInput } from "./calculate";
 import { canonicalJson } from "./config";
@@ -58,110 +52,7 @@ function legacy(status = 2): PracticeRecord {
     deviceId: null,
   };
 }
-function oldService(input: GoalPracticeInput) {
-  const config = input.config.scheduler;
-  if (config.id !== "builtin:fsrs6") throw new Error("Expected FSRS");
-  const prefs: PrefsSpacedRepetition = {
-    userId: "user",
-    algType: "FSRS",
-    fsrsWeights: JSON.stringify(config.weights),
-    requestRetention: config.retention,
-    maximumInterval: config.maximumIntervalDays,
-    learningSteps: JSON.stringify(config.learningStepsMinutes),
-    relearningSteps: JSON.stringify(config.relearningStepsMinutes),
-    enableFuzzing: 0,
-    syncVersion: 1,
-    lastModifiedAt: "2026-11-11T12:00:00.000Z",
-    deviceId: null,
-  };
-  const scheduling: IUserSchedulingOptions = {
-    userId: "user",
-    acceptableDelinquencyWindow: 7,
-    minReviewsPerDay: 3,
-    maxReviewsPerDay: input.config.daily.maximum,
-    daysPerWeek: null,
-    weeklyRules: null,
-    exceptions: null,
-    autoScheduleNew: true,
-  };
-  return new FSRSService(prefs, scheduling, {
-    repertoireTuneCount: input.goalTuneCount,
-  });
-}
-
-beforeEach(() => {
-  vi.stubGlobal("window", { __TUNETREES_TEST_ENABLE_FUZZ__: false });
-  vi.spyOn(console, "log").mockImplementation(() => {});
-});
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-});
-
 describe("goal-selected calculations with JSON state", () => {
-  it.each([1, 2, 3, 4])(
-    "preserves first-review FSRS-6 calculation for rating %i",
-    async (rating) => {
-      const input = options();
-      input.evaluationId = input.config.evaluations[rating - 1].id;
-      const result = await calculateGoalPractice(input);
-      const old = await oldService(input).processFirstReview({
-        repertoireRef: "repertoire",
-        tuneRef: "tune",
-        quality: rating,
-        practiced: new Date(result.practiced),
-      });
-      expect(result.due).toBe(
-        ensureMinimumNextDay(
-          old.nextDue,
-          new Date(result.practiced)
-        ).toISOString()
-      );
-      expect(JSON.parse(result.schedulerState)).toMatchObject({
-        stability: old.stability,
-        difficulty: old.difficulty,
-        reps: old.reps,
-        status: old.state,
-      });
-    }
-  );
-  it.each(
-    [1, 2, 3].flatMap((status) =>
-      [1, 2, 3, 4].map((rating) => ({ status, rating }))
-    )
-  )(
-    "preserves legacy state $status continuation for rating $rating",
-    async ({ status, rating }) => {
-      const input = options();
-      // Test model parity below the cap; cap enforcement has its own regression below.
-      input.config.daily.maximum = 3;
-      input.predecessor = legacy(status);
-      input.evaluationId = input.config.evaluations[rating - 1].id;
-      const result = await calculateGoalPractice(input);
-      const old = await oldService(input).processReview(
-        {
-          repertoireRef: "repertoire",
-          tuneRef: "tune",
-          quality: rating,
-          practiced: new Date(result.practiced),
-        },
-        legacy(status)
-      );
-      expect(result.due).toBe(
-        ensureMinimumNextDay(
-          old.nextDue,
-          new Date(result.practiced)
-        ).toISOString()
-      );
-      expect(JSON.parse(result.schedulerState)).toMatchObject({
-        stability: old.stability,
-        difficulty: old.difficulty,
-        reps: old.reps,
-        status: old.state,
-      });
-      expect(result.continued).toBe(true);
-    }
-  );
   it.each([1, 3])(
     "caps Easy graduation from legacy state %i",
     async (status) => {

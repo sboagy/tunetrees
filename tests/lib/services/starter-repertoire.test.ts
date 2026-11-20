@@ -11,12 +11,15 @@ import Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SqliteDatabase } from "../../../src/lib/db/client-sqlite";
 import { getCatalogTuneIdsByFilter } from "../../../src/lib/db/queries/tunes";
+import { goal } from "../../../src/lib/db/schema";
 import {
   ITRAD_STARTER_TEMPLATE,
   RS500_STARTER_TEMPLATE,
 } from "../../../src/lib/db/starter-repertoire-templates";
-import { generateOrGetPracticeQueue } from "../../../src/lib/services/practice-queue";
+import { getBuiltInGoals } from "../../../src/lib/goals/builtins";
+import { updateGoalPracticeQueue } from "../../../src/lib/goals/queue";
 import {
   createStarterRepertoire,
   populateStarterRepertoireFromCatalog,
@@ -37,7 +40,10 @@ vi.mock("../../../src/lib/db/client-sqlite", () => ({
 vi.mock("../../../src/lib/sync", () => ({
   queueSync: vi.fn(() => Promise.resolve()),
 }));
-vi.mock("../../../src/lib/utils/practice-date", () => ({
+vi.mock("../../../src/lib/utils/practice-date", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../src/lib/utils/practice-date")
+  >()),
   getPracticeDate: vi.fn(() => TEST_PRACTICE_DATE),
 }));
 
@@ -94,6 +100,22 @@ beforeEach(() => {
   sqlite = new Database(":memory:");
   db = drizzle(sqlite) as BetterSQLite3Database;
   applyMigrations(db);
+  for (const row of getBuiltInGoals()) {
+    db.insert(goal)
+      .values({
+        id: row.id,
+        name: row.name,
+        displayName: row.displayName,
+        description: row.description,
+        defaultConfig: JSON.stringify(row.config),
+        lastModifiedAt: TEST_PRACTICE_DATE.toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: goal.id,
+        set: { defaultConfig: JSON.stringify(row.config) },
+      })
+      .run();
+  }
   createPracticeListStagedView(db);
   seedUser();
 });
@@ -326,17 +348,16 @@ describe("populateStarterRepertoireFromCatalog", () => {
       )
     ).toBe(true);
 
-    const queue = await generateOrGetPracticeQueue(
-      db,
-      TEST_USER_ID,
-      rep.repertoireId,
-      TEST_PRACTICE_DATE,
-      null,
-      "per_day",
-      true
+    const queue = await updateGoalPracticeQueue(
+      db as unknown as SqliteDatabase,
+      {
+        userId: TEST_USER_ID,
+        repertoireId: rep.repertoireId,
+        practiceDate: TEST_PRACTICE_DATE,
+      }
     );
 
-    expect(queue.length).toBeGreaterThan(0);
+    expect(queue.rows.length).toBeGreaterThan(0);
   });
 
   it("uses origin filter for the RS500 template", async () => {

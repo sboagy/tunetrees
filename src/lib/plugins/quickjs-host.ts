@@ -1,7 +1,6 @@
 /** The page owns invocation deadlines and the worker generation. Bridge replies
  * return only to that same worker and only while their invocation is active. */
 import {
-  type FsrsResult,
   type InvokeRequest,
   isWorkerInput,
   isWorkerOutput,
@@ -18,7 +17,6 @@ interface PendingRequest {
   startedAt: number;
   timeoutMs: number;
   functionName: PluginFunctionName;
-  methodName?: "processFirstReview" | "processReview";
   pluginId?: string;
   pluginName?: string;
 }
@@ -69,15 +67,15 @@ function ensureWorker(): Worker {
   runner.onmessage = (event: MessageEvent<unknown>) => {
     if (worker !== runner || !isWorkerOutput(event.data)) return;
     const data = event.data;
-    // A timeout can replace the worker while a database/FSRS callback is still
+    // A timeout can replace the worker while a database callback is still
     // pending. Never deliver that callback to the new worker, whose bridge IDs
     // start over. Completed invocations also discard their late responses.
-    const reply = (message: QueryResult | FsrsResult, invokeId: number) => {
+    const reply = (message: QueryResult, invokeId: number) => {
       if (worker === runner && pending.has(invokeId))
         runner.postMessage(message);
     };
 
-    if ("type" in data && data.type === "query") {
+    if ("type" in data) {
       const queryStartedAt = performance.now();
       const bridge = bridges.get(data.invokeId);
       const responder: QueryResult = {
@@ -136,74 +134,6 @@ function ensureWorker(): Worker {
       return;
     }
 
-    if ("type" in data && data.type === "fsrs") {
-      const fsrsStartedAt = performance.now();
-      const bridge = bridges.get(data.invokeId);
-      const responder: FsrsResult = {
-        type: "fsrsResult",
-        id: data.id,
-        ok: false,
-        error: { message: "fsrsScheduler not available" },
-      };
-
-      const scheduler = bridge?.fsrsScheduler;
-      if (!scheduler) {
-        console.warn("[QuickJS][host] fsrsScheduler bridge missing", {
-          invokeId: data.invokeId,
-          fsrsId: data.id,
-          method: data.method,
-        });
-        reply(responder, data.invokeId);
-        return;
-      }
-
-      const handler =
-        data.method === "processFirstReview"
-          ? scheduler.processFirstReview
-          : scheduler.processReview;
-
-      Promise.resolve()
-        .then(() => handler(data.payload))
-        .then((result) => {
-          console.info("[QuickJS][host] fsrsScheduler complete", {
-            invokeId: data.invokeId,
-            fsrsId: data.id,
-            method: data.method,
-            durationMs: performance.now() - fsrsStartedAt,
-          });
-          reply(
-            {
-              type: "fsrsResult",
-              id: data.id,
-              ok: true,
-              result,
-            } satisfies FsrsResult,
-            data.invokeId
-          );
-        })
-        .catch((error: unknown) => {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          console.warn("[QuickJS][host] fsrsScheduler failed", {
-            invokeId: data.invokeId,
-            fsrsId: data.id,
-            method: data.method,
-            durationMs: performance.now() - fsrsStartedAt,
-            error: message || "fsrsScheduler failed",
-          });
-          reply(
-            {
-              type: "fsrsResult",
-              id: data.id,
-              ok: false,
-              error: { message: message || "fsrsScheduler failed" },
-            } satisfies FsrsResult,
-            data.invokeId
-          );
-        });
-      return;
-    }
-
     const entry = pending.get(data.id);
     if (!entry) return;
 
@@ -217,7 +147,6 @@ function ensureWorker(): Worker {
       id: data.id,
       ok: data.ok,
       functionName: entry.functionName,
-      methodName: entry.methodName,
       pluginId: entry.pluginId,
       pluginName: entry.pluginName,
       timeoutMs: entry.timeoutMs,
@@ -231,7 +160,6 @@ function ensureWorker(): Worker {
       console.warn("[QuickJS][host] invoke failed", {
         id: data.id,
         functionName: entry.functionName,
-        methodName: entry.methodName,
         pluginId: entry.pluginId,
         pluginName: entry.pluginName,
         totalMs,
@@ -264,9 +192,6 @@ export async function runQuickJsPlugin(
     bridge?: PluginBridge;
   }
 ): Promise<unknown> {
-  if (params.functionName === "createScheduler" && !params.methodName) {
-    throw new Error("Missing scheduler method name");
-  }
   if (!isWorkerInput({ ...params, type: "invoke", id: 1 })) {
     throw new Error("Invalid plugin invocation parameters");
   }
@@ -283,7 +208,6 @@ export async function runQuickJsPlugin(
       console.warn("[QuickJS][host] invoke timeout", {
         id,
         functionName: params.functionName,
-        methodName: params.methodName,
         timeoutMs,
         elapsedMs,
         pendingCount: pending.size,
@@ -301,7 +225,6 @@ export async function runQuickJsPlugin(
       startedAt,
       timeoutMs,
       functionName: params.functionName,
-      methodName: params.methodName,
       ...pluginMeta,
     });
     if (params.bridge) {
@@ -312,7 +235,6 @@ export async function runQuickJsPlugin(
       type: "invoke",
       id,
       functionName: params.functionName,
-      methodName: params.methodName,
       script: params.script,
       payload: params.payload,
       meta: params.meta,
@@ -321,7 +243,6 @@ export async function runQuickJsPlugin(
     console.info("[QuickJS][host] invoke dispatched", {
       id,
       functionName: params.functionName,
-      methodName: params.methodName,
       timeoutMs,
       hasBridge: Boolean(params.bridge),
       ...pluginMeta,

@@ -1,8 +1,6 @@
-// The versioned goal entry point is deliberately separate from the legacy
-// factory API: invoking it must never implicitly run a numeric FSRS review.
+// Import and versioned goal entry points share transport, not scheduling semantics.
 export type PluginFunctionName =
   | "parseImport"
-  | "createScheduler"
   | "describeGoalSchedulerV1"
   | "scheduleGoalV1";
 
@@ -10,7 +8,6 @@ export interface InvokeRequest {
   type: "invoke";
   id: number;
   functionName: PluginFunctionName;
-  methodName?: "processFirstReview" | "processReview";
   script: string;
   payload: unknown;
   meta?: unknown;
@@ -51,40 +48,16 @@ export interface QueryResult {
   error?: { message: string };
 }
 
-export interface FsrsRequest {
-  type: "fsrs";
-  id: number;
-  invokeId: number;
-  method: "processFirstReview" | "processReview";
-  payload: unknown;
-}
-
-export interface FsrsResult {
-  type: "fsrsResult";
-  id: number;
-  ok: boolean;
-  result?: unknown;
-  error?: { message: string };
-}
-
-export type AnyMessage = InvokeRequest | QueryResult | FsrsResult;
-
-export type WorkerMessage = WorkerResponse | QueryRequest | FsrsRequest;
+export type AnyMessage = InvokeRequest | QueryResult;
+export type WorkerMessage = WorkerResponse | QueryRequest;
 export interface PluginBridge {
   queryDb?: (sql: string) => Promise<unknown>;
-  fsrsScheduler?: Record<
-    "processFirstReview" | "processReview",
-    (payload: unknown) => Promise<unknown>
-  >;
 }
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function id(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-}
-function method(value: unknown) {
-  return value === "processFirstReview" || value === "processReview";
 }
 function reply(value: Record<string, unknown>) {
   return (
@@ -99,39 +72,24 @@ export function isWorkerInput(value: unknown): value is AnyMessage {
   if (value.type === "invoke")
     return (
       typeof value.script === "string" &&
-      (((value.functionName === "parseImport" ||
+      (value.functionName === "parseImport" ||
         value.functionName === "describeGoalSchedulerV1" ||
         value.functionName === "scheduleGoalV1") &&
-        value.methodName === undefined) ||
-        (value.functionName === "createScheduler" && method(value.methodName)))
+      value.methodName === undefined
     );
-  return (
-    (value.type === "queryResult" || value.type === "fsrsResult") &&
-    reply(value)
-  );
+  return value.type === "queryResult" && reply(value);
 }
+
 export function isWorkerOutput(value: unknown): value is WorkerMessage {
   if (!record(value) || !id(value.id)) return false;
   if (value.type === "query")
     return id(value.invokeId) && typeof value.sql === "string";
-  if (value.type === "fsrs") return id(value.invokeId) && method(value.method);
   return value.type === undefined && reply(value);
 }
 
-export type PluginInvocation = {
+export interface PluginInvocation {
   script: string;
   payload: unknown;
   meta?: unknown;
-} & (
-  | {
-      functionName:
-        | "parseImport"
-        | "describeGoalSchedulerV1"
-        | "scheduleGoalV1";
-      methodName?: never;
-    }
-  | {
-      functionName: "createScheduler";
-      methodName: "processFirstReview" | "processReview";
-    }
-);
+  functionName: PluginFunctionName;
+}

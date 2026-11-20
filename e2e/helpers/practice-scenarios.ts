@@ -92,24 +92,6 @@ export async function navigateToTabForTest(
 // All new tests should use the parallel-safe functions below
 // ============================================================================
 
-/**
- * Fast local seeding via browser Test API (preferred for E2E)
- *
- * This avoids slow remote DB resets by writing directly to the app's
- * local SQLite database and regenerating the daily queue.
- */
-export async function seedAddToReviewLocally(
-  page: Page,
-  opts: { repertoireId: string; tuneIds: string[]; userIdInt?: string }
-) {
-  return await page.evaluate(async (input) => {
-    if (!(globalThis as any).__ttTestApi) {
-      throw new Error("__ttTestApi not attached on window");
-    }
-    return await (globalThis as any).__ttTestApi.seedAddToReview(input);
-  }, opts);
-}
-
 export async function seedSchedulingPluginLocally(
   page: Page,
   opts?: {

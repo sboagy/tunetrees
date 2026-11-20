@@ -467,7 +467,7 @@ export async function getPracticeHistory(
  * NOTE: This function intentionally does NOT set `scheduled = now`. The
  * `scheduled` field on repertoire_tune is reserved for explicit user-set
  * schedule overrides (via the ScheduledOverridePicker). Making tunes
- * immediately available for practice is handled by addSpecificTunesToExistingQueue
+ * immediately available for practice is handled by the manual action in updateGoalPracticeQueue
  * which writes directly to daily_practice_queue.
  *
  * This is the client-side equivalent of the legacy Python function:

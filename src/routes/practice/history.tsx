@@ -36,7 +36,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getPracticeRecords } from "../../lib/db/queries/practice";
 import type { PracticeRecordWithTune } from "../../lib/db/types";
-import { FSRS_QUALITY_MAP } from "../../lib/scheduling/fsrs-service";
+import { FSRS_QUALITY_MAP } from "../../lib/goals/ratings";
 
 /**
  * Practice History Component
@@ -333,69 +333,66 @@ const PracticeHistory: Component = () => {
           <div class="mb-4 flex flex-wrap gap-3">
             {/* Quality Filter */}
             <div class="flex-1 min-w-[200px]">
-              <label
-                for="quality-filter"
-                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Rating
+              <label for="quality-filter" class="block">
+                <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Rating
+                </span>
+                <select
+                  id="quality-filter"
+                  value={filterQuality()}
+                  onChange={(e) => setFilterQuality(e.currentTarget.value)}
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Ratings</option>
+                  <For each={qualityRatings()}>
+                    {(rating) => (
+                      <option value={rating.value}>{rating.label}</option>
+                    )}
+                  </For>
+                </select>
               </label>
-              <select
-                id="quality-filter"
-                value={filterQuality()}
-                onChange={(e) => setFilterQuality(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Ratings</option>
-                <For each={qualityRatings()}>
-                  {(rating) => (
-                    <option value={rating.value}>{rating.label}</option>
-                  )}
-                </For>
-              </select>
             </div>
 
             {/* Goal Filter */}
             <div class="flex-1 min-w-[200px]">
-              <label
-                for="goal-filter"
-                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Goal
+              <label for="goal-filter" class="block">
+                <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Goal
+                </span>
+                <select
+                  id="goal-filter"
+                  value={filterGoal()}
+                  onChange={(e) => setFilterGoal(e.currentTarget.value)}
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Goals</option>
+                  <For each={goals()}>
+                    {(goal) => <option value={goal}>{goal}</option>}
+                  </For>
+                </select>
               </label>
-              <select
-                id="goal-filter"
-                value={filterGoal()}
-                onChange={(e) => setFilterGoal(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Goals</option>
-                <For each={goals()}>
-                  {(goal) => <option value={goal}>{goal}</option>}
-                </For>
-              </select>
             </div>
 
             {/* Page Size Selector */}
             <div class="flex-1 min-w-[150px]">
-              <label
-                for="page-size"
-                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Show
+              <label for="page-size" class="block">
+                <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Show
+                </span>
+                <select
+                  id="page-size"
+                  value={pageSize()}
+                  onChange={(e) =>
+                    setPageSize(Number.parseInt(e.currentTarget.value, 10))
+                  }
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
               </label>
-              <select
-                id="page-size"
-                value={pageSize()}
-                onChange={(e) =>
-                  setPageSize(Number.parseInt(e.currentTarget.value, 10))
-                }
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
             </div>
           </div>
 

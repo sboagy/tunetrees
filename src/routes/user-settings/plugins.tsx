@@ -181,7 +181,7 @@ const PluginsPage: Component = () => {
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
 
   const [testFunction, setTestFunction] = createSignal<
-    "parseImport" | "processFirstReview" | "processReview"
+    "parseImport" | "describeGoalSchedulerV1" | "scheduleGoalV1"
   >("parseImport");
   const DEFAULT_TEST_PAYLOADS = {
     parseImport: JSON.stringify(
@@ -193,75 +193,16 @@ const PluginsPage: Component = () => {
       null,
       2
     ),
-    processFirstReview: JSON.stringify(
+    describeGoalSchedulerV1: "{}",
+    scheduleGoalV1: JSON.stringify(
       {
-        input: {
-          repertoireRef: "repertoire-id",
-          tuneRef: "tune-id",
-          quality: 3,
-          practiced: new Date().toISOString(),
-          goal: "fluency",
-          technique: "daily_practice",
-        },
-        prior: null,
-        preferences: null,
-        scheduling: null,
-        fallback: {
-          nextDue: new Date().toISOString(),
-          lastReview: new Date().toISOString(),
-          state: 0,
-          stability: 1,
-          difficulty: 1,
-          elapsedDays: 0,
-          scheduledDays: 1,
-          reps: 0,
-          lapses: 0,
-          interval: 1,
-        },
-      },
-      null,
-      2
-    ),
-    processReview: JSON.stringify(
-      {
-        input: {
-          repertoireRef: "repertoire-id",
-          tuneRef: "tune-id",
-          quality: 3,
-          practiced: new Date().toISOString(),
-          goal: "fluency",
-          technique: "daily_practice",
-        },
-        prior: {
-          id: "record-id",
-          repertoireRef: "repertoire-id",
-          tuneRef: "tune-id",
-          practiced: new Date().toISOString(),
-          quality: 3,
-          due: new Date().toISOString(),
-          stability: 1,
-          difficulty: 1,
-          interval: 1,
-          repetitions: 1,
-          lapses: 0,
-          state: 1,
-          elapsedDays: 0,
-          lastModifiedAt: new Date().toISOString(),
-        },
-        preferences: null,
-        scheduling: null,
-        fallback: {
-          nextDue: new Date().toISOString(),
-          lastReview: new Date().toISOString(),
-          state: 1,
-          stability: 1,
-          difficulty: 1,
-          elapsedDays: 0,
-          scheduledDays: 1,
-          reps: 1,
-          lapses: 0,
-          interval: 1,
-        },
+        apiVersion: 1,
+        goalId: "goal-id",
+        options: {},
+        stateVersion: 1,
+        practiced: new Date().toISOString(),
+        evaluation: { id: "tomorrow", actionId: "tomorrow" },
+        previousState: null,
       },
       null,
       2
@@ -495,12 +436,7 @@ const PluginsPage: Component = () => {
       const selectedFunction = testFunction();
       const result = await runPluginFunction({
         script: currentDraft.script,
-        ...(selectedFunction === "parseImport"
-          ? { functionName: "parseImport" as const }
-          : {
-              functionName: "createScheduler" as const,
-              methodName: selectedFunction,
-            }),
+        functionName: selectedFunction,
         payload,
         meta,
         timeoutMs: 30000,
@@ -842,18 +778,18 @@ const PluginsPage: Component = () => {
                           setTestFunction(
                             e.currentTarget.value as
                               | "parseImport"
-                              | "processFirstReview"
-                              | "processReview"
+                              | "describeGoalSchedulerV1"
+                              | "scheduleGoalV1"
                           )
                         }
                         class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                         data-testid="plugin-test-function"
                       >
                         <option value="parseImport">parseImport</option>
-                        <option value="processFirstReview">
-                          processFirstReview
+                        <option value="describeGoalSchedulerV1">
+                          describeGoalSchedulerV1
                         </option>
-                        <option value="processReview">processReview</option>
+                        <option value="scheduleGoalV1">scheduleGoalV1</option>
                       </select>
                     </label>
                   </div>
