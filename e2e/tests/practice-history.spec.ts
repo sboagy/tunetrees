@@ -79,7 +79,9 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     await page
       .getByTestId("practice-history-practiced-input")
       .fill("2026-04-20T10:15");
-    await page.getByTestId("practice-history-quality-select").selectOption("4");
+    await page
+      .getByTestId("practice-history-quality-select")
+      .selectOption("easy");
 
     await page.getByTestId("practice-history-save-button").click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
@@ -87,6 +89,12 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     const grid = page.locator("table").first();
     await expect(grid).toBeVisible({ timeout: 10_000 });
     await expect(grid.getByText("Easy")).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByTestId("practice-history-quality-chart")
+    ).toHaveCount(0);
+    await page
+      .getByTestId("practice-history-goal-filter")
+      .selectOption({ label: "Recall" });
     await expect(page.getByTestId("practice-history-analytics")).toBeVisible({
       timeout: 10_000,
     });
@@ -98,12 +106,115 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     ).toBeVisible();
   });
 
+  test("records Fluency and scopes the entire history view to the selected goal", async ({
+    page,
+  }) => {
+    await page.getByTestId("practice-history-add-button").click();
+    await page
+      .getByTestId("practice-history-practiced-input")
+      .fill("2026-04-18T09:00");
+    await page
+      .getByTestId("practice-history-quality-select")
+      .selectOption("good");
+    await page.getByTestId("practice-history-save-button").click();
+    await page.waitForLoadState("networkidle", { timeout: 15_000 });
+    await expect(page.getByTestId("practice-history-add-form")).toHaveCount(0);
+    await page.getByTestId("practice-history-add-button").click();
+    await page
+      .getByTestId("practice-history-entry-goal")
+      .selectOption({ label: "Fluency" });
+    await page
+      .getByTestId("practice-history-practiced-input")
+      .fill("2026-04-19T09:00");
+    await page
+      .getByTestId("practice-history-quality-select")
+      .selectOption("fluent");
+    await page.getByTestId("practice-history-save-button").click();
+    await page.waitForLoadState("networkidle", { timeout: 15_000 });
+    const table = page.getByTestId("practice-history-events-table");
+    await expect(table.locator("tbody tr")).toHaveCount(2);
+    await expect(
+      page.getByTestId("practice-history-quality-chart")
+    ).toHaveCount(0);
+    await page
+      .getByTestId("practice-history-goal-filter")
+      .selectOption({ label: "Recall" });
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await expect(table.getByText("Good", { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(table.getByText("Fluent", { exact: true })).toHaveCount(0);
+    await expect(
+      table.getByRole("columnheader", { name: "Stability", exact: true })
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByTestId("practice-history-quality-chart")
+    ).toBeVisible({ timeout: 10_000 });
+    await page
+      .getByTestId("practice-history-goal-filter")
+      .selectOption({ label: "Fluency" });
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await expect(table.getByText("Fluent", { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(table.getByText("Good", { exact: true })).toHaveCount(0);
+    await expect(
+      table.getByRole("columnheader", { name: "Ladder position" })
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByTestId("practice-history-quality-chart")
+    ).toHaveCount(0);
+    await page.getByTestId("practice-history-add-button").click();
+    await expect(
+      page.getByTestId("practice-history-entry-goal").locator("option:checked")
+    ).toHaveText("Fluency");
+    await page.getByTestId("practice-history-discard-button").click();
+    await table
+      .getByRole("button", { name: "Delete entry", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Delete practice entry?" })
+      .getByRole("button", { name: "Delete entry", exact: true })
+      .click();
+    await page.waitForLoadState("networkidle", { timeout: 15_000 });
+    await expect(page.getByTestId("practice-history-goal-filter")).toHaveValue(
+      ""
+    );
+    await expect(table.getByText("Good", { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByTestId("practice-history-add-button").click();
+    await expect(
+      page.getByTestId("practice-history-entry-goal").locator("option:checked")
+    ).toHaveText("Recall");
+  });
+
+  test("rejects a future practice date without writing history", async ({
+    page,
+  }) => {
+    await page.getByTestId("practice-history-add-button").click();
+    await page
+      .getByTestId("practice-history-practiced-input")
+      .fill("2099-04-18T09:00");
+    await page.getByTestId("practice-history-save-button").click();
+    await expect(page.getByRole("alert")).toContainText(
+      "Practice date cannot be in the future",
+      { timeout: 10_000 }
+    );
+    await expect(page.locator("tbody tr")).toHaveCount(0);
+    await expect(page.getByTestId("practice-history-add-form")).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
   test("keeps saved history rows read-only", async ({ page }) => {
     await page.getByTestId("practice-history-add-button").click();
     await page
       .getByTestId("practice-history-practiced-input")
       .fill("2026-04-18T09:00");
-    await page.getByTestId("practice-history-quality-select").selectOption("3");
+    await page
+      .getByTestId("practice-history-quality-select")
+      .selectOption("good");
     await page.getByTestId("practice-history-save-button").click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
 
@@ -129,18 +240,27 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
     await page
       .getByTestId("practice-history-practiced-input")
       .fill("2026-04-21T08:30");
-    await page.getByTestId("practice-history-quality-select").selectOption("2");
+    await page
+      .getByTestId("practice-history-quality-select")
+      .selectOption("hard");
     await page.getByTestId("practice-history-save-button").click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
   });
 
-  test("deletes an existing practice record immediately", async ({ page }) => {
+  test("deletes an existing practice record after confirmation", async ({
+    page,
+  }) => {
     const rows = page.locator("tbody tr");
     await expect(rows).toHaveCount(1);
 
-    await rows
-      .first()
-      .getByRole("button", { name: "Delete practice history entry" })
+    await rows.first().getByRole("button", { name: "Delete entry" }).click();
+    const confirmation = page.getByRole("dialog", {
+      name: "Delete practice entry?",
+    });
+    await expect(confirmation).toBeVisible({ timeout: 10_000 });
+    await expect(rows).toHaveCount(1);
+    await confirmation
+      .getByRole("button", { name: "Delete entry", exact: true })
       .click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
 

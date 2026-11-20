@@ -1331,3 +1331,79 @@ ignores dialog targets, with desktop/mobile browser coverage. Its three other
 questions are covered: configuration accepts missing/boolean values and rejects
 non-booleans; editor changes preserve the scheduler object via spreads; calculation
 tests verify 25-hour versus ten-minute results for the same first Good evaluation.
+
+
+## Mixed-goal Practice History batch (2026-11-19, uncommitted)
+
+Scope: the existing tune Practice History page and its Add Practice Entry form.
+The agreed selector controls the whole view. All goals retains chronological common
+columns and session counts; selecting a goal exposes its supported columns and
+analysis. Stored labels and JSON state are authoritative. FSRS graph continuity is
+split before filtering, so hiding intervening goals does not join separate histories.
+Unsupported events remain visible, with unavailable details rather than false zeros.
+
+The existing +Add form now selects a goal and its evaluations. It defaults to the
+filtered goal or the tune's current goal. Manual entry shares goal resolution and
+calculation, uses the preceding event at the entered date, and leaves later events
+and current scheduling unchanged when backdated. The user approved rejecting future
+dates because future records become canonical predecessors and block normal practice.
+No history replay, revision table, schema migration or deletion-sync repair was added.
+Deletion still has the existing local-only limitation, now stated in confirmation.
+
+Validation: 1,477 unit tests, typecheck, lint and format checks pass. Twelve new SQLite
+manual-entry regressions cover future dates, backdated preservation, predecessor
+selection, ladder entry, changed inputs, ownership, obsolete callers, persistence
+retries, displayed-settings changes, queue/draft preservation, undated legacy rows
+and time collisions. Ten history-reader tests cover snapshot authority,
+unknown/malformed data, mixed-goal metrics, resets, legacy decoding, missing intervals,
+same-day events and filtered graph breaks. CodeRabbit completed with 12 findings;
+all actionable findings are addressed, including stronger assertions, linear-sized
+chart datasets, stale form/delete scope guards, resource-error recovery and the
+existing Good default for FSRS. After retrying 1Password authorization, the focused
+desktop Chromium/Mobile Chrome run passed all 15 tests (including auth setup) in
+35.9 seconds. This is focused workflow validation, not full-suite E2E or complete
+design-system acceptance.
+
+### UI verification tracking (design-system Q1–Q3)
+
+Report scope: tune sidebar → Practice History, goal selector/table/details/charts,
+Add Practice Entry and deletion confirmation. Baseline 8ee1464d plus this working
+tree; local SQLite fixtures and existing desktop/mobile dev servers. Servers were
+not restarted. Rules: T1 common table, T/B filter/data states, V2 semantic styling,
+A3 deletion action, E/F manual form, R dialog/access/layout behavior.
+
+- Data correctness: unit tests pass for supported and unavailable event states.
+- Browser workflows: pass on desktop/mobile for empty history, Recall entry and
+  analytics, Fluency entry and goal-scoped rows/columns/charts, future-date rejection,
+  read-only saved rows, confirmed deletion and return navigation.
+- Grammar/layout: semantic tokens used for new content; light/dark screenshots,
+  320/390/768/1280 widths, 200% zoom and long-label checks not yet tested.
+- Access: primitive confirmation and labeled controls used; keyboard-only,
+  screen-reader, focus-return and reduced-motion checks not yet tested.
+- Editing/exit paths: save, future-date validation, confirmed deletion and return
+  navigation pass. Existing route departure/dirty-form protections require
+  follow-up; this batch is not a whole-app UI audit.
+- Persistence/error recovery: SQLite retry/ownership tests pass; browser offline,
+  failure/retry and navigation during save remain unverified.
+
+### Follow-up CodeRabbit review (2026-11-19)
+
+All seven findings were addressed. Manual-entry form state and pending persistence
+receipts are isolated by database/user/repertoire/tune for the lifetime of the page:
+changing repertoire leaves the new view usable, returning restores a pending retry,
+and late results do not display errors in a different view. A receipt remembers a
+successful SQLite insert so retrying persistence cannot recreate an entry deleted
+in the meantime. Supported scheduler columns remain visible when another event has
+unavailable state; deleting the selected goal's last event resets the filter to All
+goals. Save now shows progress and a device-save success toast, and failed history
+loads show Retry without a perpetual loading indicator.
+
+Validation after these fixes: 1,482 unit tests across 111 files pass, including four
+new component recovery tests and a thirteenth SQLite manual-entry regression for
+deletion between persistence attempts. Typecheck, repository lint and format checks
+pass. The focused desktop Chromium/Mobile Chrome History suite passes all 15 tests
+(including auth setup) in 39.0 seconds, with additional coverage for filter reset
+after deleting the last event for a goal. Servers were not restarted. Component
+coverage verifies navigation during save and query retry; actual browser offline
+persistence recovery and the visual/accessibility matrix above remain unverified.
+Changes remain uncommitted and unpushed.

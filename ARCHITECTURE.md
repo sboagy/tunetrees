@@ -474,6 +474,17 @@ the enriched per-tune query and history charts use the same generic ordering hel
 Display callers explicitly tolerate invalid timestamps as missing; scheduling rejects
 them. Canonical JSON hashing lives once in `goals/config.ts` and serves ladders and
 preview fingerprints with unchanged digest bytes.
+`goals/practice-history.ts` presents immutable event labels and decoded scheduler
+state, assigning continuity groups before goal filtering. The tune history selector
+controls columns, metrics and graphs; All goals shows common event information.
+`goals/manual-practice.ts` records explicit manual entries using the shared goal
+resolver and calculator with the predecessor at the entered date. Future dates and
+timestamp collisions are rejected. A synchronous transaction rechecks captured
+inputs and inserts the event; older insertions preserve later events and the current
+due date. Latest insertions update the due date without changing the assigned goal,
+manual schedule override, queue completion or staged work. Retained receipts make
+device-save retries idempotent. This is not a history replay or correction service.
+
 `queue-allocation.ts` owns shared goal-based date classification and allocation:
 due/recent/old backlog up to each maximum, then unscheduled/future top-ups only to
 the minimum. It does not impose a combined repertoire limit. `queue.ts` reads the

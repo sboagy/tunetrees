@@ -48,6 +48,12 @@ import {
   readGoalCommitItems,
 } from "./commit";
 import { canonicalJson } from "./config";
+import {
+  ManualPracticePersistenceError,
+  ManualPracticeRemovedError,
+  prepareManualPractice,
+  saveManualPractice,
+} from "./manual-practice";
 import { readPracticeSession } from "./practice-session";
 import {
   practiceContextFingerprints,
@@ -1435,5 +1441,174 @@ describe("repertoire history SQL consumers", () => {
       "UPDATE practice_record SET stability = NULL, goal = 'fluency' WHERE id='latest'"
     );
     expect(await getFsrsRetentionCurve(db, "rep")).toEqual([]);
+  });
+});
+
+describe("manual goal-aware practice history", () => {
+  const input = () => ({
+    userId: "owner",
+    repertoireId: "rep",
+    tuneId: "tune",
+    goalId: recall.id,
+    evaluationId: "good",
+    practiced: new Date("2026-11-15T12:00:00Z"),
+  });
+  it("rejects future dates before calculation", async () => {
+    await expect(
+      prepareManualPractice(db, {
+        ...input(),
+        practiced: new Date(Date.now() + 86400000),
+      })
+    ).rejects.toThrow(/future/);
+  });
+  it("preserves later history and the current schedule on backdated insertion", async () => {
+    event("later");
+    const before = db.select().from(practiceRecord).all();
+    const assignment = db.select().from(repertoireTune).all();
+    const receipt = await prepareManualPractice(db, input());
+    await saveManualPractice(db, receipt, () => true);
+    expect(db.select().from(practiceRecord).all()).toEqual(
+      expect.arrayContaining(before)
+    );
+    expect(db.select().from(repertoireTune).all()).toEqual(assignment);
+    expect(db.select().from(practiceRecord).all()).toHaveLength(2);
+  });
+  it("calculates from the preceding event rather than a later submitted event", async () => {
+    event("earlier", "2026-11-14T12:00:00Z");
+    const withoutLater = await prepareManualPractice(db, input());
+    event("later");
+    const withLater = await prepareManualPractice(db, input());
+    expect(JSON.parse(withLater.record.schedulerState).reps).toBe(11);
+    expect(withLater.record.schedulerState).toBe(
+      withoutLater.record.schedulerState
+    );
+  });
+  it("records ladder history without changing the tune's assigned goal", async () => {
+    const receipt = await prepareManualPractice(db, {
+      ...input(),
+      goalId: fluencyId,
+      evaluationId: fluency.config.evaluations[0].id,
+    });
+    await saveManualPractice(db, receipt, () => true);
+    expect(db.select().from(practiceRecord).all()[0]).toMatchObject({
+      goalId: fluencyId,
+      schedulerId: "builtin:interval-ladder",
+    });
+    expect(context().goalId).toBe(recall.id);
+    expect(context().predecessor?.due).toBe(receipt.record.due);
+  });
+  it("rejects a changed snapshot before inserting an entry", async () => {
+    const receipt = await prepareManualPractice(db, input());
+    event("intervening", "2026-11-14T12:00:00Z");
+    await expect(saveManualPractice(db, receipt, () => true)).rejects.toThrow(
+      /changed/
+    );
+    expect(db.select().from(practiceRecord).all()).toHaveLength(1);
+  });
+  it("rejects a foreign owner", async () => {
+    await expect(
+      prepareManualPractice(db, { ...input(), userId: "other" })
+    ).rejects.toThrow(/unavailable/);
+  });
+  it("does not write when the caller's auth lifetime has ended", async () => {
+    const receipt = await prepareManualPractice(db, input());
+    await expect(saveManualPractice(db, receipt, () => false)).rejects.toThrow(
+      /context changed/
+    );
+    expect(db.select().from(practiceRecord).all()).toHaveLength(0);
+  });
+  it("retries device persistence without duplicating the event or overwriting newer scheduling", async () => {
+    const receipt = await prepareManualPractice(db, input());
+    vi.mocked(persistDb).mockRejectedValueOnce(new Error("disk"));
+    await expect(
+      saveManualPractice(db, receipt, () => true)
+    ).rejects.toBeInstanceOf(ManualPracticePersistenceError);
+    raw.run(
+      "UPDATE repertoire_tune SET current = '2027-01-01' WHERE repertoire_ref = 'rep'"
+    );
+    await saveManualPractice(db, receipt, () => true);
+    expect(persistDb).toHaveBeenCalledTimes(2);
+    expect(db.select().from(practiceRecord).all()).toHaveLength(1);
+    expect(db.select().from(repertoireTune).all()[0].current).toBe(
+      "2027-01-01"
+    );
+  });
+  it("rejects a duplicate practiced time", async () => {
+    event("same", input().practiced.toISOString());
+    await expect(prepareManualPractice(db, input())).rejects.toThrow(
+      /already uses/
+    );
+  });
+  it("rejects settings different from the choices shown in the form", async () => {
+    await expect(
+      prepareManualPractice(db, {
+        ...input(),
+        expectedConfiguration: "outdated settings",
+      })
+    ).rejects.toThrow(/Goal settings changed/);
+    expect(db.select().from(practiceRecord).all()).toHaveLength(0);
+  });
+  it("preserves existing staged work and queue completion", async () => {
+    db.insert(dailyPracticeQueue)
+      .values({
+        id: "queue",
+        userRef: "owner",
+        repertoireRef: "rep",
+        tuneRef: "tune",
+        windowStartUtc: stamp,
+        windowEndUtc: "2026-11-17T12:00:00Z",
+        bucket: 1,
+        orderIndex: 0,
+        snapshotCoalescedTs: stamp,
+        generatedAt: stamp,
+        lastModifiedAt: stamp,
+      })
+      .run();
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "good",
+        practiced: new Date(stamp),
+      },
+      () => true
+    );
+    const drafts = db.select().from(tableTransientData).all();
+    const queue = db.select().from(dailyPracticeQueue).all();
+    const receipt = await prepareManualPractice(db, input());
+    await saveManualPractice(db, receipt, () => true);
+    expect(db.select().from(tableTransientData).all()).toEqual(drafts);
+    expect(db.select().from(dailyPracticeQueue).all()).toEqual(queue);
+  });
+  it("ignores undated legacy entries when selecting a dated predecessor", async () => {
+    event("undated", null);
+    event("earlier", "2026-11-14T12:00:00Z");
+    const receipt = await prepareManualPractice(db, input());
+    expect(JSON.parse(receipt.record.schedulerState).reps).toBe(11);
+    await saveManualPractice(db, receipt, () => true);
+    expect(db.select().from(practiceRecord).all()).toHaveLength(3);
+  });
+  it("does not resurrect a deleted backfill when retrying device persistence", async () => {
+    event("later");
+    const receipt = await prepareManualPractice(db, input());
+    vi.mocked(persistDb).mockRejectedValueOnce(new Error("disk"));
+    await expect(
+      saveManualPractice(db, receipt, () => true)
+    ).rejects.toBeInstanceOf(ManualPracticePersistenceError);
+    expect(receipt.committed).toBe(true);
+    raw.run("DELETE FROM practice_record WHERE id = ?", [receipt.record.id]);
+    await expect(
+      saveManualPractice(db, receipt, () => true)
+    ).rejects.toBeInstanceOf(ManualPracticeRemovedError);
+    expect(
+      db
+        .select()
+        .from(practiceRecord)
+        .all()
+        .map((row) => row.id)
+    ).toEqual(["later"]);
+    expect(persistDb).toHaveBeenCalledTimes(1);
   });
 });
