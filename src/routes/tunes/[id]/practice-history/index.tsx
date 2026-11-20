@@ -7,7 +7,12 @@
  * @module routes/tunes/[id]/practice-history
  */
 
-import { useLocation, useNavigate, useParams } from "@solidjs/router";
+import {
+  useBeforeLeave,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "@solidjs/router";
 import { eq, isNull, or } from "drizzle-orm";
 import { LoaderCircle, Plus, Save } from "lucide-solid";
 import {
@@ -39,6 +44,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { createDraftExitGuard } from "@/components/ui/createDraftExitGuard";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentRepertoire } from "@/lib/context/CurrentRepertoireContext";
 import {
@@ -307,11 +313,24 @@ const PracticeHistoryPage: Component = () => {
     }
   };
 
-  const handleCancelDraft = () => {
+  const discardDraft = () => {
     form().setMutationError(null);
     form().setDraftRecord(null);
     form().setPendingSave(null);
   };
+
+  const { requestExit, Confirmation } = createDraftExitGuard({
+    dirty: () => Boolean(draftRecord()),
+    pending: () => isSavingDraft() || Boolean(pendingSave()),
+    discard: discardDraft,
+    description: "Your unfinished practice entry will be lost.",
+  });
+  const handleCancelDraft = () => requestExit(discardDraft);
+  useBeforeLeave((event) => {
+    if (!draftRecord() && !isSavingDraft() && !pendingSave()) return;
+    event.preventDefault();
+    requestExit(() => event.retry(true));
+  });
 
   const handleSaveDraft = async () => {
     const entryForm = form();
@@ -425,6 +444,7 @@ const PracticeHistoryPage: Component = () => {
       class="h-full overflow-y-auto bg-background text-foreground"
       data-testid="practice-history-container"
     >
+      <Confirmation />
       <div class="w-full max-w-6xl px-4 py-4">
         <Card class="shadow-lg">
           <CardHeader class="border-b border-gray-200 dark:border-gray-700">

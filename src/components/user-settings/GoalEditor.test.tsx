@@ -5,19 +5,61 @@ import {
   screen,
   waitFor,
 } from "@solidjs/testing-library";
+import { createSignal, Show } from "solid-js";
 import { afterEach, expect, it, vi } from "vitest";
 import { getBuiltInGoals } from "@/lib/goals/builtins";
 import type { GoalPluginSelection } from "@/lib/goals/plugin-settings";
 import type { EditableGoalDefinition } from "@/lib/goals/settings";
-import { GoalEditor } from "./GoalEditor";
+import { GoalEditor, type GoalEditorDraft } from "./GoalEditor";
 
+// Exercise the editor through its category-facing validation contract.
+function EditorHarness(props: {
+  initial: EditableGoalDefinition;
+  plugins?: { id: string; name: string }[];
+  onInspectPlugin?: (id: string) => Promise<GoalPluginSelection>;
+  onSave: (
+    definition: EditableGoalDefinition,
+    selection?: GoalPluginSelection
+  ) => Promise<void>;
+}) {
+  let draft!: GoalEditorDraft;
+  const [failure, setFailure] = createSignal("");
+  const save = async () => {
+    try {
+      const value = draft.validate();
+      await props.onSave(value.definition, value.reviewedPlugin);
+    } catch (cause) {
+      if (!draft.error()) setFailure(String(cause));
+    }
+  };
+  return (
+    <>
+      <GoalEditor
+        {...props}
+        onRegister={(value) => {
+          draft = value;
+        }}
+        onSave={save}
+      />
+      <button
+        type="button"
+        data-testid="goal-save"
+        disabled={draft.pending()}
+        onClick={save}
+      >
+        Save changes
+      </button>
+      <Show when={failure()}>
+        <p role="alert">{failure()}</p>
+      </Show>
+    </>
+  );
+}
 afterEach(cleanup);
 function setup(name = "recall") {
   const definition = getBuiltInGoals().find((item) => item.name === name)!;
   const save = vi.fn().mockResolvedValue(undefined);
-  render(() => (
-    <GoalEditor initial={definition} onSave={save} onCancel={() => {}} />
-  ));
+  render(() => <EditorHarness initial={definition} onSave={save} />);
   return { definition, save };
 }
 it("saves Unlimited and zero minimum without changing evaluation identities", async () => {
@@ -114,7 +156,7 @@ it("retains edits and displays a failed save for retry", async () => {
   expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
     "Remember tunes"
   );
-  expect(screen.getByTestId("goal-save").closest("fieldset")?.disabled).toBe(
+  expect((screen.getByTestId("goal-save") as HTMLButtonElement).disabled).toBe(
     false
   );
 });
@@ -143,12 +185,11 @@ function setupPlugin(initial: EditableGoalDefinition = getBuiltInGoals()[0]) {
     .mockResolvedValue(structuredClone(selection));
   const save = vi.fn().mockResolvedValue(undefined);
   render(() => (
-    <GoalEditor
+    <EditorHarness
       initial={initial}
       plugins={[selection.plugin]}
       onInspectPlugin={inspect}
       onSave={save}
-      onCancel={() => {}}
     />
   ));
   return { inspect, save };

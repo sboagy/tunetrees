@@ -172,6 +172,74 @@ function assertSaveCurrent(context?: GoalSettingsSaveContext) {
     );
 }
 
+export type GoalSettingsChange = {
+  id: string;
+  expected?: GoalSettingsEntry;
+  definition: EditableGoalDefinition;
+  reviewedPlugin?: GoalPluginSelection;
+};
+
+/** Prepare plugins before entering SQLite's synchronous transaction. All changed
+ * goals commit together, so a stale or invalid collapsed goal cannot cause a partial save.
+ */
+export async function saveGoalSettingsBatch(
+  db: SqliteDatabase,
+  userId: string,
+  changes: GoalSettingsChange[],
+  context?: GoalSettingsSaveContext
+) {
+  assertSaveCurrent(context);
+  const snapshots = structuredClone(changes);
+  if (new Set(snapshots.map((change) => change.id)).size !== snapshots.length)
+    throw new Error("A goal can only occur once in a settings save");
+  const prepared = await Promise.all(
+    snapshots.map(async (change) => {
+      const valid = resolveGoalDefinition(change.definition);
+      if (change.expected) {
+        if (change.id !== change.expected.row.id)
+          throw new Error("Goal identity does not match the edited goal");
+        currentEntry(db, userId, change.expected);
+      }
+      const selection = await prepareGoalPluginSettings(
+        db,
+        userId,
+        valid.config,
+        change.reviewedPlugin
+      );
+      return { ...change, valid, selection };
+    })
+  );
+  db.transaction((tx) => {
+    assertSaveCurrent(context);
+    for (const change of prepared) {
+      if (change.selection)
+        assertGoalPluginSelection(tx, userId, change.selection);
+      if (change.expected) {
+        const entry = currentEntry(tx, userId, change.expected);
+        const overrides = canonicalJson(
+          goalOverrides(entry.defaults, change.valid)
+        );
+        const lastModifiedAt = new Date().toISOString();
+        tx.insert(goalUserSettings)
+          .values({ userId, goalId: entry.row.id, overrides, lastModifiedAt })
+          .onConflictDoUpdate({
+            target: [goalUserSettings.userId, goalUserSettings.goalId],
+            set: {
+              overrides,
+              deleted: 0,
+              lastModifiedAt,
+              syncVersion: sql.raw(`${goalUserSettings.syncVersion.name} + 1`),
+            },
+          })
+          .run();
+      } else {
+        insertConfiguredGoal(tx, userId, change.id, change.valid);
+      }
+    }
+  });
+  await persistGoalSettings();
+}
+
 export async function saveGoalSettings(
   db: SqliteDatabase,
   userId: string,
@@ -179,36 +247,19 @@ export async function saveGoalSettings(
   edited: EditableGoalDefinition,
   context?: GoalSettingsSaveContext
 ) {
-  assertSaveCurrent(context);
-  const snapshot = structuredClone(expected);
-  const valid = resolveGoalDefinition(edited);
-  currentEntry(db, userId, snapshot);
-  const selection = await prepareGoalPluginSettings(
+  await saveGoalSettingsBatch(
     db,
     userId,
-    valid.config,
-    context?.reviewedPlugin
+    [
+      {
+        id: expected.row.id,
+        expected,
+        definition: edited,
+        reviewedPlugin: context?.reviewedPlugin,
+      },
+    ],
+    context
   );
-  db.transaction((tx) => {
-    assertSaveCurrent(context);
-    if (selection) assertGoalPluginSelection(tx, userId, selection);
-    const entry = currentEntry(tx, userId, snapshot);
-    const overrides = canonicalJson(goalOverrides(entry.defaults, valid));
-    const lastModifiedAt = new Date().toISOString();
-    tx.insert(goalUserSettings)
-      .values({ userId, goalId: entry.row.id, overrides, lastModifiedAt })
-      .onConflictDoUpdate({
-        target: [goalUserSettings.userId, goalUserSettings.goalId],
-        set: {
-          overrides,
-          deleted: 0,
-          lastModifiedAt,
-          syncVersion: sql.raw(`${goalUserSettings.syncVersion.name} + 1`),
-        },
-      })
-      .run();
-  });
-  await persistGoalSettings();
 }
 
 /** The caller keeps this ID across persistence retries; creation never duplicates a goal. */
@@ -219,14 +270,26 @@ export async function createConfiguredGoal(
   definition: EditableGoalDefinition,
   context?: GoalSettingsSaveContext
 ) {
-  assertSaveCurrent(context);
-  const valid = resolveGoalDefinition(definition);
-  const selection = await prepareGoalPluginSettings(
+  await saveGoalSettingsBatch(
     db,
     userId,
-    valid.config,
-    context?.reviewedPlugin
+    [
+      {
+        id,
+        definition,
+        reviewedPlugin: context?.reviewedPlugin,
+      },
+    ],
+    context
   );
+}
+
+function insertConfiguredGoal(
+  db: SqliteDatabase,
+  userId: string,
+  id: string,
+  valid: EditableGoalDefinition
+) {
   let defaultTechnique = "base_interval";
   if (valid.config.scheduler.id === "builtin:fsrs6") defaultTechnique = "fsrs";
   if (valid.config.scheduler.id === "plugin")
@@ -244,25 +307,20 @@ export async function createConfiguredGoal(
         ? canonicalJson(valid.config.scheduler.intervalsDays)
         : null,
   };
-  db.transaction((tx) => {
-    assertSaveCurrent(context);
-    if (selection) assertGoalPluginSelection(tx, userId, selection);
-    const existing = tx.select().from(goal).where(eq(goal.id, id)).get();
-    if (existing) {
-      if (
-        existing.deleted ||
-        Object.entries(values).some(
-          ([key, value]) => existing[key as keyof typeof existing] !== value
-        )
+  const existing = db.select().from(goal).where(eq(goal.id, id)).get();
+  if (existing) {
+    if (
+      existing.deleted ||
+      Object.entries(values).some(
+        ([key, value]) => existing[key as keyof typeof existing] !== value
       )
-        throw new Error("Goal identity already exists with different content");
-      return;
-    }
-    tx.insert(goal)
-      .values({ ...values, lastModifiedAt: new Date().toISOString() })
-      .run();
-  });
-  await persistGoalSettings();
+    )
+      throw new Error("Goal identity already exists with different content");
+    return;
+  }
+  db.insert(goal)
+    .values({ ...values, lastModifiedAt: new Date().toISOString() })
+    .run();
 }
 
 /** Replace active assignments atomically; history and frozen queue attribution stay intact.

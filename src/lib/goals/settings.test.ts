@@ -29,6 +29,7 @@ import {
   readGoalSettings,
   readGoalSettingsCatalog,
   saveGoalSettings,
+  saveGoalSettingsBatch,
 } from "./settings";
 
 vi.mock("../db/client-sqlite", () => ({ persistDb: vi.fn() }));
@@ -112,6 +113,62 @@ describe("goal settings persistence", () => {
     });
     expect(entry().row).toEqual(before.row);
     expect(entry(recall.id, "other").effective).toEqual(before.effective);
+  });
+  it("saves multiple edits and a new goal in one category save", async () => {
+    const first = entry();
+    const second = entry(getBuiltInGoals()[1].id);
+    await saveGoalSettingsBatch(db, "owner", [
+      {
+        id: first.row.id,
+        expected: first,
+        definition: { ...first.effective, displayName: "Remember" },
+      },
+      {
+        id: second.row.id,
+        expected: second,
+        definition: { ...second.effective, displayName: "Learn" },
+      },
+      { id: "new", definition: custom },
+    ]);
+    expect(entry().effective.displayName).toBe("Remember");
+    expect(entry(second.row.id).effective.displayName).toBe("Learn");
+    expect(entry("new").effective).toEqual(custom);
+    expect(persistDb).toHaveBeenCalledOnce();
+  });
+  it("rolls back earlier edits when a later category write fails", async () => {
+    const before = entry();
+    await expect(
+      saveGoalSettingsBatch(db, "owner", [
+        {
+          id: before.row.id,
+          expected: before,
+          definition: { ...before.effective, displayName: "Not saved" },
+        },
+        { id: `${before.row.id}-new`, definition: custom },
+        { id: getBuiltInGoals()[1].id, definition: custom },
+      ])
+    ).rejects.toThrow("different content");
+    expect(entry().effective).toEqual(before.effective);
+    expect(entry(`${before.row.id}-new`)).toBeUndefined();
+    expect(persistDb).not.toHaveBeenCalled();
+  });
+  it("rejects the whole category when a later goal is invalid", async () => {
+    const first = entry();
+    const second = entry(getBuiltInGoals()[1].id);
+    const invalid = structuredClone(second.effective);
+    invalid.config.daily.minimum = 10;
+    invalid.config.daily.maximum = 2;
+    await expect(
+      saveGoalSettingsBatch(db, "owner", [
+        {
+          id: first.row.id,
+          expected: first,
+          definition: { ...first.effective, displayName: "Not saved" },
+        },
+        { id: second.row.id, expected: second, definition: invalid },
+      ])
+    ).rejects.toThrow("Minimum");
+    expect(db.select().from(goalUserSettings).all()).toHaveLength(0);
   });
   it("reset inherits current defaults and preserves the syncable settings row", async () => {
     const before = entry();

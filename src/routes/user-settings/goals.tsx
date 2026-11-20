@@ -1,22 +1,32 @@
-import { Plus } from "lucide-solid";
+import { ChevronDown, LoaderCircle, Plus, Save, Trash2 } from "lucide-solid";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { toast } from "solid-sonner";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { GoalEditor } from "@/components/user-settings/GoalEditor";
+import { createDraftExitGuard } from "@/components/ui/createDraftExitGuard";
+import {
+  GoalEditor,
+  type GoalEditorDraft,
+} from "@/components/user-settings/GoalEditor";
 import { PracticeCalendarSummary } from "@/components/user-settings/PracticeCalendarSummary";
+import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getPluginsByCapability } from "@/lib/db/queries/plugins";
 import { getBuiltInGoals, getCustomGoalConfig } from "@/lib/goals/builtins";
 import { inspectGoalPlugin } from "@/lib/goals/plugin-settings";
 import {
-  createConfiguredGoal,
   deleteConfiguredGoal,
   type EditableGoalDefinition,
+  type GoalSettingsChange,
   type GoalSettingsEntry,
   GoalSettingsPersistenceError,
   persistGoalSettings,
   readGoalSettingsCatalog,
-  saveGoalSettings,
+  saveGoalSettingsBatch,
   type UnavailableGoalSettings,
 } from "@/lib/goals/settings";
 
@@ -42,7 +52,38 @@ export default function GoalsPage() {
   const [unavailable, setUnavailable] = createSignal<UnavailableGoalSettings[]>(
     []
   );
-  const [editing, setEditing] = createSignal<GoalSettingsEntry>();
+  const settings = useUserSettingsDialog();
+  const [expanded, setExpanded] = createSignal<Record<string, boolean>>({});
+  const [visited, setVisited] = createSignal<Record<string, boolean>>({});
+  const [editors, setEditors] = createSignal<Record<string, GoalEditorDraft>>(
+    {}
+  );
+  const [resetValues, setResetValues] = createSignal<
+    Record<string, EditableGoalDefinition>
+  >({});
+  const [message, setMessage] = createSignal("");
+  const registerEditor = (id: string, editor: GoalEditorDraft) => {
+    setEditors((old) => ({ ...old, [id]: editor }));
+    onCleanup(() =>
+      setEditors((old) => {
+        if (old[id] !== editor) return old;
+        const next = { ...old };
+        delete next[id];
+        return next;
+      })
+    );
+  };
+  const toggleGoal = (id: string) => {
+    setVisited((old) => ({ ...old, [id]: true }));
+    setExpanded((old) => ({ ...old, [id]: !old[id] }));
+  };
+  const clearDraft = () => {
+    setExpanded({});
+    setVisited({});
+    setResetValues({});
+    setAdding(undefined);
+    setDeleting(undefined);
+  };
   const [adding, setAdding] = createSignal<{
     id: string;
     definition: EditableGoalDefinition;
@@ -112,10 +153,11 @@ export default function GoalsPage() {
   };
   createEffect(() => {
     // refresh() reads the auth user and database synchronously, tracking both.
-    setEditing(undefined);
+    clearDraft();
     setAdding(undefined);
     setDeleting(undefined);
     setError("");
+    setMessage("");
     setCanRetryPersistence(false);
     try {
       refresh();
@@ -140,6 +182,7 @@ export default function GoalsPage() {
       !disposed && localDb() === db && user()?.id === userId;
     setBusy(true);
     setError("");
+    setMessage("");
     setCanRetryPersistence(false);
     try {
       await operation(db, userId, current);
@@ -147,10 +190,10 @@ export default function GoalsPage() {
       incrementRepertoireListChanged();
       incrementPracticeListStagedChanged();
       refresh();
-      setEditing(undefined);
+      clearDraft();
       setAdding(undefined);
       setDeleting(undefined);
-      toast.success("Goal settings saved");
+      setMessage("Goal settings saved to this device.");
     } catch (cause) {
       if (!current()) return;
       // The SQLite transaction may have committed before disk persistence failed.
@@ -166,7 +209,7 @@ export default function GoalsPage() {
     void operation.catch(() => {});
   };
   const reload = () => {
-    setEditing(undefined);
+    clearDraft();
     setAdding(undefined);
     setDeleting(undefined);
     try {
@@ -177,6 +220,85 @@ export default function GoalsPage() {
       setError(String(cause));
     }
   };
+  const dirty = () =>
+    Boolean(adding()) ||
+    Object.values(editors()).some((editor) => editor.changed());
+  const pending = () => busy() || canRetryPersistence();
+  const { requestExit, Confirmation } = createDraftExitGuard({
+    dirty,
+    pending,
+    discard: clearDraft,
+    description: "Unsaved changes to Goals will be lost.",
+  });
+  const save = () => {
+    if (busy() || canRetryPersistence()) return;
+    const changes: GoalSettingsChange[] = [];
+    for (const [id, editor] of Object.entries(editors())) {
+      const expected = goals().find((entry) => entry.row.id === id);
+      if (expected && !editor.changed()) continue;
+      try {
+        changes.push({ id, expected, ...editor.validate() });
+      } catch {
+        setExpanded((old) => ({ ...old, [id]: true }));
+        queueMicrotask(editor.focusError);
+        return;
+      }
+    }
+    if (!changes.length) return;
+    report(
+      perform((db, uid, isCurrent) =>
+        saveGoalSettingsBatch(db, uid, changes, { isCurrent })
+      )
+    );
+  };
+  onCleanup(
+    settings.registerDraft({
+      pending,
+      requestExit,
+      footer: (close) => (
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background px-4 py-3"
+          data-testid="goals-settings-footer"
+        >
+          <div class="text-sm">
+            <p>Changes to Goals</p>
+            <output class="block text-muted-foreground">{message()}</output>
+          </div>
+          <div class="flex gap-2">
+            <Button
+              class="min-h-11"
+              variant="outline"
+              disabled={pending()}
+              onClick={close}
+            >
+              Cancel
+            </Button>
+            <Button
+              class="min-h-11 min-w-36"
+              data-testid="goal-save"
+              disabled={
+                !dirty() ||
+                pending() ||
+                Object.values(editors()).some((editor) => editor.pending())
+              }
+              onClick={save}
+            >
+              <Show
+                when={busy()}
+                fallback={<Save class="size-4" aria-hidden="true" />}
+              >
+                <LoaderCircle
+                  class="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              </Show>
+              {busy() ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        </div>
+      ),
+    })
+  );
   return (
     <div
       class="max-w-3xl space-y-5 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
@@ -192,6 +314,87 @@ export default function GoalsPage() {
         </p>
       </div>
       <PracticeCalendarSummary />
+      <Confirmation />
+      <Show when={deleting()} keyed>
+        {(entry) => (
+          <AlertDialog
+            open
+            onOpenChange={(open) => {
+              if (!open && !busy()) setDeleting(undefined);
+            }}
+          >
+            <AlertDialogContent
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+                document.getElementById("goal-cancel-delete")?.focus();
+              }}
+              onInteractOutside={(event) => event.preventDefault()}
+              onEscapeKeyDown={(event) => {
+                if (busy()) event.preventDefault();
+              }}
+            >
+              <AlertDialogTitle>
+                Delete {entry.effective.displayName}?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose a replacement for tunes assigned to this goal. Due dates
+                and history will be kept. Pending practice and notes must be
+                handled first.
+              </AlertDialogDescription>
+              <label class="block text-sm">
+                <span>Replacement goal</span>
+                <select
+                  class="min-h-11 w-full border border-input rounded bg-background text-foreground p-2"
+                  data-testid="goal-replacement"
+                  value={replacement()}
+                  onChange={(e) => setReplacement(e.currentTarget.value)}
+                >
+                  <option value="">Choose a goal</option>
+                  <For
+                    each={goals().filter(
+                      (item) => item.row.id !== entry.row.id
+                    )}
+                  >
+                    {(item) => (
+                      <option value={item.row.id}>
+                        {item.effective.displayName}
+                      </option>
+                    )}
+                  </For>
+                </select>
+              </label>
+              <Button
+                variant="outline"
+                id="goal-cancel-delete"
+                class="min-h-11"
+                disabled={busy()}
+                onClick={() => setDeleting(undefined)}
+              >
+                Cancel deletion
+              </Button>
+              <Button
+                variant="destructive-ghost"
+                data-testid="goal-confirm-delete"
+                disabled={!replacement() || busy()}
+                onClick={() =>
+                  report(
+                    perform((db, uid) =>
+                      deleteConfiguredGoal(db, uid, entry, replacement())
+                    )
+                  )
+                }
+              >
+                <Trash2 class="size-4" aria-hidden="true" /> Replace and delete
+              </Button>
+              <Show when={error()}>
+                <p role="alert" class="text-sm text-destructive">
+                  {error()}
+                </p>
+              </Show>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </Show>
       <Show when={pluginsError()}>
         <div role="alert" class="space-y-2 text-sm text-destructive">
           <p>{pluginsError()}</p>
@@ -207,7 +410,11 @@ export default function GoalsPage() {
       <Show when={error()}>
         <div role="alert" class="space-y-2 text-sm text-destructive">
           <p>{error()}</p>
-          <Button variant="outline" disabled={busy()} onClick={reload}>
+          <Button
+            variant="outline"
+            disabled={busy()}
+            onClick={() => requestExit(reload)}
+          >
             Reload goals
           </Button>
           <Show when={canRetryPersistence()}>
@@ -263,7 +470,7 @@ export default function GoalsPage() {
                   <p class="text-sm text-muted-foreground">
                     {entry.effective.description}
                   </p>
-                  <p class="text-xs text-muted-foreground">
+                  <p class="text-sm text-muted-foreground">
                     {schedulerLabels[entry.effective.config.scheduler.id]} ·
                     Daily {entry.effective.config.daily.minimum}–
                     {entry.effective.config.daily.maximum || "Unlimited"}
@@ -273,121 +480,75 @@ export default function GoalsPage() {
                 <Button
                   variant="outline"
                   data-testid={`goal-edit-${entry.row.id}`}
-                  onClick={() => {
-                    setAdding(undefined);
-                    setDeleting(undefined);
-                    setEditing(entry);
-                  }}
+                  class="min-h-11 shrink-0"
+                  aria-expanded={Boolean(expanded()[entry.row.id])}
+                  aria-controls={`goal-fields-${entry.row.id}`}
+                  onClick={() => toggleGoal(entry.row.id)}
                 >
-                  Edit
+                  <ChevronDown class="size-4" aria-hidden="true" />
+                  {expanded()[entry.row.id] ? "Collapse" : "Edit"}
                 </Button>
               </div>
-              <Show when={editing()?.row.id === entry.row.id}>
-                <GoalEditor
-                  initial={entry.effective}
-                  plugins={plugins()}
-                  onInspectPlugin={inspectPlugin}
-                  onCancel={() => setEditing(undefined)}
-                  onSave={(definition, reviewedPlugin) =>
-                    perform((db, uid, isCurrent) =>
-                      saveGoalSettings(db, uid, entry, definition, {
-                        isCurrent,
-                        reviewedPlugin,
-                      })
-                    )
-                  }
-                />
-                <div class="flex flex-wrap gap-2">
-                  <Show when={entry.overridden}>
-                    <Button
-                      variant="outline"
-                      data-testid="goal-reset"
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Reset ${entry.effective.displayName} to its defaults?`
-                          )
-                        )
-                          report(
-                            perform((db, uid, isCurrent) =>
-                              saveGoalSettings(db, uid, entry, entry.defaults, {
-                                isCurrent,
-                              })
-                            )
-                          );
-                      }}
-                    >
-                      Reset to defaults
-                    </Button>
-                  </Show>
-                  <Show when={entry.row.privateFor !== null}>
-                    <Button
-                      variant="destructive-ghost"
-                      data-testid="goal-delete"
-                      onClick={() => {
-                        setDeleting(entry);
-                        setReplacement("");
-                      }}
-                    >
-                      Delete goal…
-                    </Button>
-                  </Show>
-                </div>
+              <Show when={editors()[entry.row.id]?.changed()}>
+                <p class="text-sm text-muted-foreground">Unsaved changes</p>
               </Show>
-              <Show when={deleting()?.row.id === entry.row.id}>
-                <div class="space-y-2 rounded border border-border p-3">
-                  <p class="text-sm">
-                    Choose a replacement for tunes assigned to this goal. Due
-                    dates and history will be kept. Pending practice and notes
-                    must be handled first.
-                  </p>
-                  <label class="block text-sm">
-                    <span>Replacement goal</span>
-                    <select
-                      class="min-h-11 w-full border border-input rounded bg-background text-foreground p-2"
-                      data-testid="goal-replacement"
-                      value={replacement()}
-                      onChange={(e) => setReplacement(e.currentTarget.value)}
-                    >
-                      <option value="">Choose a goal</option>
-                      <For
-                        each={goals().filter(
-                          (item) => item.row.id !== entry.row.id
-                        )}
+              <Show when={editors()[entry.row.id]?.error()}>
+                <p class="text-sm text-destructive">Needs attention</p>
+              </Show>
+              <Show when={visited()[entry.row.id]}>
+                <div
+                  id={`goal-fields-${entry.row.id}`}
+                  hidden={!expanded()[entry.row.id]}
+                  class="space-y-3"
+                >
+                  <Show
+                    when={resetValues()[entry.row.id] ?? entry.effective}
+                    keyed
+                  >
+                    {(initial) => (
+                      <GoalEditor
+                        initial={initial}
+                        baseline={entry.effective}
+                        plugins={plugins()}
+                        onInspectPlugin={inspectPlugin}
+                        onRegister={(editor) =>
+                          registerEditor(entry.row.id, editor)
+                        }
+                        onSave={save}
+                      />
+                    )}
+                  </Show>
+                  <div class="flex flex-wrap gap-2">
+                    <Show when={entry.overridden}>
+                      <Button
+                        variant="outline"
+                        data-testid="goal-reset"
+                        onClick={() =>
+                          setResetValues((old) => ({
+                            ...old,
+                            [entry.row.id]: structuredClone(entry.defaults),
+                          }))
+                        }
                       >
-                        {(item) => (
-                          <option value={item.row.id}>
-                            {item.effective.displayName}
-                          </option>
-                        )}
-                      </For>
-                    </select>
-                  </label>
-                  <Button
-                    variant="outline"
-                    onClick={() => setDeleting(undefined)}
-                  >
-                    Cancel deletion
-                  </Button>
-                  <Button
-                    variant="destructive-ghost"
-                    data-testid="goal-confirm-delete"
-                    disabled={!replacement()}
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Delete ${entry.effective.displayName} and replace its assignments?`
-                        )
-                      )
-                        report(
-                          perform((db, uid) =>
-                            deleteConfiguredGoal(db, uid, entry, replacement())
-                          )
-                        );
-                    }}
-                  >
-                    Replace and delete
-                  </Button>
+                        Reset to defaults
+                      </Button>
+                    </Show>
+                    <Show when={entry.row.privateFor !== null}>
+                      <Button
+                        variant="destructive-ghost"
+                        data-testid="goal-delete"
+                        onClick={() => {
+                          requestExit(() => {
+                            setDeleting(entry);
+                            setReplacement("");
+                          });
+                        }}
+                      >
+                        <Trash2 class="size-4" aria-hidden="true" /> Delete
+                        goal…
+                      </Button>
+                    </Show>
+                  </div>
                 </div>
               </Show>
             </section>
@@ -401,15 +562,8 @@ export default function GoalsPage() {
                 initial={draft.definition}
                 plugins={plugins()}
                 onInspectPlugin={inspectPlugin}
-                onCancel={() => setAdding(undefined)}
-                onSave={(definition, reviewedPlugin) =>
-                  perform((db, uid, isCurrent) =>
-                    createConfiguredGoal(db, uid, draft.id, definition, {
-                      isCurrent,
-                      reviewedPlugin,
-                    })
-                  )
-                }
+                onRegister={(editor) => registerEditor(draft.id, editor)}
+                onSave={save}
               />
             </section>
           )}
@@ -419,7 +573,6 @@ export default function GoalsPage() {
             variant="accent"
             data-testid="goal-add"
             onClick={() => {
-              setEditing(undefined);
               setDeleting(undefined);
               const scheduler = getBuiltInGoals()[0].config.scheduler;
               setAdding({

@@ -1,4 +1,5 @@
 import { createTable, flexRender } from "@tanstack/solid-table";
+import { ChevronDown, Trash2 } from "lucide-solid";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import {
   type ColumnDef,
@@ -15,6 +16,15 @@ import {
   formatPracticeHistoryDate,
   getPracticeHistoryStateLabel,
 } from "./practice-history-utils";
+
+const numericColumns = new Set([
+  "interval",
+  "stability",
+  "difficulty",
+  "reps",
+  "lapses",
+  "ladder",
+]);
 
 /** The same chronological event table is available at every viewport width.
  * Filtering affects presentation only; episode identities were computed upstream. */
@@ -125,7 +135,7 @@ export function HistoryEventsTable(props: {
           disabled={props.deletingIds.has(context.row.original.record.id)}
           onClick={() => props.onDelete(context.row.original.record.id)}
         >
-          Delete entry
+          <Trash2 class="size-4" aria-hidden="true" /> Delete entry
         </Button>
       ),
     },
@@ -198,7 +208,11 @@ export function HistoryEventsTable(props: {
           </select>
         </label>
         <Show when={goalKey()}>
-          <Button variant="ghost" onClick={() => setGoalKey("")}>
+          <Button
+            class="min-h-11"
+            variant="ghost"
+            onClick={() => setGoalKey("")}
+          >
             Clear filters
           </Button>
         </Show>
@@ -226,7 +240,7 @@ export function HistoryEventsTable(props: {
                     {(header) => (
                       <th
                         scope="col"
-                        class={`px-2 py-1.5 font-medium ${header.id === "interval" ? "text-right" : "text-left"}`}
+                        class={`px-2 py-1.5 font-medium ${numericColumns.has(header.id) ? "text-right" : "text-left"}`}
                       >
                         {flexRender(
                           header.column.columnDef.header,
@@ -249,7 +263,7 @@ export function HistoryEventsTable(props: {
                   <For each={row.getVisibleCells()}>
                     {(cell) => (
                       <td
-                        class={`px-2 py-1.5 align-top ${cell.column.id === "interval" ? "text-right tabular-nums" : "text-left"}`}
+                        class={`px-2 py-1.5 align-top ${numericColumns.has(cell.column.id) ? "text-right tabular-nums" : "text-left"}`}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -387,7 +401,7 @@ function EventDetails(props: { event: HistoryEvent }) {
         aria-controls={id()}
         onClick={() => setOpen(!open())}
       >
-        Details
+        <ChevronDown class="size-4" aria-hidden="true" /> Details
       </Button>
       <Show when={open()}>
         <div id={id()} class="space-y-2 py-2">

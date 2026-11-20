@@ -92,21 +92,21 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
       <DropdownMenu>
         <DropdownMenu.Trigger
           title={selected()?.description ?? undefined}
-          class={`${badgeClass()} cursor-pointer hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+          class={`${badgeClass()} min-h-11 max-w-full cursor-pointer hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
           onClick={(event) => event.stopPropagation()}
         >
           {displayName()}
-          <ChevronDown class="w-3 h-3 ml-0.5 opacity-60" />
+          <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
         </DropdownMenu.Trigger>
 
         <DropdownMenu.Portal>
-          <DropdownMenu.Content class="z-50 min-w-[10rem] overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 shadow-md">
+          <DropdownMenu.Content class="z-50 min-w-40 max-w-[calc(100vw-1rem)] max-h-[min(32rem,80dvh)] overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground p-1 shadow-md">
             {/* Goal items */}
             <For each={props.goals?.() ?? []}>
               {(goal) => (
                 <DropdownMenu.Item
                   data-testid={`goal-option-${goal.name}`}
-                  class="relative flex cursor-pointer select-none items-center rounded-sm py-1 pl-7 pr-3 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 outline-none"
+                  class="relative flex min-h-11 cursor-pointer select-none items-center rounded-sm py-2 pl-7 pr-3 text-sm hover:bg-accent data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground outline-none"
                   onSelect={() => props.onGoalChange!(goal.name)}
                 >
                   {/* Checkmark for current goal */}
@@ -121,7 +121,7 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
                   <span>
                     {goal.displayName ?? goal.name}
                     <Show when={goal.description}>
-                      <span class="block max-w-xs text-xs text-muted-foreground">
+                      <span class="block max-w-xs text-sm text-muted-foreground break-words">
                         {goal.description}
                       </span>
                     </Show>
@@ -131,9 +131,9 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
             </For>
 
             {/* Separator + Edit Goals action */}
-            <DropdownMenu.Separator class="my-1 -mx-1 h-px bg-gray-200 dark:bg-gray-700" />
+            <DropdownMenu.Separator class="my-1 -mx-1 h-px bg-border" />
             <DropdownMenu.Item
-              class="flex cursor-pointer select-none items-center rounded-sm px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 outline-none gap-1.5"
+              class="flex min-h-11 cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm text-muted-foreground hover:bg-accent data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground outline-none gap-1.5"
               onSelect={() => openUserSettings("goals")}
             >
               <Settings2 class="w-3 h-3" />

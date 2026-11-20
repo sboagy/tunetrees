@@ -67,6 +67,32 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     await gotoPracticeHistory(page, CATALOG_TUNE_KESH_ID);
   });
 
+  test("guards unfinished entries on Cancel and navigation", async ({
+    page,
+  }) => {
+    await page.getByTestId("practice-history-add-button").click();
+    const date = page.getByTestId("practice-history-practiced-input");
+    await date.fill("2026-04-19T14:30");
+    await page.getByTestId("practice-history-discard-button").click();
+    const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
+    await expect(confirmation).toBeVisible({ timeout: 10_000 });
+    await expect(
+      confirmation.getByRole("button", { name: "Keep editing" })
+    ).toBeFocused();
+    await confirmation.getByRole("button", { name: "Keep editing" }).click();
+    await expect(date).toHaveValue("2026-04-19T14:30");
+    await page.getByTestId("practice-history-cancel-button").click();
+    await expect(confirmation).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/practice-history/);
+    await confirmation.getByRole("button", { name: "Discard changes" }).click();
+    await expect(page).not.toHaveURL(/practice-history/, { timeout: 10_000 });
+    await gotoPracticeHistory(page, CATALOG_TUNE_KESH_ID);
+    await expect(page.getByTestId("practice-history-add-form")).toHaveCount(0);
+    await expect(
+      page.getByText("No practice records found for this tune.")
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
   test("adds a practice entry with FSRS labels and shows analytics", async ({
     page,
   }) => {
@@ -169,6 +195,9 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
       page.getByTestId("practice-history-entry-goal").locator("option:checked")
     ).toHaveText("Fluency");
     await page.getByTestId("practice-history-discard-button").click();
+    await page
+      .getByRole("button", { name: "Discard changes", exact: true })
+      .click();
     await table
       .getByRole("button", { name: "Delete entry", exact: true })
       .click();

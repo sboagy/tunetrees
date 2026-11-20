@@ -1,5 +1,13 @@
-import { Plus, Save } from "lucide-solid";
-import { createSignal, For, Index, onCleanup, onMount, Show } from "solid-js";
+import { Plus } from "lucide-solid";
+import {
+  createSignal,
+  createUniqueId,
+  For,
+  Index,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { Button } from "@/components/ui/button";
 import { getBuiltInGoals, getCustomGoalConfig } from "@/lib/goals/builtins";
 import {
@@ -73,7 +81,7 @@ function NumberList(props: {
           );
         }}
       />
-      <span class="text-xs text-muted-foreground">
+      <span class="text-sm text-muted-foreground">
         Comma-separated numbers.
       </span>
     </label>
@@ -84,6 +92,7 @@ function SchedulerFields(props: {
   scheduler: GoalScheduler;
   onChange: (scheduler: GoalScheduler) => void;
 }) {
+  const helpId = createUniqueId();
   const ladder = () => {
     const s = props.scheduler;
     return s.id === "builtin:interval-ladder" ? s : undefined;
@@ -115,7 +124,7 @@ function SchedulerFields(props: {
                 })
               }
             />
-            <p class="text-xs text-muted-foreground">
+            <p class="text-sm text-muted-foreground">
               Use increasing positive intervals. Fractions of a day are
               supported. The last step repeats; extra same-day practice is
               manual.
@@ -161,7 +170,7 @@ function SchedulerFields(props: {
                 <input
                   type="checkbox"
                   data-testid="goal-allow-same-day-reviews"
-                  aria-describedby="goal-same-day-help"
+                  aria-describedby={helpId}
                   checked={fsrs()!.allowSameDayReviews ?? false}
                   onChange={(e) =>
                     updateFsrs({ allowSameDayReviews: e.currentTarget.checked })
@@ -169,7 +178,7 @@ function SchedulerFields(props: {
                 />
                 <span>Allow reviews later the same day</span>
               </label>
-              <p id="goal-same-day-help" class="text-sm text-muted-foreground">
+              <p id={helpId} class="text-sm text-muted-foreground">
                 Keep FSRS’s short intervals. Additional same-day practice uses
                 Practice again; tunes do not automatically re-enter today’s
                 queue. When off, the next review is scheduled no earlier than
@@ -210,21 +219,33 @@ function SchedulerFields(props: {
   );
 }
 
+/** A category draft retains each editor while collapsed; only the category saves. */
+export interface GoalEditorDraft {
+  changed: () => boolean;
+  pending: () => boolean;
+  error: () => string;
+  validate: () => {
+    definition: EditableGoalDefinition;
+    reviewedPlugin?: GoalPluginSelection;
+  };
+  focusError: () => void;
+}
+
 export function GoalEditor(props: {
   initial: EditableGoalDefinition;
+  baseline?: EditableGoalDefinition;
   plugins?: { id: string; name: string }[];
   onInspectPlugin?: (id: string) => Promise<GoalPluginSelection>;
-  onSave: (
-    definition: EditableGoalDefinition,
-    selection?: GoalPluginSelection
-  ) => Promise<void>;
-  onCancel: () => void;
+  onRegister: (draft: GoalEditorDraft) => void;
+  onSave: () => void;
 }) {
   const [definition, setDefinition] = createSignal(
     structuredClone(props.initial)
   );
-  const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
+  const helpId = createUniqueId();
+  let form!: HTMLFormElement;
+  let errorElement!: HTMLParagraphElement;
   const config = () => definition().config;
   const changeConfig = (patch: Partial<GoalConfig>) =>
     setDefinition((old) => ({ ...old, config: { ...old.config, ...patch } }));
@@ -326,14 +347,17 @@ export function GoalEditor(props: {
       return { kind: "plugin", actionId: pluginActions()[0]?.id ?? "" };
     return { kind: "stay" };
   };
-  const submit = async (event: Event) => {
-    event.preventDefault();
-    if (busy() || pluginPending()) return;
+  const validate = () => {
     setError("");
-    setBusy(true);
     try {
-      if (selectedScheduler() !== schedulerValue() || pluginError())
+      if (
+        pluginPending() ||
+        selectedScheduler() !== schedulerValue() ||
+        pluginError()
+      )
         throw new Error("Load the selected scheduler's actions before saving.");
+      if (!form.checkValidity())
+        throw new Error("Check the highlighted fields in this goal.");
       const valid = resolveGoalDefinition(definition());
       if (valid.config.scheduler.id === "plugin") {
         const selection = pluginSelection();
@@ -341,20 +365,39 @@ export function GoalEditor(props: {
           throw new Error("Load scheduling actions before saving.");
         validateGoalPluginChoices(valid.config, selection);
       }
-      await props.onSave(valid, pluginSelection());
+      return { definition: valid, reviewedPlugin: pluginSelection() };
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
+      throw cause;
     }
   };
+  props.onRegister({
+    changed: () =>
+      JSON.stringify(definition()) !==
+        JSON.stringify(props.baseline ?? props.initial) ||
+      selectedScheduler() !== schedulerValue(),
+    pending: pluginPending,
+    error,
+    validate,
+    focusError: () => {
+      const invalid = form.querySelector<HTMLElement>(
+        "input:invalid, select:invalid, textarea:invalid"
+      );
+      (invalid ?? errorElement)?.focus();
+    },
+  });
   return (
     <form
-      onSubmit={submit}
+      ref={form}
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onSave();
+      }}
       class="space-y-4 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
       data-testid="goal-editor"
     >
-      <fieldset disabled={busy()} class="space-y-4">
+      <fieldset class="space-y-4">
         <label class="block space-y-1 text-sm">
           <span>Name</span>
           <input
@@ -371,7 +414,7 @@ export function GoalEditor(props: {
           />
         </label>
         <label class="block space-y-1 text-sm">
-          <span>Intent of this goal</span>
+          <span>Intent of this goal (optional)</span>
           <textarea
             class={inputClass}
             data-testid="goal-description"
@@ -427,7 +470,7 @@ export function GoalEditor(props: {
             </label>
           </div>
         </div>
-        <p class="text-xs text-muted-foreground">
+        <p class="text-sm text-muted-foreground">
           Limits apply separately in each repertoire. Due and overdue tunes come
           first. To reach the minimum, add unscheduled tunes, then the nearest
           future reviews. Minimum zero means no automatic top-up.
@@ -447,7 +490,7 @@ export function GoalEditor(props: {
           value={config().daily.delinquencyDays}
           onInput={(delinquencyDays) => changeDaily({ delinquencyDays })}
         />
-        <p class="text-xs text-muted-foreground">
+        <p class="text-sm text-muted-foreground">
           Prioritize recently overdue tunes before older overdue work. This does
           not change your evaluation or apply a penalty.
         </p>
@@ -457,7 +500,7 @@ export function GoalEditor(props: {
             class={inputClass}
             data-testid="goal-scheduler"
             value={selectedScheduler()}
-            aria-describedby="goal-scheduler-help"
+            aria-describedby={helpId}
             onChange={(e) => changeScheduler(e.currentTarget.value)}
           >
             <option value="builtin:fsrs6">FSRS-6 (memory recall)</option>
@@ -486,7 +529,7 @@ export function GoalEditor(props: {
             </For>
           </select>
         </label>
-        <p id="goal-scheduler-help" class="text-sm text-muted-foreground">
+        <p id={helpId} class="text-sm text-muted-foreground">
           Changing scheduler replaces the evaluation choices below with
           compatible defaults. Changes take effect when you save.
         </p>
@@ -701,23 +744,15 @@ export function GoalEditor(props: {
           </Button>
         </fieldset>
         <Show when={error()}>
-          <p role="alert" class="text-sm text-destructive">
+          <p
+            ref={errorElement}
+            role="alert"
+            tabIndex={-1}
+            class="text-sm text-destructive"
+          >
             {error()}
           </p>
         </Show>
-        <div class="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={props.onCancel}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            data-testid="goal-save"
-            disabled={pluginPending()}
-          >
-            <Save class="size-4" />
-            {busy() ? "Saving…" : "Save goal"}
-          </Button>
-        </div>
       </fieldset>
     </form>
   );

@@ -460,7 +460,12 @@ the active goal calculator.
 
 `goals/settings.ts` owns local configuration edits using the same default decoder
 and validation as practice. Built-in and private-goal edits write personal overrides;
-unchanged fields inherit defaults. Editor snapshots reject stale saves. Custom goals
+unchanged fields inherit defaults. Goals Settings retains one category draft, including
+collapsed editors, and commits changed/new goals in one synchronous transaction after
+plugin preparation. The shared Settings footer saves that category; dirty/pending exit
+handling is registered with `UserSettingsDialogContext`. The overlay remains outside
+Router to preserve the underlying page, while `SettingsNavigationBoundary` inside Router
+forwards navigation to the same exit guard. Editor snapshots reject stale saves. Custom goals
 use stable `custom:<UUID>` keys independent of display names. Deletion requires a
 visible replacement, moves owned assignments atomically, and preserves due dates,
 history and frozen queue attribution; pending drafts block deletion. SQLite writes

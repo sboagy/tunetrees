@@ -138,6 +138,78 @@ test.describe("GOALS-001: Goals settings", () => {
     });
   });
 
+  test("saves collapsed goal drafts together and guards Settings dismissal", async ({
+    page,
+  }) => {
+    await openSettingsTab(page, "goals");
+    const recall = page.getByTestId(
+      "goal-panel-00000000-0000-0000-0000-000000000001"
+    );
+    const fluency = page.getByTestId(
+      "goal-panel-00000000-0000-0000-0000-000000000003"
+    );
+    await expect(page.getByTestId("goal-save")).toBeDisabled();
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await recall.getByTestId("goal-minimum").fill("2");
+    await recall.getByRole("button", { name: "Collapse", exact: true }).click();
+    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
+    await fluency.getByTestId("goal-minimum").fill("1");
+    await page.getByTestId("settings-close-button").click();
+    await expect(
+      page.getByRole("heading", { name: "Discard changes?" })
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByRole("button", { name: "Keep editing" })
+    ).toBeFocused();
+    await page.getByRole("button", { name: "Keep editing" }).click();
+    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("1");
+    await page.getByTestId("goal-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("goal-save")).toBeDisabled({
+      timeout: 10000,
+    });
+    await page.reload();
+    await openSettingsTab(page, "goals");
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(recall.getByTestId("goal-minimum")).toHaveValue("2");
+    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("1");
+  });
+
+  test("reveals invalid collapsed goals before saving and preserves other edits", async ({
+    page,
+  }) => {
+    await openSettingsTab(page, "goals");
+    const recall = page.getByTestId(
+      "goal-panel-00000000-0000-0000-0000-000000000001"
+    );
+    const fluency = page.getByTestId(
+      "goal-panel-00000000-0000-0000-0000-000000000003"
+    );
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await recall.getByTestId("goal-name").fill("");
+    await recall.getByRole("button", { name: "Collapse", exact: true }).click();
+    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
+    await fluency.getByTestId("goal-minimum").fill("1");
+    await page.getByTestId("goal-save").click();
+    await expect(recall.getByTestId("goal-name")).toBeFocused({
+      timeout: 10000,
+    });
+    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("1");
+    await page.getByTestId("settings-close-button").click();
+    await page
+      .getByRole("button", { name: "Discard changes", exact: true })
+      .click();
+    await expect(page.getByTestId("settings-modal")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await openSettingsTab(page, "goals");
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(recall.getByTestId("goal-name")).toHaveValue("Recall");
+    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("0");
+  });
+
   test("persists the per-goal same-day FSRS option", async ({ page }) => {
     await openSettingsTab(page, "goals");
     const editRecall = page.getByTestId(
@@ -285,7 +357,6 @@ test.describe("GOALS-001: Goals settings", () => {
     await page
       .getByTestId("goal-replacement")
       .selectOption({ label: "Recall" });
-    page.once("dialog", (dialog) => dialog.accept());
     await page.getByTestId("goal-confirm-delete").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
@@ -337,8 +408,8 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
     await expect(
       page.getByRole("heading", { name: "Goals", level: 3 })
     ).toBeVisible({ timeout: 10000 });
-    await expect(settingsModal.getByTestId("settings-tab-goals")).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(
+      settingsModal.getByTestId("settings-tab-goals")
+    ).toHaveAttribute("aria-current", "page");
   });
 });

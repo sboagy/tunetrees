@@ -17,7 +17,10 @@ import { UserSettingsDialog } from "./components/layout/UserSettingsDialog";
 import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
 import { ByosUploadMaintenance } from "./components/references/ByosUploadMaintenance";
 import { GroupsDialogProvider } from "./contexts/GroupsDialogContext";
-import { UserSettingsDialogProvider } from "./contexts/UserSettingsDialogContext";
+import {
+  SettingsNavigationBoundary,
+  UserSettingsDialogProvider,
+} from "./contexts/UserSettingsDialogContext";
 import { ChatProvider } from "./lib/ai/context";
 import { AuthProvider } from "./lib/auth/AuthContext";
 import { CurrentRepertoireProvider } from "./lib/context/CurrentRepertoireContext";
@@ -112,7 +115,7 @@ function App() {
                         <ByosUploadMaintenance />
                         <GroupsManagerDialog />
                         {/* <ThemeDebugger /> */}
-                        <Router>
+                        <Router root={SettingsNavigationBoundary}>
                           {/* Public Routes */}
                           <Route path="/login" component={Login} />
                           <Route path="/privacy" component={PrivacyPolicy} />

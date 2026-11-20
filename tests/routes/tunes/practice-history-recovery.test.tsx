@@ -26,6 +26,9 @@ vi.mock("@solidjs/router", () => ({
   useParams: () => ({ id: "tune" }),
   useLocation: () => ({}),
   useNavigate: () => vi.fn(),
+  // These tests exercise repertoire-scoped recovery without a mounted router.
+  // Real navigation/discard behavior is covered in practice-history.spec.ts.
+  useBeforeLeave: vi.fn(),
 }));
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({ localDb: () => mocks.db, userIdInt: () => "owner" }),

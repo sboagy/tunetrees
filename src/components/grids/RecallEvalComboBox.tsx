@@ -148,7 +148,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
             class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-popover text-popover-foreground border border-border rounded shadow-lg max-h-72 overflow-auto"
           >
             <Show when={previewStatus()}>
-              <output class="block px-3 py-2 text-xs text-muted-foreground">
+              <output class="block px-3 py-2 text-sm text-muted-foreground">
                 {previewStatus()}
               </output>
             </Show>
@@ -163,12 +163,12 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
                   }}
                 >
                   <span class={option.color}>{option.label}</span>
-                  <span class="block text-xs text-muted-foreground">
+                  <span class="block text-sm text-muted-foreground">
                     {option.description}
                   </span>
                   <Show when={duePreviews()[option.value]}>
                     {(due) => (
-                      <span class="block text-xs text-muted-foreground">
+                      <span class="block text-sm text-muted-foreground">
                         If practiced now: due{" "}
                         {new Date(due()).toLocaleString(undefined, {
                           dateStyle: "medium",

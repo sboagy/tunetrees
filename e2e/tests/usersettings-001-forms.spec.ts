@@ -102,10 +102,24 @@ test.describe("USERSETTINGS-001: Goal daily settings", () => {
     await recall.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
     await expect(page.getByTestId("goal-maximum")).toHaveValue("4");
-    page.once("dialog", (dialog) => dialog.accept());
-    await page.getByTestId("goal-reset").click();
+    // Reset stages defaults in the category draft; only Save changes persists them.
+    await recall.getByTestId("goal-reset").click();
+    await expect(recall.getByTestId("goal-minimum")).toHaveValue("3");
+    await expect(recall.getByTestId("goal-maximum")).toHaveValue("10");
+    await expect(recall).toContainText("Unsaved changes");
+    await expect(recall).toContainText("Daily 1–4");
+    await expect(page.getByTestId("goal-save")).toBeEnabled();
+    await page.getByTestId("goal-save").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(recall).toContainText("Daily 3–10", { timeout: 10000 });
+    await expect(page.getByTestId("goal-save")).toBeDisabled();
+
+    // A full document navigation verifies that the reset was durably saved.
+    await page.goto("/user-settings/goals");
+    await expect(recall).toContainText("Daily 3–10", { timeout: 15000 });
+    await recall.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(recall.getByTestId("goal-minimum")).toHaveValue("3");
+    await expect(recall.getByTestId("goal-maximum")).toHaveValue("10");
   });
 });
 
