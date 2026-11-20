@@ -363,6 +363,13 @@ These principles define the product behavior and should be preserved.
 4. Conflict resolution: Last-write-wins (based on timestamp).
 5. Graceful degradation: App fully functional when offline.
 
+## Browser route loading
+
+`src/App.tsx` loads secondary history, tune-editor/detail, group and debug routes
+on demand with Solid's `lazy`, as it does Settings. Route guards and providers
+stay in the existing shell. Vite/Workbox precaches the emitted route chunks so
+deferring their initial execution does not exclude them from offline installation.
+
 ## Spaced Repetition (FSRS)
 
 TuneTrees uses the FSRS algorithm (`ts-fsrs`):

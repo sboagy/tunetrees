@@ -25,17 +25,21 @@ import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
 import { CurrentTuneSetProvider } from "./lib/context/CurrentTuneSetContext";
 import { OnboardingProvider } from "./lib/context/OnboardingContext";
 import { UIPreferencesProvider } from "./lib/context/UIPreferencesContext";
-import DatabaseBrowser from "./routes/debug/db";
-import GroupsPage from "./routes/groups";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
 import PrivacyPolicy from "./routes/Privacy";
-import PracticeHistory from "./routes/practice/history";
 import TermsOfService from "./routes/Terms";
-import TuneDetailsPage from "./routes/tunes/[id]";
-import EditTunePage from "./routes/tunes/[id]/edit";
-import TunePracticeHistoryPage from "./routes/tunes/[id]/practice-history";
-import NewTunePage from "./routes/tunes/new";
+
+// Load secondary route code only when opened, as with Settings below.
+const DatabaseBrowser = lazy(() => import("./routes/debug/db"));
+const GroupsPage = lazy(() => import("./routes/groups"));
+const PracticeHistory = lazy(() => import("./routes/practice/history"));
+const TuneDetailsPage = lazy(() => import("./routes/tunes/[id]"));
+const EditTunePage = lazy(() => import("./routes/tunes/[id]/edit"));
+const TunePracticeHistoryPage = lazy(
+  () => import("./routes/tunes/[id]/practice-history")
+);
+const NewTunePage = lazy(() => import("./routes/tunes/new"));
 
 // Lazy load settings pages
 const UserSettingsLayout = lazy(() => import("./routes/user-settings"));

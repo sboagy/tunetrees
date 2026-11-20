@@ -1710,3 +1710,40 @@ Subsequent SonarQube fixes nest the three Practice History filter controls insid
 imports. Typecheck and focused Biome checks pass after those changes. Browser
 checks were not repeated for the label/import-only follow-up. The user authorized
 committing and pushing this cleanup together with the two preceding local commits.
+
+
+## Lighthouse startup follow-up (2026-11-20)
+
+CI on `727fe0d0` failed the unchanged 2,000 ms FCP budget twice: the best
+samples were 2,244 and 2,246 ms. The preceding passing report measured 1,873 ms.
+Runner CPU benchmarks differed, but the repeat failure ruled out treating this
+as a single noisy run. Total bundle transfer was similar; entry dependencies
+and preload fragmentation changed during cleanup. This investigation does not
+attribute the entire timing difference to one removed module.
+
+Measured a targeted improvement: secondary history, tune-editor/detail, group
+and debug route imports now use the existing Solid lazy-route pattern. Providers,
+guards, route paths and page implementations remain unchanged. On an isolated
+preview server at port 4187, with the same placeholder build environment, bundled
+Playwright Chromium and LHCI 0.13.0 desktop configuration, three baseline runs
+measured FCP 2,157 / 2,138 / 2,141 ms; three candidate runs measured
+1,927 / 1,911 / 1,887 ms. All candidate Lighthouse assertions pass. Entry gzip
+size decreased from 630,188 to 541,149 bytes and module preloads from 45 to 36.
+These are local measurements, not a guarantee of the next hosted-runner result.
+
+The workflow also stops supplying the normal GitHub token as an LHCI App token
+(the unrelated 422 occurred in both passing and failing runs), uploads the hidden
+`.lighthouseci` reports directory, and prints the actual configured targets in
+PR comments. The Actions job remains the pass/fail check. Performance budgets
+and number of runs are unchanged.
+
+Validation: 1,435 unit tests, typecheck, production build, focused Biome and YAML
+parsing pass. Generated Workbox precache includes application JavaScript chunks;
+only the two already-excluded unused SQLite worker/OPFS helper assets are omitted.
+Authenticated route navigation and offline E2E have not been rerun for this change.
+The existing dev/preview servers were left untouched. No commit/push yet.
+
+CodeRabbit reviewed all four Lighthouse follow-up files and reported zero
+findings. No post-review code changes were needed. The local performance and
+static/unit results above still apply; authenticated/offline E2E and remote CI
+remain pending.
