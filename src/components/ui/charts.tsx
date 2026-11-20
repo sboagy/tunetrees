@@ -73,6 +73,29 @@ type ChartContext = {
   tooltip: TooltipModel<keyof ChartTypeRegistry>;
 };
 
+/** Theme only scales the chart uses; custom axis bindings must not gain extra axes. */
+export function getChartScaleNames(
+  type: ChartType,
+  data: ChartData,
+  scales: NonNullable<ChartOptions["scales"]>
+): string[] {
+  const names = new Set(Object.keys(scales));
+  if (!["bar", "line", "scatter", "bubble"].includes(type)) return [...names];
+  const defaultAxis = (axis: "x" | "y") =>
+    Object.keys(scales).find((name) => {
+      const scale = scales[name];
+      if (scale && "axis" in scale && scale.axis) return scale.axis === axis;
+      return name.startsWith(axis);
+    }) ?? axis;
+  for (const dataset of data.datasets) {
+    const x = "xAxisID" in dataset ? dataset.xAxisID : undefined;
+    const y = "yAxisID" in dataset ? dataset.yAxisID : undefined;
+    names.add(typeof x === "string" ? x : defaultAxis("x"));
+    names.add(typeof y === "string" ? y : defaultAxis("y"));
+  }
+  return [...names];
+}
+
 const BaseChart: Component<ChartProps> = (rawProps) => {
   const [canvasRef, setCanvasRef] = createSignal<HTMLCanvasElement | null>(
     null
@@ -89,6 +112,39 @@ const BaseChart: Component<ChartProps> = (rawProps) => {
     rawProps
   );
   const setRefs = mergeRefs(props.ref, (el) => setCanvasRef(el));
+  const motion = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
+  const themedOptions = (): ChartOptions => {
+    const options: ChartOptions = props.options;
+    const canvas = canvasRef();
+    const color = canvas ? getComputedStyle(canvas).color : undefined;
+    const legend = options.plugins?.legend;
+    const scales = options.scales ?? {};
+    const scaleNames = getChartScaleNames(props.type, props.data, scales);
+    return {
+      ...options,
+      color,
+      animation: motion.matches ? false : options.animation,
+      scales: Object.fromEntries(
+        scaleNames.map((name) => [
+          name,
+          { ...scales[name], ticks: { ...scales[name]?.ticks, color } },
+        ])
+      ),
+      plugins: {
+        ...options.plugins,
+        legend: {
+          ...legend,
+          labels: { ...legend?.labels, color },
+        },
+      },
+    };
+  };
+  const refreshAppearance = () => {
+    const current = chart();
+    if (!current) return;
+    current.options = themedOptions();
+    current.update("none");
+  };
 
   const init = () => {
     const canvas = canvasRef();
@@ -99,13 +155,26 @@ const BaseChart: Component<ChartProps> = (rawProps) => {
     const instance = new Chart(ctx, {
       type: config.type,
       data: config.data,
-      options: config.options,
+      options: themedOptions(),
       plugins: config.plugins,
     });
     setChart(instance);
   };
 
-  onMount(() => init());
+  onMount(() => {
+    init();
+    // Canvas pixels do not inherit later theme changes like ordinary text does.
+    const observer = new MutationObserver(refreshAppearance);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
+    motion.addEventListener("change", refreshAppearance);
+    onCleanup(() => {
+      observer.disconnect();
+      motion.removeEventListener("change", refreshAppearance);
+    });
+  });
 
   createEffect(
     on(
@@ -126,7 +195,7 @@ const BaseChart: Component<ChartProps> = (rawProps) => {
       () => {
         const c = chart();
         if (!c) return;
-        c.options = props.options ?? {};
+        c.options = themedOptions();
         c.update();
       },
       { defer: true }

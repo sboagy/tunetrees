@@ -397,7 +397,7 @@ export function GoalEditor(props: {
       class="space-y-4 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
       data-testid="goal-editor"
     >
-      <fieldset class="space-y-4">
+      <fieldset class="min-w-0 space-y-4">
         <label class="block space-y-1 text-sm">
           <span>Name</span>
           <input
@@ -581,7 +581,7 @@ export function GoalEditor(props: {
             />
           )}
         </Show>
-        <fieldset class="space-y-3">
+        <fieldset class="min-w-0 space-y-3">
           <legend class="font-medium">Evaluation choices</legend>
           <Index each={config().evaluations}>
             {(choice, index) => (

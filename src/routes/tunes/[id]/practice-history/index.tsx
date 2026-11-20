@@ -14,7 +14,7 @@ import {
   useParams,
 } from "@solidjs/router";
 import { eq, isNull, or } from "drizzle-orm";
-import { LoaderCircle, Plus, Save } from "lucide-solid";
+import { ChevronLeft, LoaderCircle, Plus, Save } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -441,19 +441,19 @@ const PracticeHistoryPage: Component = () => {
 
   return (
     <div
-      class="h-full overflow-y-auto bg-background text-foreground"
+      class="h-full overflow-y-auto bg-background text-foreground [color-scheme:light] dark:[color-scheme:dark]"
       data-testid="practice-history-container"
     >
       <Confirmation />
       <div class="w-full max-w-6xl px-4 py-4">
-        <Card class="shadow-lg">
-          <CardHeader class="border-b border-gray-200 dark:border-gray-700">
+        <Card>
+          <CardHeader class="border-b border-border">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <CardTitle class="text-lg font-semibold text-gray-900 dark:text-white">
+                <CardTitle class="text-lg font-semibold text-foreground">
                   Practice History
                   <Show when={tune()}>
-                    <span class="font-normal text-gray-500 dark:text-gray-400">
+                    <span class="font-normal text-muted-foreground">
                       {" "}
                       — {tune()!.title}
                     </span>
@@ -468,22 +468,24 @@ const PracticeHistoryPage: Component = () => {
               <div class="order-first flex flex-wrap items-center gap-2 self-end lg:order-none lg:self-auto">
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
+                  class="min-h-11 gap-1"
                   onClick={handleBack}
                   disabled={isSavingDraft() || !!pendingSave()}
                   data-testid="practice-history-cancel-button"
                 >
-                  <span>Cancel</span>
+                  <ChevronLeft class="size-4" aria-hidden="true" />
+                  <span>Back</span>
                 </Button>
                 <Button
                   type="button"
-                  size="sm"
+                  variant="accent"
+                  class="min-h-11 gap-1"
                   onClick={handleStartAdd}
                   disabled={!canAddRecord()}
                   data-testid="practice-history-add-button"
                 >
-                  <Plus class="h-4 w-4" />
+                  <Plus class="size-4" aria-hidden="true" />
                   <span>Add</span>
                 </Button>
               </div>
@@ -517,7 +519,7 @@ const PracticeHistoryPage: Component = () => {
             </Show>
             <Show when={mutationError()}>
               <div
-                class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                class="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
                 role="alert"
               >
                 {mutationError()}
@@ -532,65 +534,61 @@ const PracticeHistoryPage: Component = () => {
             </Show>
             <Show when={draftRecord()}>
               {(draft) => (
-                <Card
-                  class="border-dashed"
+                <form
+                  class="max-w-3xl space-y-4 border-t border-border pt-4"
                   data-testid="practice-history-add-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleSaveDraft();
+                  }}
                 >
-                  <CardHeader class="space-y-3 pb-3">
-                    <header class="flex justify-between items-center w-full mb-4">
-                      <div class="flex flex-1 justify-start">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCancelDraft}
-                          disabled={isSavingDraft() || !!pendingSave()}
-                          data-testid="practice-history-discard-button"
+                  <header class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background py-3">
+                    <h3 class="text-base font-semibold">Add practice entry</h3>
+                    <div class="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="min-h-11"
+                        onClick={handleCancelDraft}
+                        disabled={isSavingDraft() || !!pendingSave()}
+                        data-testid="practice-history-discard-button"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        class="min-h-11 min-w-24 gap-1"
+                        disabled={isSavingDraft() || !draft().evaluationId}
+                        aria-busy={isSavingDraft()}
+                        data-testid="practice-history-save-button"
+                      >
+                        <Show
+                          when={isSavingDraft()}
+                          fallback={<Save class="size-4" aria-hidden="true" />}
                         >
-                          Cancel
-                        </Button>
-                      </div>
-                      <div class="flex min-w-0 flex-1 justify-center px-3">
-                        <CardTitle class="text-center text-base font-semibold">
-                          Add Practice Entry
-                        </CardTitle>
-                      </div>
-                      <div class="flex flex-1 justify-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleSaveDraft}
-                          disabled={isSavingDraft() || !draft().evaluationId}
-                          aria-busy={isSavingDraft()}
-                          data-testid="practice-history-save-button"
-                        >
-                          <Show
-                            when={isSavingDraft()}
-                            fallback={<Save class="h-4 w-4" />}
-                          >
-                            <LoaderCircle
-                              class="h-4 w-4 animate-spin motion-reduce:animate-none"
-                              aria-hidden="true"
-                            />
-                          </Show>
-                          <span>{isSavingDraft() ? "Saving…" : "Save"}</span>
-                        </Button>
-                      </div>
-                    </header>
+                          <LoaderCircle
+                            class="size-4 animate-spin motion-reduce:animate-none"
+                            aria-hidden="true"
+                          />
+                        </Show>
+                        <span>{isSavingDraft() ? "Saving…" : "Save"}</span>
+                      </Button>
+                    </div>
+                  </header>
+                  <div class="space-y-4">
                     <CardDescription>
                       Uses the selected goal’s current settings. Older entries
                       leave later records and the current schedule unchanged. A
                       new latest entry updates the next due date. Future
                       practice dates are not allowed.
                     </CardDescription>
-                  </CardHeader>
-                  <CardContent class="space-y-4">
+
                     <div class="grid gap-4 md:grid-cols-2">
-                      <label class="grid gap-1.5 text-sm">
+                      <label class="grid min-w-0 gap-1.5 text-sm">
                         <span>Goal</span>
                         <select
                           data-testid="practice-history-entry-goal"
-                          class="min-h-11 rounded-md border border-input bg-background px-3 text-foreground"
+                          class="w-full min-w-0 min-h-11 rounded-md border border-input bg-background px-3 text-foreground"
                           disabled={isSavingDraft() || !!pendingSave()}
                           value={draft().goalId}
                           onChange={(event) => {
@@ -624,7 +622,7 @@ const PracticeHistoryPage: Component = () => {
                           </For>
                         </select>
                       </label>
-                      <label class="grid gap-1.5 text-sm">
+                      <label class="grid min-w-0 gap-1.5 text-sm">
                         <span class="font-medium text-foreground">
                           Date Practiced
                         </span>
@@ -642,12 +640,12 @@ const PracticeHistoryPage: Component = () => {
                                 : current
                             )
                           }
-                          class="h-9 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                          class="w-full min-w-0 min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                           data-testid="practice-history-practiced-input"
                         />
                       </label>
 
-                      <label class="grid gap-1.5 text-sm">
+                      <label class="grid min-w-0 gap-1.5 text-sm">
                         <span class="font-medium text-foreground">
                           Evaluation
                         </span>
@@ -660,7 +658,7 @@ const PracticeHistoryPage: Component = () => {
                               evaluationId: event.currentTarget.value,
                             })
                           }
-                          class="min-h-11 rounded-md border border-input bg-background px-3 text-foreground"
+                          class="w-full min-w-0 min-h-11 rounded-md border border-input bg-background px-3 text-foreground"
                           data-testid="practice-history-quality-select"
                         >
                           <option value="" disabled>
@@ -680,8 +678,8 @@ const PracticeHistoryPage: Component = () => {
                         </select>
                       </label>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </form>
               )}
             </Show>
 
@@ -695,8 +693,8 @@ const PracticeHistoryPage: Component = () => {
               fallback={
                 <Show when={practiceRecords.loading || historicalGoals.loading}>
                   <div class="py-8 text-center">
-                    <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-                    <p class="mt-4 text-gray-600 dark:text-gray-400">
+                    <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent motion-reduce:animate-none" />
+                    <p class="mt-4 text-muted-foreground">
                       Loading practice history...
                     </p>
                   </div>
@@ -709,7 +707,7 @@ const PracticeHistoryPage: Component = () => {
                     (practiceRecords()?.length ?? 0) === 0 && !draftRecord()
                   }
                 >
-                  <div class="py-8 text-center text-gray-500 dark:text-gray-400">
+                  <div class="py-8 text-center text-muted-foreground">
                     <p>No practice records found for this tune.</p>
                     <p class="mt-2 text-sm">
                       Use &quot;Add&quot; to backfill a prior session if needed.
@@ -738,7 +736,10 @@ const PracticeHistoryPage: Component = () => {
             if (!open) setDeleteTarget(null);
           }}
         >
-          <AlertDialogContent>
+          <AlertDialogContent
+            class="max-w-md w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto"
+            onInteractOutside={(event) => event.preventDefault()}
+          >
             <AlertDialogHeader>
               <AlertDialogTitle>Delete practice entry?</AlertDialogTitle>
               <AlertDialogDescription>
@@ -749,7 +750,11 @@ const PracticeHistoryPage: Component = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              <Button
+                class="min-h-11"
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+              >
                 Cancel
               </Button>
               <Button

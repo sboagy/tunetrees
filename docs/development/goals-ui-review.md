@@ -1,87 +1,80 @@
 # Goals UI review — first pass
 
-Scope: #426 goal settings, shared Settings entry points, goal assignment menus,
-practice evaluation/recovery controls, mixed-goal Practice History and goal-related
-Analysis. This is a feature review, not whole-app compliance. The user will inspect
-this pass manually before a second review.
+Scope: #426 Goals settings, shared Settings entry points, goal assignment menus,
+practice evaluation/recovery controls, mixed-goal Practice History, and the
+FSRS retention view in Analysis. This is a feature review, not a whole-app audit.
 
-Baseline: `53a4d247`; this checkpoint contains the first interaction-remediation batch. Environment:
-local development servers, isolated Playwright test accounts (no personal browser
-access). Browser verification is in progress. The first focused run exposed router hooks in
-the outside-Router overlay; those hooks were moved to a shared Router boundary.
-That failed run is not counted as passing coverage.
+The first interaction checkpoint began at `53a4d247` and was validated/pushed in
+`ce7b0492`. The visual continuation passed the developer’s full local E2E run
+on 2026-11-20 and is ready for manual inspection. Testing uses existing
+local development servers and isolated Playwright test accounts. No personal
+browser access or dev/preview server restarts were used.
 
-## Findings and remediation
+## Current findings and remediation
 
-| Surface / entry | Rule | Expected vs observed | Evidence | Severity | Shared cause / remediation | Retest |
-| --- | --- | --- | --- | --- | --- | --- |
-| Settings → Goals → edit several goals | E6, F4 | One category draft/save; previously one editor and Save per goal, expansion replaced edits | Static: goals.tsx / GoalEditor.tsx at baseline | P0 | User approved category draft/shared footer; retained collapsed editors, atomic batch save | Pending |
-| Settings → Goals → X/category/navigation | E2, R2 | Guard dirty/pending exits and trap modal focus; previously no dirty guard and custom nonmodal shell | Static: both Settings shells at baseline | P0 | Shared Settings shell and category registration, route/departure guard, discard confirmation | Pending |
-| Goals → scheduler/help | V3, R2 | Readable help and unique associations with multiple editors; baseline help used text-xs and fixed IDs | Static: GoalEditor.tsx | P2 | text-sm help, per-editor IDs | Pending |
-| Practice History → table | T1 | Numeric values aligned/tabular; baseline FSRS and ladder metrics left-aligned | Static: HistoryEventsTable.tsx | P2 | Implemented; verification pending | Not tested |
-| Practice History → Add | A1, C1, L3 | Consistent action vocabulary/layout; baseline Cancel navigation and split Add header | Static: practice-history/index.tsx | P2 | Pending | Not tested |
-| Practice History → Add → Cancel/navigation | E2, R2 | Unfinished entries previously discarded without confirmation | Focused desktop/mobile test | P0 | Shared draft exit guard; user approved | Pass for Cancel, Keep editing, confirmed navigation |
-| Grid → goal badge | R1, V3 | Touch targets, wrapping labels and readable help; baseline compact trigger/menu | Static: GoalBadge.tsx | P2 | Pending | Not tested |
-| Analysis → retention chart | R4, B3 | Text/data alternative and retry on error; baseline chart-only data and error message | Static: FsrsRetentionChart.tsx | P2 | Pending | Not tested |
+| Surface / entry | Rules | Expected vs observed | Severity | Fix / shared cause | Evidence and retest |
+| --- | --- | --- | --- | --- | --- |
+| Settings → Goals → several editors | E6, F4 | One category draft/save; previously opening another editor replaced edits | P0 | User-approved category draft, retained collapsed editors, atomic batch save and shared footer | Previous desktop/mobile Goals tests pass for batch persistence, collapsed edits and reset/save/reload |
+| Settings → Goals → close/category/navigation | E2, R2 | Dirty/pending guard and modal focus; previously custom nonmodal shell lacked the guard | P0 | Shared Settings shell and Router-boundary draft exit guard | Previous tests pass for Keep editing, confirmed navigation, safe focus, pending save and failure retention |
+| Goals editor fields | V3, R2 | Readable help and unique associations when several editors are open | P2 | text-sm help and per-editor IDs | Typecheck and editor tests pass; light/dark screenshots inspected |
+| Goals at 320px | R1, V3 | Sections overflowed and clipped Edit: 318px content, 428px scroll width | P1 | Remove fieldset minimum-content sizing; wrap summaries; stack footer actions | Layout suite passes: content and scroll width both 318px; long-name save exercised |
+| Settings at intermediate/short sizes | R1, L2 | Navigation switched at 768px; short dialog needed whole-surface scrolling | P2 | 640px navigation breakpoint and whole-dialog scrolling below 480px height | Save and Close reachable in light/dark layout suite, including 667×320 |
+| Grid → goal badges | V2, V3, R1 | Compact targets/help and duplicated palette | P2 | Shared categorical palette, preserved hues, readable/wrapping labels and 44px targets | User approved V2 exception. All 14 default text/background pairs exceed 6.3:1 in both themes; menu keyboard/focus checks pass |
+| History → Add | A1, L3, R3, R5 | Parent navigation said Cancel; nested card and split actions | P2 | Back navigation, green Add, one form header, native submit and themed date input | Layout suite passes; populated-history test saves an actual entry and renders its analytics |
+| History → Add → Cancel/navigation | E2, R2 | Unfinished entries were discarded without confirmation | P0 | User-approved shared draft exit guard | Previous CRUD/guard tests and current layout suite pass for Cancel, Keep editing, confirmed navigation and focus |
+| History → Add at 667×320 | L2, R1 | Bottom tune-details panel intercepted Add/Cancel | P1 | User-approved temporary collapse at heights ≤480px; manual expansion retained, normal-height preference preserved | Both original failures pass after fix; explicit expansion/collapse/preference-restoration test passes |
+| Populated History → charts at narrow widths | T1, R1 | Chart grid's intrinsic size overflowed the surrounding view by up to 140px | P1 | Explicit one-column track and min-width constraints; table retains its own horizontal scrolling | Populated light/dark layout checks pass at all five sizes |
+| History / Analysis charts | R4, R5 | Fixed gray canvas labels were dim in dark mode; no reduced-motion handling | P2 | Shared chart wrapper uses inherited theme text color, observes theme changes and respects reduced-motion media preference | Populated screenshots inspected; live-theme canvas redraw test included in final suite; data alternatives retained |
+| Practice submission recovery | V3, R1 | Compact Copy/Clear targets | P2 | 44px controls | Trial clicks verify controls are genuinely reachable, not merely inside viewport bounds; acknowledgement and focus checks pass |
 
-## Coverage matrix
+## Coverage and limits
 
-`Not tested` means no browser claim. Static findings do not establish runtime compliance.
+`Pass` describes the named checks, not every possible state on a surface.
+Historical checkpoint results below remain relevant; the developer confirmed
+full local E2E passes for this visual continuation.
 
-| Surface | Editing / exits / persistence | Empty/loading/error | Keyboard/focus | 320/390/768/1280 | Light/dark | Long labels / short height / zoom / reduced motion |
-| --- | --- | --- | --- | --- | --- | --- |
-| Goals / both Settings entry points | Overlay batch save, collapsed edits, discard, offline plugin save: pass; direct route not tested | Validation: pass; remaining states not tested | Invalid field and safe confirmation focus: pass | Not tested | Not tested | Not tested |
-| Goal assignment menus | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |
-| Practice evaluations / recovery | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |
-| Practice History / Add | Cancel/Keep editing/navigation discard and existing CRUD: pass | Empty/future-date validation: pass | Safe confirmation focus: pass | Not tested | Not tested | Not tested |
-| Goal-related Analysis | N/A (read only) | Not tested | Not tested | Not tested | Not tested | Not tested |
+| Surface | Editing / persistence / recovery | Layout / themes | Keyboard / perception | Still not tested in this pass |
+| --- | --- | --- | --- | --- |
+| Goals / Settings | Pass: batch save, collapsed edits, reset/save/reload, offline custom goal save, dirty and pending guards, validation focus | Pass: 320/390/768/1280 and 667×320, both themes, long labels | Pass: safe confirmation focus and measured goal-palette contrast | Complete keyboard-only category editing; screen-reader announcements; real on-screen keyboard; 200% browser zoom |
+| Goal assignment menus | Existing assignment/navigation test passes; current tests do not change assignment | Light/dark screenshots at all five sizes | Pass: keyboard open, Escape and focus return | Long custom-name assignment after rename; screen-reader selection announcement |
+| Evaluations / recovery | Existing failure/recovery tests cover draft preservation; current suite exercises notes recovery without deleting notes | Light/dark screenshots at all five sizes | Pass: Escape/focus return, unobstructed Copy/acknowledgement/Clear controls | Screen-reader announcement timing; every error variant visually; real on-screen keyboard |
+| History / Add | Pass: actual FSRS entry save; earlier tests cover mixed-goal filtering, deletion and exit guards | Pass: populated table/charts and Add at all five sizes, both themes | Data tables remain available; charts hidden from assistive technology when equivalent event details exist | Full keyboard-only table traversal; screen-reader table/chart experience; 200% browser zoom |
+| Analysis retention | Read-only; previous focused checks cover data alternative and error retry | Populated light/dark screenshots at 1280px; empty-state screenshots captured earlier | Live theme redraw and reduced-motion configuration covered | Narrow Analysis layout, screen-reader data alternative, numerical model accuracy (separate issue) |
 
-Other Settings categories retain their existing save semantics; the shared shell
-is checked as a representative consumer, not an audit of every category form.
-No database schema or scheduler calculation changes are part of this review.
+The automated/visual implementation batch has passed its checks and is ready
+for the developer’s manual inspection. This is **not full Q2 compliance certification**: the explicitly
+untested manual cases remain for the planned user inspection and subsequent
+second review. Other Settings categories and unrelated Analysis widgets are not
+being redesigned by this feature audit.
 
-## Verification log
+## Validation and review
 
-- Typecheck passes after the shared-draft and navigation-boundary changes.
-- 44 focused unit/component/SQLite checks passed before the router-boundary
-  correction: editor validation/plugin behavior, multiple-goal save, transaction
-  rollback, category discard, pending saves, and failed-save draft retention.
-- First browser launch stopped before Playwright due to 1Password timeout.
-- Next launch reached desktop/mobile browsers and exposed the outside-Router
-  hook error. Fixed at the shared boundary; targeted rerun pending.
-- Practice History Add's missing dirty-exit guard is an additional E2 finding;
-  user approved the guard. It now shares the Goals exit guard and has a focused
-  Playwright case for Keep editing and confirmed navigation/discard.
+- User confirmed full local E2E passed for the previous checkpoint. Its remaining
+  reset test was updated for the approved staged Reset → Save contract, retaining
+  saved-value assertions and adding reload checks. Four unit failures were fixed
+  by supplying the existing Router hook in the recovery-test mock.
+- Current full unit suite: **112 files / 1,469 tests pass**.
+- Current typecheck, formatting, lint and diff whitespace checks pass.
+- New persistent suite: `e2e/tests/goals-002-layout.spec.ts`. Before the latest
+  review fixes, all Chromium scenarios passed across the full run plus targeted
+  reruns. The initial short-height and populated-chart overflow failures were
+  fixed in runtime code. A resize-related stale-row test failure was fixed using
+  a trial click that waits for a reachable replacement; no forced clicks or
+  weakened assertions were used.
+- Final Chromium + Mobile Chrome run (31 tests including setup): **passed**.
+- CodeRabbit reviewed tracked and untracked changes. Both findings were valid
+  and fixed: own-property lookup for named goal colors, and respecting custom
+  chart axis bindings instead of adding unused x/y axes. Seven regression tests
+  cover those edges in `tests/lib/goal-ui-appearance.test.ts`.
 
-- Subsequent desktop/mobile Goals run: 10 passed, 3 failed. Category batch save,
-  collapsed draft persistence, dirty dismissal, same-day FSRS, plugin offline
-  save, and custom-goal CRUD passed. Both invalid-field focus cases failed because
-  `:invalid` selected a fieldset; corrected to select native input controls.
-  The mobile badge test expected the collapsed navigation to be visible; it now
-  checks the selected category's `aria-current` alongside visible Goals content.
-- After those fixes and the shared Practice History exit guard: 46 focused tests
-  pass (including retention chart data alternatives/retry), typecheck and lint pass.
-  The combined desktop/mobile Goals and Practice History rerun is awaiting
-  1Password authorization. These latest browser changes are not yet verified.
+## Evidence
 
-- Combined Goals/Practice History run: 27 passed, 2 failed on the newly extracted
-  Goals confirmation focus. Removed the synchronous autofocus override and use
-  the dialog primitive's deferred first-control focus (Keep editing is first).
-- Targeted retest after that fix: **5 passed** (setup + both guard workflows on
-  desktop and Mobile Chrome). All other combined-run cases had passed; no full
-  E2E suite was run. Focused unit tests rerun: **46 passed**.
-- Layout/theme/zoom/assistive verification remains outstanding; this report does
-  not declare the first UI audit complete. The user authorized committing and pushing this validated checkpoint.
-- User's subsequent full local E2E run: 846 passed, 61 skipped, 2 failed (the same
-  old immediate-reset expectation on desktop/mobile). Updated that test for the
-  approved staged Reset → Save changes contract, retaining saved-value assertions
-  and adding draft-value, unchanged saved summary, and reload-persistence checks.
-  No runtime change was needed. Entire `usersettings-001-forms.spec.ts` rerun:
-  **23 passed** across desktop/mobile including setup; typecheck and focused Biome
-  check pass. Existing Account tests include incomplete assertions, so their green
-  result is not evidence of full Account validation/save compliance.
-- User confirmed the subsequent full local E2E passed. Full unit rerun exposed
-  four recovery tests failing before assertions because their router mock omitted
-  the newly used `useBeforeLeave` hook. Updated that mock without changing the
-  recovery assertions or runtime code. Full rerun: **111 files / 1462 tests pass**;
-  typecheck and focused Biome check pass.
+- `test-results/goals-002-layout-*`: current screenshots/traces for forms,
+  populated history/charts, retention, goal menus, evaluations and recovery.
+- `logs/goals-ui-audit/`: earlier screenshots, contrast measurements (14 pairs
+  per theme), and `coderabbit.txt` with the completed review. These artifacts are
+  ignored locally; the E2E suite reproduces the visual checks.
+- The chart change preserves scheduler calculations and recorded practice data.
+  The palette change preserves existing built-in hues and deterministic custom
+  colors. The short-height layout does not write the temporary collapsed state
+  into the saved normal-height preference.

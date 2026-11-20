@@ -193,7 +193,7 @@ export function HistoryEventsTable(props: {
   return (
     <section class="space-y-4 text-foreground" aria-label="Practice events">
       <div class="flex flex-wrap items-end gap-4">
-        <label class="grid gap-1 text-sm">
+        <label class="grid min-w-0 max-w-full gap-1 text-sm">
           <span>Goal</span>
           <select
             class="min-h-11 max-w-full rounded-md border border-input bg-background px-3 text-foreground"
@@ -313,17 +313,17 @@ export function HistoryEventsTable(props: {
         </Show>
       </dl>
       <div
-        class="grid gap-6 lg:grid-cols-2"
+        class="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2"
         data-testid="practice-history-analytics"
       >
         <Show when={goalKey() && summary().successRate !== null}>
-          <section data-testid="practice-history-quality-chart">
+          <section class="min-w-0" data-testid="practice-history-quality-chart">
             <h3 class="text-base font-semibold">FSRS rating trend</h3>
             <p class="text-sm text-muted-foreground">
               Recorded FSRS actions: 1 Again, 2 Hard, 3 Good, 4 Easy. Recorded
               evaluation labels remain in the table.
             </p>
-            <div class="relative h-48">
+            <div class="relative h-48 min-w-0" aria-hidden="true">
               <BarChart
                 data={ratings()}
                 options={{
@@ -336,13 +336,16 @@ export function HistoryEventsTable(props: {
           </section>
         </Show>
         <Show when={goalKey() && stability().datasets.length}>
-          <section data-testid="practice-history-stability-chart">
+          <section
+            class="min-w-0"
+            data-testid="practice-history-stability-chart"
+          >
             <h3 class="text-base font-semibold">FSRS stability (days)</h3>
             <p class="text-sm text-muted-foreground">
               Lines stop at goal changes and fresh starts. Each value is also
               available in event details.
             </p>
-            <div class="relative h-48">
+            <div class="relative h-48 min-w-0" aria-hidden="true">
               <LineChart
                 data={stability()}
                 options={{

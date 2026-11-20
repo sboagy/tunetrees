@@ -9,6 +9,7 @@ import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Check, ChevronDown, Settings2 } from "lucide-solid";
 import { type Component, For, Show } from "solid-js";
 import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
+import { goalIdentityColors } from "@/lib/goal-colors";
 import type { IGoalOption } from "./types";
 
 export type { IGoalOption };
@@ -20,49 +21,6 @@ interface GoalBadgeProps {
   goals?: () => IGoalOption[];
   /** When provided the badge becomes an interactive dropdown */
   onGoalChange?: (newGoal: string) => void;
-}
-
-// ── Stable pastel color from name hash ──────────────────────────────────────
-
-const NAMED_COLORS: Record<string, string> = {
-  recall: "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
-  notes:
-    "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200",
-  technique:
-    "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200",
-  backup:
-    "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200",
-  initial_learn:
-    "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200",
-  fluency: "bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200",
-  session_ready: "bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200",
-  performance_polish:
-    "bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-200",
-};
-
-// Simple deterministic hash → one of a discrete set of pastel palettes
-const PASTEL_PALETTES = [
-  "bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200",
-  "bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200",
-  "bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200",
-  "bg-lime-100 dark:bg-lime-900 text-lime-800 dark:text-lime-200",
-  "bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200",
-  "bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200",
-];
-
-function nameHash(name: string): number {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) {
-    h = Math.trunc(Math.imul(31, h) + (name.codePointAt(i) ?? 0));
-  }
-  return Math.abs(h);
-}
-
-function colorForGoal(name: string): string {
-  return (
-    NAMED_COLORS[name] ??
-    PASTEL_PALETTES[nameHash(name) % PASTEL_PALETTES.length]
-  );
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -77,7 +35,7 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
     selected()?.displayName ??
     (goalKey().startsWith("custom:") ? "Custom goal" : goalKey());
   const badgeClass = () =>
-    `inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-xs ${colorForGoal(goalKey())}`;
+    `inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-sm ${goalIdentityColors(goalKey())}`;
 
   // Read-only variant
   const Pill = () => (
@@ -92,10 +50,10 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
       <DropdownMenu>
         <DropdownMenu.Trigger
           title={selected()?.description ?? undefined}
-          class={`${badgeClass()} min-h-11 max-w-full cursor-pointer hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+          class={`${badgeClass()} min-h-11 max-w-full cursor-pointer hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
           onClick={(event) => event.stopPropagation()}
         >
-          {displayName()}
+          <span class="min-w-0 break-words">{displayName()}</span>
           <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
         </DropdownMenu.Trigger>
 
@@ -112,13 +70,14 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
                   {/* Checkmark for current goal */}
                   <Show when={goal.name === goalKey()}>
                     <span class="absolute left-2 top-1/2 -translate-y-1/2">
-                      <Check class="w-3 h-3" />
+                      <Check class="size-4" aria-hidden="true" />
                     </span>
                   </Show>
                   <span
-                    class={`mr-2 inline-block w-2 h-2 rounded-full ${colorForGoal(goal.name).split(" ")[0]}`}
+                    aria-hidden="true"
+                    class={`mr-2 inline-block size-2 shrink-0 rounded-full ${goalIdentityColors(goal.name)}`}
                   />
-                  <span>
+                  <span class="min-w-0 break-words">
                     {goal.displayName ?? goal.name}
                     <Show when={goal.description}>
                       <span class="block max-w-xs text-sm text-muted-foreground break-words">
@@ -136,7 +95,7 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
               class="flex min-h-11 cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm text-muted-foreground hover:bg-accent data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground outline-none gap-1.5"
               onSelect={() => openUserSettings("goals")}
             >
-              <Settings2 class="w-3 h-3" />
+              <Settings2 class="size-4" aria-hidden="true" />
               Edit Goals…
             </DropdownMenu.Item>
           </DropdownMenu.Content>

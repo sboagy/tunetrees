@@ -146,11 +146,11 @@ export function SettingsShell(
           data-testid="settings-modal-backdrop"
         />
         <div
-          class="fixed inset-0 z-50 flex items-start justify-center md:pt-8 md:pb-16 pointer-events-none"
+          class="settings-dialog-wrapper fixed inset-0 z-50 flex items-start justify-center sm:pt-8 sm:pb-16 pointer-events-none"
           data-testid="settings-modal-wrapper"
         >
           <Dialog.Content
-            class="bg-background text-foreground md:rounded-lg shadow-2xl border border-border w-full max-w-full md:max-w-6xl h-dvh md:max-h-[calc(100dvh-8rem)] flex flex-col pointer-events-auto"
+            class="settings-dialog bg-background text-foreground sm:rounded-lg shadow-2xl border border-border w-full max-w-full sm:max-w-6xl h-dvh sm:max-h-[calc(100dvh-8rem)] flex flex-col pointer-events-auto"
             onInteractOutside={(event) => event.preventDefault()}
             onOpenAutoFocus={(event) => {
               event.preventDefault();
@@ -158,13 +158,13 @@ export function SettingsShell(
             }}
             data-testid="settings-modal"
           >
-            <div class="px-4 md:px-6 py-3 md:py-4 border-b border-border flex items-start justify-between shrink-0">
+            <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex items-start justify-between shrink-0">
               <div class="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setIsSidebarOpen(!isSidebarOpen())}
-                  class="md:hidden min-h-11 min-w-11 p-2 text-foreground hover:bg-accent rounded-md"
-                  aria-label="Toggle menu"
+                  class="sm:hidden min-h-11 min-w-11 p-2 text-foreground hover:bg-accent rounded-md"
+                  aria-label="Settings navigation"
                   aria-expanded={isSidebarOpen()}
                   aria-controls="settings-sidebar"
                   data-testid="settings-menu-toggle"
@@ -175,11 +175,11 @@ export function SettingsShell(
                   <Dialog.Title
                     ref={title}
                     tabIndex={-1}
-                    class="text-xl md:text-2xl font-semibold"
+                    class="text-lg font-semibold"
                   >
                     Settings
                   </Dialog.Title>
-                  <Dialog.Description class="hidden md:block text-sm text-muted-foreground mt-1">
+                  <Dialog.Description class="hidden sm:block text-sm text-muted-foreground mt-1">
                     Manage your account settings and set scheduling preferences.
                   </Dialog.Description>
                 </div>
@@ -195,18 +195,18 @@ export function SettingsShell(
                 <X class="size-5" aria-hidden="true" />
               </button>
             </div>
-            <div class="flex-1 flex min-h-0 overflow-hidden relative">
+            <div class="settings-dialog-body flex-1 flex min-h-0 overflow-hidden relative">
               <Show when={isSidebarOpen()}>
                 <button
                   type="button"
-                  class="md:hidden absolute inset-0 bg-black/30 z-10"
+                  class="sm:hidden absolute inset-0 bg-black/30 z-10"
                   onClick={() => setIsSidebarOpen(false)}
                   aria-label="Close menu"
                 />
               </Show>
               <aside
                 id="settings-sidebar"
-                class="md:block md:relative absolute z-20 bg-background border-r border-border overflow-y-auto p-4 h-full w-64 shrink-0"
+                class="sm:block sm:relative absolute z-20 bg-background border-r border-border overflow-y-auto p-4 h-full w-64 shrink-0"
                 classList={{ hidden: !isSidebarOpen() }}
                 data-testid="settings-sidebar"
               >
@@ -239,7 +239,7 @@ export function SettingsShell(
                 </nav>
               </aside>
               <main
-                class="flex-1 min-w-0 overflow-y-auto p-4 md:p-6 w-full"
+                class="settings-dialog-content flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 w-full"
                 data-testid="settings-content"
               >
                 {props.children}

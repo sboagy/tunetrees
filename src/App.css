@@ -700,3 +700,22 @@
     text-underline-offset: 0.16em;
   }
 }
+
+/* L2: let the entire Settings dialog scroll when landscape/keyboard space is short. */
+@media (max-height: 480px) {
+  .settings-dialog-wrapper {
+    padding: 1rem;
+  }
+  .settings-dialog {
+    height: auto;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+  }
+  .settings-dialog-body {
+    flex: none;
+    overflow: visible;
+  }
+  .settings-dialog-content {
+    overflow: visible;
+  }
+}

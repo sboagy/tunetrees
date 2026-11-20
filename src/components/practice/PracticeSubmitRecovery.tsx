@@ -55,6 +55,7 @@ export function PracticeSubmitRecovery(props: {
               />
             </label>
             <Button
+              class="min-h-11"
               variant="outline"
               onClick={copyNotes}
               data-testid="recovery-copy-notes"
@@ -77,6 +78,7 @@ export function PracticeSubmitRecovery(props: {
               </span>
             </label>
             <Button
+              class="min-h-11"
               variant="outline"
               disabled={!savedElsewhere() || props.pending}
               onClick={props.onClearNotes}

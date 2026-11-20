@@ -264,7 +264,7 @@ export default function GoalsPage() {
             <p>Changes to Goals</p>
             <output class="block text-muted-foreground">{message()}</output>
           </div>
-          <div class="flex gap-2">
+          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Button
               class="min-h-11"
               variant="outline"
@@ -274,7 +274,7 @@ export default function GoalsPage() {
               Cancel
             </Button>
             <Button
-              class="min-h-11 min-w-36"
+              class="min-h-11 min-w-36 gap-1"
               data-testid="goal-save"
               disabled={
                 !dirty() ||
@@ -305,7 +305,7 @@ export default function GoalsPage() {
       data-testid="goals-settings"
     >
       <div>
-        <h3 class="text-lg font-medium">Goals</h3>
+        <h3 class="text-lg font-semibold">Goals</h3>
         <p class="text-sm text-muted-foreground">
           Choose what you are working toward. Each goal has its own evaluations,
           scheduler and daily limits. Your settings apply across your
@@ -450,7 +450,10 @@ export default function GoalsPage() {
           </section>
         )}
       </For>
-      <fieldset disabled={busy() || canRetryPersistence()} class="space-y-3">
+      <fieldset
+        disabled={busy() || canRetryPersistence()}
+        class="min-w-0 space-y-3"
+      >
         <For each={goals()}>
           {(entry) => (
             <section
@@ -458,7 +461,7 @@ export default function GoalsPage() {
               data-testid={`goal-panel-${entry.row.id}`}
             >
               <div class="flex items-start justify-between gap-3">
-                <div>
+                <div class="min-w-0 break-words">
                   <h4 class="font-medium">
                     {entry.effective.displayName}{" "}
                     <Show when={entry.row.privateFor === null}>
@@ -571,6 +574,7 @@ export default function GoalsPage() {
         <Show when={!adding()}>
           <Button
             variant="accent"
+            class="min-h-11 gap-1"
             data-testid="goal-add"
             onClick={() => {
               setDeleting(undefined);
@@ -585,7 +589,7 @@ export default function GoalsPage() {
               });
             }}
           >
-            <Plus class="size-4" />
+            <Plus class="size-4" aria-hidden="true" />
             Add goal
           </Button>
         </Show>
