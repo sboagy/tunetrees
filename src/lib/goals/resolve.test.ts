@@ -1263,6 +1263,46 @@ describe("atomic goal practice submission", () => {
     );
   });
 
+  it("displays the linked legacy Recall rating after switching the active goal", async () => {
+    await item();
+    event("legacy", stamp, "2026-11-18T04:57:13.050Z");
+    raw.run("UPDATE practice_record SET quality = 2 WHERE id = 'legacy'");
+    raw.run(
+      "UPDATE daily_practice_queue SET completed_at = ?, displayed_practice_record_id = 'legacy'",
+      [stamp]
+    );
+    assign(fluencyId, "fluency");
+    expect(
+      readPracticeSession(db, "owner", "rep", stamp).get("tune")?.submittedLabel
+    ).toBe("Hard");
+  });
+
+  it("does not borrow the latest legacy rating when a completed queue has no event link", async () => {
+    await item();
+    event("unlinked", stamp, "2026-11-18T04:57:13.050Z");
+    raw.run("UPDATE practice_record SET quality = 3 WHERE id = 'unlinked'");
+    raw.run("UPDATE daily_practice_queue SET completed_at = ?", [stamp]);
+    expect(
+      readPracticeSession(db, "owner", "rep", stamp).get("tune")?.submittedLabel
+    ).toBe("Not available");
+  });
+
+  it("does not interpret a legacy non-Recall quality as an FSRS evaluation", async () => {
+    await item();
+    event("legacy-ladder");
+    raw.run(
+      "UPDATE practice_record SET quality = 3, goal = 'fluency', goal_id = ?",
+      [fluencyId]
+    );
+    raw.run(
+      "UPDATE daily_practice_queue SET completed_at = ?, displayed_practice_record_id = 'legacy-ladder'",
+      [stamp]
+    );
+    expect(
+      readPracticeSession(db, "owner", "rep", stamp).get("tune")?.submittedLabel
+    ).toBe("Not available");
+  });
+
   it("links the displayed event rather than a newer event and uses the current goal", async () => {
     const receipt = await item();
     await submit([receipt]);
@@ -1270,6 +1310,7 @@ describe("atomic goal practice submission", () => {
     assign(fluencyId, "fluency");
     const session = readPracticeSession(db, "owner", "rep", stamp).get("tune");
     expect(session?.event?.id).toBe(receipt.draft.practiceRecordId);
+    expect(session?.submittedLabel).toBe("Good");
     expect(
       session?.definition.config.evaluations.map((choice) => choice.id)
     ).toContain("effortless");

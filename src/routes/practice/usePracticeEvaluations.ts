@@ -432,21 +432,7 @@ export function usePracticeEvaluations(
     getEvaluationModel: (tuneId) => {
       const state = session();
       const row = state.rows.get(tuneId);
-      let submittedLabel = "Recorded evaluation unavailable";
-      if (row?.event?.evaluationSnapshot) {
-        try {
-          const snapshot: unknown = JSON.parse(row.event.evaluationSnapshot);
-          if (
-            snapshot &&
-            typeof snapshot === "object" &&
-            "choiceLabel" in snapshot &&
-            typeof snapshot.choiceLabel === "string"
-          )
-            submittedLabel = snapshot.choiceLabel;
-        } catch {
-          submittedLabel = "Recorded evaluation unavailable";
-        }
-      }
+      const submittedLabel = row?.submittedLabel ?? "Not available";
       const override = evaluations()[tuneId];
       const hasDraft =
         override === undefined ? !!row?.draft?.evaluationId : !!override;

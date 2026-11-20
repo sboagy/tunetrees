@@ -1,7 +1,11 @@
 import type { PracticeRecord } from "../db/types";
 import { orderPracticeHistory } from "../utils/practice-history";
 import { SCHEDULER_STATE_BYTES } from "./config";
-import { type DecodedPracticeState, readPracticeState } from "./practice-state";
+import {
+  type DecodedPracticeState,
+  isLegacyRecallState,
+  readPracticeState,
+} from "./practice-state";
 import { type GoalIdentity, resolveGoalReference } from "./references";
 
 /** Read-only presentation of submitted events. Never consult current evaluations
@@ -72,7 +76,7 @@ function finiteInterval(value: number | null): number | null {
   return value !== null && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function normalizeEvent(
+export function readHistoryEvent(
   record: PracticeRecord,
   goals: readonly HistoricalGoal[],
   userId: string
@@ -105,10 +109,16 @@ function normalizeEvent(
   }
   // New-format events never borrow ratings or intervals from compatibility columns.
   let rating: number | null = null;
-  if (state.kind === "fsrs6") {
-    if (legacy) rating = validRating(record.quality);
-    else if (snapshot?.action.kind === "fsrs")
-      rating = validRating(snapshot.action.rating);
+  if (isLegacyRecallState(record, resolved?.id ?? null)) {
+    // A stored rating remains meaningful even when optional old state was lost
+    // by the importer (for example, zero lapses became null).
+    rating = validRating(record.quality);
+  } else if (
+    !legacy &&
+    state.kind === "fsrs6" &&
+    snapshot?.action.kind === "fsrs"
+  ) {
+    rating = validRating(snapshot.action.rating);
   }
   const legacyLabel =
     rating === null ? null : ["Again", "Hard", "Good", "Easy"][rating - 1];
@@ -168,7 +178,7 @@ export function buildHistoryEvents(
 ): HistoryEvent[] {
   const events = orderPracticeHistory(records, "as-missing")
     .reverse()
-    .map((record) => normalizeEvent(record, goals, userId));
+    .map((record) => readHistoryEvent(record, goals, userId));
   let episode = 0;
   for (let index = 0; index < events.length; index++) {
     if (index === 0 || !continuesEpisode(events[index - 1], events[index]))

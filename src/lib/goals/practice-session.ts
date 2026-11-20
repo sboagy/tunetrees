@@ -7,6 +7,7 @@ import {
 } from "../db/schema";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import type { EvaluationChoice } from "./config";
+import { readHistoryEvent } from "./practice-history";
 import { readGoalRepertoireSnapshot } from "./resolve";
 
 /** One local snapshot for the active queue's controls. Never run schedulers while
@@ -68,7 +69,14 @@ export function readPracticeSession(
           );
         return [
           row.queue.tuneRef,
-          { ...row, definition: snapshot.resolveAssignment(assignment) },
+          {
+            ...row,
+            submittedLabel: row.event
+              ? readHistoryEvent(row.event, snapshot.goals, userId)
+                  .evaluationLabel
+              : "Not available",
+            definition: snapshot.resolveAssignment(assignment),
+          },
         ];
       })
   );

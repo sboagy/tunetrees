@@ -111,3 +111,100 @@ describe("legacy queue completion evidence", () => {
     expect(prepareQueueCompletions([queue], [attributed])).toEqual(first);
   });
 });
+
+describe("imported queue window recovery", () => {
+  const importedQueue = {
+    ...queue,
+    row: {
+      ...queue.row,
+      device_id: "data-migration-2025-10-05",
+      window_start_utc: "2020-01-03T00:00:00Z",
+      window_end_utc: "2020-01-04T00:00:00Z",
+    },
+  };
+  const importedEvent = {
+    ...event,
+    row: {
+      ...event.row,
+      device_id: "data-migration-2025-10-05",
+      practiced: "2020-01-03T15:00:00Z",
+      last_modified_at: "2020-02-01T00:00:00Z",
+    },
+  };
+
+  it("recovers one in-window event without requiring practiced to equal completion", () => {
+    const result = prepareQueueCompletions([importedQueue], [importedEvent]);
+    expect(result.updates.map((entry) => entry.event.key)).toEqual(["event"]);
+    expect(result.updates[0].event.row.practiced).toBe(
+      importedEvent.row.practiced
+    );
+  });
+
+  it("recovers an older window independently of a newer unfinished queue", () => {
+    const newer = {
+      ...importedQueue,
+      row: {
+        ...importedQueue.row,
+        id: "newer",
+        completed_at: null,
+        window_start_utc: "2020-01-04T00:00:00Z",
+      },
+    };
+    expect(
+      prepareQueueCompletions(
+        [importedQueue, newer],
+        [importedEvent]
+      ).updates.map((entry) => entry.event.key)
+    ).toEqual(["event"]);
+  });
+
+  it("uses the in-window event even when later practice exists", () => {
+    const later = {
+      ...importedEvent,
+      key: "later",
+      row: {
+        ...importedEvent.row,
+        id: "later",
+        practiced: "2020-01-05T15:00:00Z",
+      },
+    };
+    expect(
+      prepareQueueCompletions(
+        [importedQueue],
+        [later, importedEvent]
+      ).updates.map((entry) => entry.event.key)
+    ).toEqual(["event"]);
+  });
+
+  it("does not hide a second event with different provenance", () => {
+    const second = {
+      ...importedEvent,
+      key: "second",
+      row: { ...importedEvent.row, id: "second", device_id: "another" },
+    };
+    expect(
+      prepareQueueCompletions([importedQueue], [importedEvent, second]).updates
+    ).toEqual([]);
+  });
+
+  it.each([
+    { practiced: "2020-01-04T00:00:00Z" },
+    { practiced: "2020-01-02T23:59:59Z" },
+    { device_id: "another" },
+    { scheduler_id: "builtin:fsrs6" },
+    { repertoire_ref: "other" },
+    { tune_ref: "other" },
+  ])("rejects unavailable or ineligible window evidence: %j", (override) => {
+    expect(
+      prepareQueueCompletions(
+        [importedQueue],
+        [
+          {
+            ...importedEvent,
+            row: { ...importedEvent.row, ...override },
+          },
+        ]
+      ).updates
+    ).toEqual([]);
+  });
+});

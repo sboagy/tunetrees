@@ -165,6 +165,22 @@ describe("mixed-goal history", () => {
       state: { source: "legacy" },
     });
   });
+  it("retains a known legacy rating when imported scheduler state is incomplete", () => {
+    const [event] = read([
+      record({
+        goalId: null,
+        schedulerId: null,
+        schedulerVersion: null,
+        schedulerState: null,
+        evaluationId: null,
+        evaluationSnapshot: null,
+        quality: 2,
+        difficulty: null,
+      }),
+    ]);
+    expect(event.evaluationLabel).toBe("Hard");
+    expect(event.state.kind).toBe("unavailable");
+  });
   it("excludes unknown intervals rather than substituting zero or compatibility values", () => {
     expect(
       summarizeHistoryEvents(

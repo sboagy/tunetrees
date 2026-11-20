@@ -1,7 +1,7 @@
 # One-time goals cutover
 
 This is the #426 procedure for the one real user's devices and existing test users.
-The migration tooling is ready; **run the production cutover only when the complete
+Historical imported-completion validation is still in progress; **run the production cutover only when the complete
 #426 runtime/UI release is ready to deploy**. Development of the tooling does not
 require migrating production now.
 
@@ -58,8 +58,10 @@ Implementation details and script contracts are in the
 
 In one locked transaction it converts supported custom definitions/stable keys,
 seeds missing personal Recall settings, attributes unambiguous legacy history and
-assignments, and links completed queue rows only when exact submission evidence
-identifies one event. Existing overrides, history timestamps and raw historical
+assignments, and links completed queue rows when exact submission evidence identifies one
+event, or an imported queue window has exactly one eligible in-window event.
+The latter is an explicitly accepted best-effort historical display recovery;
+uncertain completions remain unlinked and display “Not available”. Existing overrides, history timestamps and raw historical
 goal names are preserved. A repeat application makes no additional writes.
 
 Incomplete new-format events without a goal identity, pending server drafts,

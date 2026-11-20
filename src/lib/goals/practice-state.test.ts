@@ -52,6 +52,29 @@ describe("single practice state reader", () => {
       limitations: [expect.stringContaining("not stored")],
     });
   });
+  it("preserves the old reader's zero-lapse default for imported legacy Recall", () => {
+    expect(
+      readPracticeState({ ...legacy, lapses: null }, recallId)
+    ).toMatchObject({
+      kind: "fsrs6",
+      source: "legacy",
+      state: { lapses: 0, stability: 12, reps: 10 },
+      limitations: expect.arrayContaining([
+        expect.stringContaining("lapse count"),
+      ]),
+    });
+  });
+  it("does not default missing lapses in new JSON state", () => {
+    expect(() =>
+      readPracticeState(
+        {
+          ...modern,
+          schedulerState: canonicalJson({ ...state, lapses: null }),
+        },
+        recallId
+      )
+    ).toThrow("Invalid FSRS-6 state");
+  });
   it.each(["base_interval", "plugin-id", "metronome"])(
     "does not infer FSRS from numeric columns for legacy technique %s",
     (technique) => {

@@ -1407,3 +1407,179 @@ after deleting the last event for a goal. Servers were not restarted. Component
 coverage verifies navigation during save and query retry; actual browser offline
 persistence recovery and the visual/accessibility matrix above remain unverified.
 Changes remain uncommitted and unpushed.
+
+## Legacy completed-queue display investigation (2026-11-19)
+
+History checkpoint: local commit `b73a8573`, not pushed. Read-only inspection of
+local Supabase found older completed rows for Ballydesmond Polka, Tobin's Favorite
+and Young Tom Ennis without `displayed_practice_record_id`. In the latest sampled
+queue (November 2, 2025), completion is 03:26:57; the corresponding latest practice
+rows have practiced 08:26:57 and modified November 3 at 04:57:13.050. These are
+candidate associations, not verified links. The current migration's exact
+modification-time rule cannot establish them. The offsets may reflect historical
+timezone/import behavior; this investigation has not established their cause or
+data corruption. No application data was changed and no migration was run.
+
+The main-branch grid used `latest_quality` for completed rows, which explains how
+it could display a rating without this event link. The new queue instead requires
+an identified event; that semantic change was not sufficiently covered by tests.
+Browser access was unavailable (browser host unavailable and native Chrome access
+timed out), so the exact browser SQLite rows and screenshot state remain unverified.
+
+An independent compatibility fix now reuses `readHistoryEvent` for linked queue
+evaluation labels, including supported legacy Recall ratings. It does not use the
+current assigned goal to reinterpret a historical rating or guess an event for an
+unlinked queue. Added SQLite regressions cover linked legacy Recall after a goal
+switch, unlinked legacy completion, and unsupported legacy goal semantics; the
+existing new-format linked-event test also checks the displayed label. All 109
+focused tests pass, along with typecheck and scoped Biome checks. This fix is
+uncommitted. How to present unlinked old completions remains a user decision;
+do not silently substitute the latest rating as the original completion evaluation.
+
+### Correction: excluded historical database evidence (2026-11-19)
+
+The earlier investigation used an old, git-ignored SQLite file outside this
+worktree without establishing its relevance. The developer has explicitly excluded
+that file. Claims that it verified the three example associations, established the
+import timezone, or reconstructed all 344 remaining completions are withdrawn.
+The derived mapping is not a migration input or a test oracle. Original integer
+record ordering, source batch partitions and counts from that file are not evidence
+for this conversion.
+
+The uncommitted America/New_York matching branch and its synthetic unit/transaction
+tests have been removed. The worktree importer calls `new Date(sqliteTs)` without
+pinning a timezone; its device marker does not prove the environment in which it
+ran. The existing exact modification-time matcher remains unchanged.
+
+Independent runtime fixes remain: linked legacy Recall events use the shared
+history reader for labels; missing legacy lapse counts use the existing zero
+initialization policy with an explicit limitation. New-format JSON remains strict,
+and no runtime latest/nearest fallback has been added.
+
+Fresh read-only inspection of local Supabase finds 591 active imported completed
+queue rows with no displayed-event links, plus three linked non-imported rows.
+These are current local counts, not proof that records are missing. Further
+association analysis is restricted to this worktree's seed data, local Supabase
+and relevant versioned code. No static ID mapping, retained database conversion,
+reset, staging/production access, commit or push is part of this correction.
+
+### Reassessment from worktree seed and current local Supabase
+
+Compared the checked-in `supabase/seeds/baseline_local_20260217.sql` with
+local Postgres using temporary tables in a rolled-back transaction:
+
+- All 1,169 seeded practice records exist locally, with every seeded column
+  identical. This comparison uses record IDs, not tune titles.
+- The seed contains 591 active imported completed queue rows, matching the local
+  imported completed count. All 614 imported queue rows exist locally; 611 have
+  identical seeded columns. Two additional non-imported seed rows are absent.
+  Local test activity therefore means the whole database is not an untouched seed.
+- All 591 unlinked completed rows have same-owner/repertoire/tune history. None
+  has an exact practiced/completed or modified/completed timestamp match. Only
+  34 have exactly one practice timestamp within generation/completion, which
+  is not sufficient evidence of association.
+- The imported practice rows have just ten distinct modification timestamps,
+  spanning 2025-11-03 04:57:13.040–04:57:13.050. These timestamps cannot recover
+  individual submission times.
+- Grouping completed tunes by owner/repertoire/completion and practice tunes by
+  owner/repertoire/practiced, then comparing distinct tune sets without adjusting
+  timestamps, yields 65 unique candidate batches covering 488 queue rows; four
+  ambiguous batches covering six rows; and 21 unmatched batches covering 97 rows.
+  These are candidate-set counts, not verified links. No integer source ordering
+  or archived database was consulted in this reassessment.
+
+The remaining problem is historical association, not absent practice history or
+missing schema columns. The database does not directly record the old submission
+relationship. A dynamic reconstruction still needs a justified matching policy;
+uniqueness of a tune set alone is not proof. Automatic post-seed conversion and
+retained link writes remain pending. Do not replace this gap with hard-coded IDs,
+a timezone assumption, or a runtime latest-record fallback.
+
+Validation of the correction: typecheck passed; all 150 focused tests across
+queue completion, history presentation, state decoding and goal resolution passed;
+scoped Biome checks passed. No application rows were modified, and no reset,
+commit, push or staging/production operation was performed.
+
+### Latest-queue recovery decision and window check (2026-11-19)
+
+The developer accepts incomplete historical queue attribution and asks to prioritize
+the latest queue, with shorter unavailable labels. Checking the actual queue window
+(start inclusive, end exclusive) yields one candidate for 507 imported completions,
+none for 82, and two for two. This differs from checking generation-to-completion.
+The latest imported window contains one candidate each for Ballydesmond Polka,
+Tobin's Favorite and Young Tom Ennis, with ratings Good, Hard and Hard.
+
+The migration now permits this best-effort recovery only for the latest active
+window per owner/repertoire, for legacy events with matching import provenance,
+when exact modification-time evidence is absent. It never chooses between multiple
+events, changes timestamps, or uses archived data. Writers recheck the full queue
+context under locks, including newer active windows. Existing exact matching remains.
+A rollback rehearsal recovers three links, reports 588 unresolved completions and
+makes no retained changes. The UI label for an unlinked completion is now “Not
+available” (design-system C2); Practice again remains available. Browser appearance
+and accessibility were not rechecked for this text-only change.
+
+`snapshot_coalesced_ts` captures the scheduling date used for queue classification:
+manual scheduled date, otherwise latest due date, otherwise the queue window start.
+It is not the practice timestamp and must not be used as submission identity.
+
+### Applied local reset/seed/conversion rehearsal (2026-11-19)
+
+With explicit developer authorization, `npm run db:local:reset` completed (auth
+setup passed, then baseline and genre/rhythm seeds loaded). The current reset npm
+command omits the generated goal configuration seed, so it was reapplied separately
+using psql with ON_ERROR_STOP before conversion. This is a manual local rehearsal;
+post-seed conversion is not yet wired automatically into reset or CI.
+
+`goals:migrate -- --local` passed, followed by `--local --apply`: three queue links,
+1,709 goal references and 20 personal Recall settings were committed. All 1,169
+seeded practice records remain; a deterministic full-row checksum excluding only
+`goal_id` is identical before and after conversion. All now have goal attribution.
+The three linked events match their queue repertoire/tune and retain Good, Hard,
+Hard. The other 588 completed historical rows remain unlinked by design. A second
+dry run reports zero writes in every category and zero unresolved goal references.
+
+The target was only 127.0.0.1:54322/postgres. Staging and production were untouched.
+No browser access/storage changes or server restarts were performed in completing
+this rehearsal. The developer will refresh the browser mirror separately; browser
+verification and a full post-conversion E2E run remain pending. No commit or push.
+
+### Extended recovery to historical imported windows (2026-11-19)
+
+At the developer's request, removed the newest-window restriction. Every active,
+completed, unlinked imported row is eligible for the same unique-in-window rule.
+Same owner/repertoire/tune and import provenance remain required; zero or multiple
+candidates remain unresolved. No latest-event fallback or timezone adjustment was
+added. Existing links are untouched. Tests cover recovery despite a newer queue,
+selection of the in-window event despite later practice, and ambiguity rejection.
+
+After unit/transaction checks and a successful sequential dry run, local apply
+added 504 links (507 total), leaving 84 unavailable. A whole-practice-table checksum
+before/after matches exactly; repeat dry run reports zero writes. The initial dry
+run overlapped the transaction test's table locks and failed; the sequential run
+passed. Migration commands and DB transaction tests must run sequentially.
+
+The October 30 screenshot's four rows remain unresolved: their windows end at
+October 31 00:00 UTC, while the next practice records are October 31 03:27:55.
+Those events are not in-window, and this recovery intentionally does not infer a
+timezone correction. Browser mirror refresh remains a manual developer action;
+no system browser access, reset, production/staging changes, commit or push occurred.
+
+### CodeRabbit review before full local E2E (2026-11-19)
+
+CodeRabbit CLI 0.9.5 reviewed all 13 uncommitted files and returned one conditional
+finding against the imported-window test: whether changing `row.scheduler_id`
+actually makes the event ineligible when the top-level `schedulerId` stays null.
+The concern is refuted by `hasNewEventMetadata`: it checks both the top-level
+identity and `newEventFields`, which explicitly includes `scheduler_id`. The fixture
+intentionally covers partial new-format metadata and correctly remains unlinked.
+No code changes were warranted by this review.
+
+Validation: all 1,498 unit tests pass, along with repository typecheck, lint,
+format:check and diff whitespace checks. The preceding database transaction tests
+also passed. Full local E2E is left for the developer's next run. This review made
+no database/browser changes and no commit or push.
+
+The developer subsequently confirmed the full local E2E run passed after this
+review and authorized committing/pushing this checkpoint. Remote CI for the new
+commit remains pending.

@@ -57,6 +57,12 @@ unattributed; incomplete new-format events without a goal identity block preflig
 no existing link and one same-owner/repertoire/tune event has a modification timestamp
 exactly matching completion, with practice between generation and completion.
 Timestamp normalization retains microseconds and permits delayed submission.
+When exact evidence is absent, any active historical window may
+recover an imported completion from exactly one same-owner/repertoire/tune practice
+inside `[window_start_utc, window_end_utc)`. Both rows must carry the historical
+import marker, and the event must be legacy. All event formats count toward
+ambiguity. Existing links are preserved. This is the developer-approved best-effort display association, not proof
+of the original submission. It applies no timezone correction or static mapping.
 Ambiguous, damaged or partial/new-format evidence is reported, never guessed from
 the latest record. Writers rederive evidence under queue/history locks, even on
 retries, and compare the complete returned queue row. Goal-ID backfills are excluded

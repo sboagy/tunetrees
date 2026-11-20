@@ -123,6 +123,28 @@ try {
         1, 0, ${stamp}, '2020-01-01', ${stamp}, ${stamp})`;
     const plan = await planFixture(tx);
 
+    // Window recovery uses current rows, including retry validation under locks.
+    await rollbackCase(tx, async (sp) => {
+      const marker = "data-migration-2025-10-05";
+      await sp`UPDATE public.practice_record SET practiced = '2020-01-01 15:00:00',
+        last_modified_at = '2020-02-01', device_id = ${marker} WHERE id = ${eventId}`;
+      await sp`UPDATE public.daily_practice_queue SET completed_at = '2020-01-01 10:00:00',
+        device_id = ${marker} WHERE id = ${queueId}`;
+      const recovered = await planFixture(sp);
+      assert.equal(recovered.queueCompletions.updates.length, 1);
+      assert.equal(
+        (await applyGoalCutoverPlan(sp, recovered)).queueCompletionsUpdated,
+        1
+      );
+      assert.equal(
+        (await applyGoalCutoverPlan(sp, recovered)).queueCompletionsUpdated,
+        0
+      );
+      const [saved] =
+        await sp`SELECT practiced::text FROM public.practice_record WHERE id = ${eventId}`;
+      assert.equal(saved.practiced, "2020-01-01 15:00:00");
+    });
+
     // Exercise the operator command's complete transaction, including apply mode,
     // inside an outer rollback scope so neither fixtures nor baseline data persist.
     await rollbackCase(tx, async (sp) => {

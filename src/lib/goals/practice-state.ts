@@ -40,6 +40,19 @@ export type DecodedPracticeState =
 
 const recallId = getBuiltInGoals().find((goal) => goal.name === "recall")?.id;
 
+/** Identity check is independent of whether every historical state field survived. */
+export function isLegacyRecallState(
+  row: PracticeStateRecord,
+  legacyGoalId: string | null
+): boolean {
+  return (
+    row.schedulerId === null &&
+    (row.goalId ?? legacyGoalId) === recallId &&
+    (!row.goal || row.goal === "recall") &&
+    (!row.technique || row.technique === "fsrs")
+  );
+}
+
 /**
  * Single state-reading boundary for scheduling and history. legacyGoalId must
  * come from owner-scoped goal resolution; do not infer identity from a label.
@@ -90,11 +103,7 @@ export function readPracticeState(
   // Old ladders/plugins also filled FSRS-looking columns. Only the unambiguous
   // built-in Recall case may continue; unresolved/custom identities stay visible.
   const goalId = row.goalId ?? legacyGoalId;
-  if (
-    goalId !== recallId ||
-    (row.goal && row.goal !== "recall") ||
-    (row.technique && row.technique !== "fsrs")
-  )
+  if (goalId === null || !isLegacyRecallState(row, legacyGoalId))
     return {
       kind: "unavailable",
       goalId,
@@ -106,7 +115,8 @@ export function readPracticeState(
     difficulty: row.difficulty,
     status: row.state,
     reps: row.repetitions,
-    lapses: row.lapses,
+    // Preserve the pre-#426 reader's null-as-zero policy for legacy lapses.
+    lapses: row.lapses ?? 0,
     // Matches the existing reader's recovery policy, not recovered history.
     // In particular, old `step` and `interval` are NOT these library fields.
     learningSteps: 0,
@@ -118,6 +128,9 @@ export function readPracticeState(
     state,
     source: "legacy",
     limitations: [
+      ...(row.lapses === null
+        ? ["Historical lapse count was not stored; initialized to zero"]
+        : []),
       "Historical learning progress and scheduled-day state were not stored; initialized to zero",
     ],
   };
