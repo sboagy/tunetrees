@@ -9,6 +9,7 @@
 
 import type { Page, Route } from "@playwright/test";
 import log from "loglevel";
+import { setOfflineForTest } from "./sync-error-guard";
 
 log.setLevel("info");
 
@@ -20,7 +21,7 @@ log.setLevel("info");
  */
 export async function goOffline(page: Page): Promise<void> {
   log.info("🔌 Going offline...");
-  await page.context().setOffline(true);
+  await setOfflineForTest(page.context(), true);
   await waitForNetworkState(page, "offline");
   log.info("✅ Offline mode enabled");
 }
@@ -32,7 +33,7 @@ export async function goOffline(page: Page): Promise<void> {
  */
 export async function goOnline(page: Page): Promise<void> {
   log.info("🌐 Going online...");
-  await page.context().setOffline(false);
+  await setOfflineForTest(page.context(), false);
   await waitForNetworkState(page, "online");
   log.info("✅ Online mode enabled");
 }

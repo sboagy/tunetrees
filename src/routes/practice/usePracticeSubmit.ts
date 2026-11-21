@@ -1,110 +1,278 @@
-import { sql } from "drizzle-orm";
-import type { Accessor } from "solid-js";
+import { type Accessor, createSignal, onCleanup } from "solid-js";
 import { toast } from "solid-sonner";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
-import { addTunesToQueue } from "../../lib/services/practice-queue";
-import { commitStagedEvaluations } from "../../lib/services/practice-recording";
-import { formatAsWindowStart } from "../../lib/utils/practice-date";
+import {
+  commitGoalPracticeEvaluations,
+  type GoalCommitItem,
+  GoalPracticePersistenceError,
+  GoalPracticeRecoveryError,
+  readGoalCommitItems,
+} from "../../lib/goals/commit";
+import { runGoalQueueCommand } from "../../lib/goals/queue-commands";
+import {
+  offerGoalQueueSaveRecovery,
+  reportGoalQueueNotices,
+} from "../../lib/goals/queue-feedback";
+import {
+  clearReviewedDraftNotes,
+  stageGoalPracticeEvaluation,
+} from "../../lib/goals/staging";
+import {
+  formatAsWindowStart,
+  getPracticeDate,
+} from "../../lib/utils/practice-date";
 
 export interface PracticeSubmitProps {
   localDb: Accessor<SqliteDatabase | null>;
   getUserId: () => Promise<string | null>;
+  userId: Accessor<string | null>;
   currentRepertoireId: Accessor<string | null>;
   queueDate: Accessor<Date>;
+  captureQueueSelection: () => () => boolean;
   evaluationsCount: Accessor<number>;
   isStaging: Accessor<boolean>;
+  hasEvaluationErrors: Accessor<boolean>;
+  onSubmittingChange: (pending: boolean) => void;
   prepareClearEvaluations: () => () => void;
   incrementPracticeListStagedChanged: () => void;
   syncPracticeScope: () => Promise<void> | void;
 }
 
 export interface PracticeSubmitState {
+  submitError: Accessor<string>;
+  recovery: Accessor<GoalPracticeRecoveryError | null>;
+  clearReviewedNotes: () => Promise<void>;
   handleSubmitEvaluations: () => Promise<void>;
   handleAddTunes: (count: number) => Promise<void>;
   handleQueueReset: () => Promise<void>;
 }
 
+async function refreshStaleEvaluations(
+  db: SqliteDatabase,
+  userId: string,
+  repertoireId: string,
+  windowStart: string,
+  items: GoalCommitItem[],
+  current: () => boolean
+) {
+  for (const { draft } of items) {
+    if (!current()) return;
+    // A stale configuration may be recalculated, but a replaced or cleared
+    // draft belongs to newer work and must never be resurrected here.
+    const latest = readGoalCommitItems(db, {
+      userId,
+      repertoireId,
+      windowStart,
+    }).find((item) => item.draft.tuneId === draft.tuneId);
+    if (!latest || JSON.stringify(latest.draft) !== JSON.stringify(draft))
+      throw new Error(
+        "An evaluation changed during Submit. Review the current choices and submit again."
+      );
+    if (!draft.evaluationId || !draft.practiced)
+      throw new Error(
+        "Choose the evaluation again to replace an incomplete preview."
+      );
+    const refreshed = await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId,
+        repertoireId,
+        tuneId: draft.tuneId,
+        evaluationId: draft.evaluationId,
+        practiced: new Date(draft.practiced),
+      },
+      current
+    );
+    if (refreshed.status !== "staged")
+      throw new Error(
+        "Practice changed again. Choose the evaluations again before submitting."
+      );
+  }
+}
+
 export function usePracticeSubmit(
   props: PracticeSubmitProps
 ): PracticeSubmitState {
+  const [submitError, setSubmitError] = createSignal("");
+  const [recoveryState, setRecoveryState] = createSignal<{
+    error: GoalPracticeRecoveryError;
+    current: () => boolean;
+  } | null>(null);
+  const recovery = () => {
+    const state = recoveryState();
+    return state?.current() ? state.error : null;
+  };
+  let pending = false;
+  let disposed = false;
+  let retry:
+    | {
+        db: SqliteDatabase;
+        userId: string;
+        repertoireId: string;
+        windowStart: string;
+        items: GoalCommitItem[];
+      }
+    | undefined;
+  onCleanup(() => {
+    disposed = true;
+  });
   const handleSubmitEvaluations = async () => {
-    const db = props.localDb();
-    const repertoireId = props.currentRepertoireId();
-
-    if (!db || !repertoireId) {
-      console.error("Missing required data for submit");
-      toast.error("Cannot submit: Missing database or repertoire data");
+    if (pending) return;
+    if (props.isStaging() || props.hasEvaluationErrors()) {
+      setSubmitError(
+        "Resolve pending or failed evaluations before submitting."
+      );
       return;
     }
-
-    const userId = await props.getUserId();
-    if (!userId) {
-      console.error("Could not determine user ID");
-      toast.error("Cannot submit: User not found");
+    const db = props.localDb(),
+      repertoireId = props.currentRepertoireId(),
+      userId = props.userId();
+    if (!db || !repertoireId || !userId) {
+      setSubmitError("Practice data is not ready.");
       return;
     }
-
-    if (props.isStaging()) {
-      toast.warning("Please wait for evaluations to finish staging.");
-      return;
-    }
-
-    const count = props.evaluationsCount();
-    if (count === 0) {
-      toast.warning("No evaluations to submit");
-      return;
-    }
-
-    console.log(
-      `Submitting ${count} staged evaluations for repertoire ${repertoireId}`
-    );
-
-    const clearSubmittedEvaluations = props.prepareClearEvaluations();
+    const selected = props.captureQueueSelection();
+    const windowStart = formatAsWindowStart(props.queueDate());
+    const current = () =>
+      !disposed &&
+      props.localDb() === db &&
+      props.userId() === userId &&
+      props.currentRepertoireId() === repertoireId &&
+      selected();
+    pending = true;
+    props.onSubmittingChange(true);
+    setSubmitError("");
+    setRecoveryState(null);
+    const clearSubmitted = props.prepareClearEvaluations();
+    let attemptedItems: GoalCommitItem[] = [];
     try {
-      const windowStartUtc = formatAsWindowStart(props.queueDate());
-      const result = await commitStagedEvaluations(
-        db,
+      const captured = readGoalCommitItems(db, {
         userId,
         repertoireId,
-        windowStartUtc
-      );
-
-      if (result.success) {
-        toast.success(
-          `Successfully submitted ${result.count} evaluation${result.count === 1 ? "" : "s"}`,
-          {
-            duration: 3000,
-          }
-        );
-
-        clearSubmittedEvaluations();
-        props.incrementPracticeListStagedChanged();
-
-        console.log(
-          `✅ Submit complete: ${result.count} evaluations committed`
-        );
-
-        void props.syncPracticeScope();
-      } else {
-        toast.error(
-          `Failed to submit evaluations: ${result.error || "Unknown error"}`,
-          {
-            duration: Number.POSITIVE_INFINITY,
-          }
-        );
-        console.error("Submit failed:", result.error);
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast.error(`Error during submit: ${errorMessage}`, {
-        duration: Number.POSITIVE_INFINITY,
+        windowStart,
       });
-      console.error("Error submitting evaluations:", error);
+      const previous =
+        retry?.db === db &&
+        retry.userId === userId &&
+        retry.repertoireId === repertoireId &&
+        retry.windowStart === windowStart
+          ? retry.items
+          : [];
+      const items = captured.length ? captured : previous;
+      if (!items.length) {
+        setSubmitError("No evaluations to submit.");
+        return;
+      }
+      attemptedItems = items;
+      retry = undefined;
+      const result = await commitGoalPracticeEvaluations(
+        db,
+        { userId, repertoireId, items },
+        current
+      );
+      if (!current()) return;
+      if (result.status === "superseded") {
+        retry = undefined;
+        return;
+      }
+      if (result.status === "stale") {
+        await refreshStaleEvaluations(
+          db,
+          userId,
+          repertoireId,
+          windowStart,
+          items,
+          current
+        );
+        if (!current()) return;
+        retry = undefined;
+        props.incrementPracticeListStagedChanged();
+        setSubmitError(
+          "Scheduling inputs changed. Updated results are shown in the queue; review them, then Submit again."
+        );
+        return;
+      }
+      retry = undefined;
+      clearSubmitted();
+      props.incrementPracticeListStagedChanged();
+      toast.success(
+        `Successfully submitted ${result.eventIds.length} evaluation${result.eventIds.length === 1 ? "" : "s"}`
+      );
+      void Promise.resolve()
+        .then(() => props.syncPracticeScope())
+        .catch((error) => console.error("Practice sync failed", error));
+    } catch (error) {
+      if (error instanceof GoalPracticePersistenceError)
+        retry = {
+          db,
+          userId,
+          repertoireId,
+          windowStart,
+          items: attemptedItems,
+        };
+      if (current()) {
+        if (error instanceof GoalPracticeRecoveryError)
+          setRecoveryState({ error, current });
+        // Refresh even when a later calculation/save fails: earlier drafts in
+        // the batch may already contain new previews that need user review.
+        props.incrementPracticeListStagedChanged();
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : "Could not submit practice. Retry."
+        );
+      }
+    } finally {
+      pending = false;
+      if (!disposed) props.onSubmittingChange(false);
+    }
+  };
+
+  const clearReviewedNotes = async () => {
+    const state = recoveryState(),
+      db = props.localDb();
+    if (
+      pending ||
+      props.isStaging() ||
+      !db ||
+      !state?.current() ||
+      state.error.kind !== "notes"
+    )
+      return;
+    pending = true;
+    props.onSubmittingChange(true);
+    try {
+      await clearReviewedDraftNotes(db, state.error.draft, state.current);
+      if (!state.current()) return;
+      setRecoveryState(null);
+      setSubmitError(
+        "Draft notes cleared. Review your evaluations, then Submit again."
+      );
+      props.incrementPracticeListStagedChanged();
+    } catch (error) {
+      if (state.current())
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : "Could not clear notes. Retry."
+        );
+    } finally {
+      pending = false;
+      if (!disposed) props.onSubmittingChange(false);
     }
   };
 
   const handleAddTunes = async (count: number) => {
+    const isCurrent = props.captureQueueSelection();
+    const practiceDate = new Date(props.queueDate());
+    if (
+      formatAsWindowStart(practiceDate) > formatAsWindowStart(getPracticeDate())
+    ) {
+      toast.warning(
+        "Future queues are previews. Choose today or an earlier queue to add tunes."
+      );
+      return;
+    }
     const db = props.localDb();
     const repertoireId = props.currentRepertoireId();
 
@@ -126,7 +294,19 @@ export function usePracticeSubmit(
     );
 
     try {
-      const added = await addTunesToQueue(db, userId, repertoireId, count);
+      const result = await runGoalQueueCommand(
+        db,
+        { userId, repertoireId, practiceDate },
+        {
+          kind: "add-more",
+          count,
+          windowStart: formatAsWindowStart(practiceDate),
+        },
+        isCurrent
+      );
+      if (!isCurrent()) return;
+      reportGoalQueueNotices(result);
+      const added = result.addedTuneIds;
 
       if (added.length > 0) {
         toast.success(
@@ -142,6 +322,15 @@ export function usePracticeSubmit(
         console.log("⚠️ No tunes added - backlog may be empty");
       }
     } catch (error) {
+      offerGoalQueueSaveRecovery(
+        db,
+        userId,
+        () => props.localDb() === db && props.userId() === userId,
+        () => {
+          if (isCurrent()) props.incrementPracticeListStagedChanged();
+        }
+      );
+      if (!isCurrent()) return;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
       toast.error(`Error adding tunes: ${errorMessage}`, {
@@ -152,6 +341,8 @@ export function usePracticeSubmit(
   };
 
   const handleQueueReset = async () => {
+    const isCurrent = props.captureQueueSelection();
+    const practiceDate = getPracticeDate();
     const db = props.localDb();
     const repertoireId = props.currentRepertoireId();
 
@@ -171,21 +362,29 @@ export function usePracticeSubmit(
     console.log(`Resetting active queue for repertoire ${repertoireId}`);
 
     try {
-      const todayWindowIso19 = formatAsWindowStart(new Date())
-        .replace(" ", "T")
-        .substring(0, 19);
-
-      db.run(sql`
-        DELETE FROM daily_practice_queue
-        WHERE user_ref = ${userId}
-          AND repertoire_ref = ${repertoireId}
-          AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${todayWindowIso19}
-      `);
-
-      toast.success("Queue reset successfully. It will be regenerated.");
+      const result = await runGoalQueueCommand(
+        db,
+        { userId, repertoireId, practiceDate },
+        { kind: "refresh" },
+        isCurrent
+      );
+      if (!isCurrent()) return;
+      reportGoalQueueNotices(result);
+      toast.success(
+        "Queue refreshed. Completed practice and drafts were preserved."
+      );
       console.log("✅ Queue reset complete");
       props.incrementPracticeListStagedChanged();
     } catch (error) {
+      offerGoalQueueSaveRecovery(
+        db,
+        userId,
+        () => props.localDb() === db && props.userId() === userId,
+        () => {
+          if (isCurrent()) props.incrementPracticeListStagedChanged();
+        }
+      );
+      if (!isCurrent()) return;
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
       toast.error(`Error resetting queue: ${errorMessage}`, {
@@ -196,6 +395,9 @@ export function usePracticeSubmit(
   };
 
   return {
+    submitError,
+    recovery,
+    clearReviewedNotes,
     handleSubmitEvaluations,
     handleAddTunes,
     handleQueueReset,

@@ -51,13 +51,13 @@ afterEach(() => {
 });
 
 describe("worker transport lifetime", () => {
-  it("rejects a missing scheduler method without interrupting active work", async () => {
+  it("rejects a removed scheduler API without interrupting active work", async () => {
     const active = runQuickJsPlugin(params);
     const worker = latest();
     await expect(
       // @ts-expect-error Exercise invalid input from an untyped caller.
       runQuickJsPlugin({ ...params, functionName: "createScheduler" })
-    ).rejects.toThrow("Missing scheduler method name");
+    ).rejects.toThrow("Invalid plugin invocation parameters");
     expect(worker.messages).toHaveLength(1);
     expect(worker.terminate).not.toHaveBeenCalled();
     worker.receive({ id: worker.invocation.id, ok: true, result: 6 });
@@ -189,6 +189,29 @@ describe("worker transport lifetime", () => {
   });
 });
 describe("worker protocol validation", () => {
+  it("accepts the versioned goal entry point", () => {
+    expect(
+      isWorkerInput({
+        type: "invoke",
+        id: 1,
+        functionName: "scheduleGoalV1",
+        script: "",
+        payload: {},
+      })
+    ).toBe(true);
+  });
+  it("rejects legacy method dispatch on the goal entry point", () => {
+    expect(
+      isWorkerInput({
+        type: "invoke",
+        id: 1,
+        functionName: "scheduleGoalV1",
+        methodName: "processReview",
+        script: "",
+        payload: {},
+      })
+    ).toBe(false);
+  });
   it.each([
     null,
     [],
@@ -204,16 +227,20 @@ describe("worker protocol validation", () => {
       isWorkerInput({
         type: "invoke",
         id: 1,
-        functionName: "createScheduler",
-        methodName: "processReview",
+        functionName: "scheduleGoalV1",
         script: "",
         payload: {},
       })
     ).toBe(true);
   });
-  it("rejects an invalid FSRS method from a worker", () => {
+  it("rejects the removed FSRS bridge from a worker", () => {
     expect(
-      isWorkerOutput({ type: "fsrs", id: 1, invokeId: 2, method: "delete" })
+      isWorkerOutput({
+        type: "fsrs",
+        id: 1,
+        invokeId: 2,
+        method: "processReview",
+      })
     ).toBe(false);
   });
 });

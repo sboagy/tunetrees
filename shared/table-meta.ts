@@ -134,6 +134,21 @@ const TABLE_EXTRAS: Record<
       sync_version: "Sync version for conflict resolution.",
     },
   },
+  goal: {
+    changeCategory: "user",
+    columnDescriptions: {
+      base_intervals:
+        "JSON array of day-values; used when default_technique = base_interval.",
+      default_config:
+        "Versioned JSON TEXT scheduling definition. NULL supports legacy goal writes.",
+      default_technique: "One of: fsrs, base_interval, or a plugin id string.",
+      device_id: "Device that last modified this record.",
+      last_modified_at: "Timestamp of last modification.",
+      private_for:
+        "Owner user_profile.id; NULL = system goal visible to all users.",
+      sync_version: "Sync version for conflict resolution.",
+    },
+  },
   daily_practice_queue: {
     changeCategory: "practice",
     normalize: (row) =>
@@ -150,6 +165,8 @@ const TABLE_EXTRAS: Record<
       bucket: "Priority bucket (lower = higher priority).",
       completed_at: "Timestamp when queue entry was completed.",
       device_id: "Device that last modified this record.",
+      displayed_practice_record_id:
+        "Event displayed by this queue row; validated soft reference, not an inferred latest review.",
       exposures_completed: "Number of exposures completed so far.",
       exposures_required: "Number of exposures required for this queue item.",
       generated_at: "Timestamp when queue entry was generated.",
@@ -171,17 +188,11 @@ const TABLE_EXTRAS: Record<
       window_start_utc: "Start of practice window (UTC).",
     },
   },
-  goal: {
+  goal_user_settings: {
     changeCategory: "user",
     columnDescriptions: {
-      base_intervals:
-        "JSON array of day-values; used when default_technique = base_interval.",
-      default_technique: "One of: fsrs, base_interval, or a plugin id string.",
-      device_id: "Device that last modified this record.",
-      last_modified_at: "Timestamp of last modification.",
-      private_for:
-        "Owner user_profile.id; NULL = system goal visible to all users.",
-      sync_version: "Sync version for conflict resolution.",
+      overrides:
+        "JSON TEXT partial definition; daily fields merge, scheduler/evaluations replace whole sections.",
     },
   },
   instrument: {
@@ -328,26 +339,41 @@ const TABLE_EXTRAS: Record<
     normalize: (row) =>
       normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]),
     columnDescriptions: {
-      backup_practiced: "Backup timestamp (pre-update stored value).",
+      backup_practiced:
+        "Historical support field retained unchanged. practiced is the common event time; this is not a complete undo snapshot.",
       device_id: "Device that last modified this record.",
-      difficulty: "Difficulty rating for FSRS scheduling.",
+      difficulty:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (difficulty). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
       due: "Due date for next review.",
-      easiness: "Easiness factor (SM2) or retention value (FSRS).",
-      elapsed_days: "Days since previous review.",
-      goal: "Practice goal for this record.",
+      easiness:
+        "Historical compatibility field; not authoritative FSRS-6 or general scheduler state.",
+      elapsed_days:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (elapsed UTC days derived from event timestamps). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
+      goal: "Legacy goal text key. New events use goal_id. Preserve original historical attribution; maintain compatibility keys where required during transition.",
       id: "Primary key for the practice record.",
-      interval: "Days until next review (interval).",
-      lapses: "Number of times forgotten (lapses).",
+      interval:
+        "Legacy integer duration. New events use fractional interval_days derived from practiced and due. A new value here is a compatibility projection, not a scheduling input.",
+      interval_days:
+        "Fractional days from persisted practiced to due. Legacy interval remains an integer projection.",
+      lapses:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (lapses). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
       last_modified_at: "Timestamp of last modification.",
       practiced: "Timestamp when the tune was practiced.",
-      quality: "Quality rating (0-5) for this practice session.",
+      quality:
+        "Historical FSRS rating or explicit compatibility projection of a new evaluation action. New events use evaluation_id and evaluation_snapshot; do not invent ratings for other schedulers.",
       repertoire_ref: "Reference to the playlist.",
-      repetitions: "Total number of repetitions completed.",
-      stability: "Memory stability value from spaced repetition algorithm.",
-      state: "Scheduler state (0=new, 1=learning, 2=review, 3=relearning).",
-      step: "Current learning step.",
+      repetitions:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (reps). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
+      scheduler_state:
+        "Authoritative versioned JSON state for all new scheduler results, including FSRS. Interpret using scheduler_id and scheduler_version; never fall back to typed columns for malformed new state.",
+      stability:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (stability). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
+      state:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (status). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
+      step: "Historical compatibility field with inconsistent old semantics. Not a ladder index or evidence of recorded FSRS learning progress. New learning progress belongs in scheduler_state.",
       sync_version: "Sync version for conflict resolution.",
-      technique: "Technique note for this practice session.",
+      technique:
+        "Legacy scheduler identifier. New events use scheduler_id and scheduler_version; any new value here is a compatibility projection.",
       tune_ref: "Reference to the tune practiced.",
     },
   },
@@ -418,27 +444,44 @@ const TABLE_EXTRAS: Record<
   table_transient_data: {
     changeCategory: "practice",
     columnDescriptions: {
-      backup_practiced: "Backup practiced timestamp.",
+      backup_practiced:
+        "Historical support field retained unchanged. practiced is the common event time; this is not a complete undo snapshot.",
       device_id: "Device that last modified this record.",
-      difficulty: "Difficulty rating (staged).",
+      difficulty:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (difficulty). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
       due: "Next due date (staged).",
-      easiness: "Easiness factor (staged).",
-      goal: "Practice goal (staged).",
-      interval: "Interval (staged).",
+      easiness:
+        "Historical compatibility field; not authoritative FSRS-6 or general scheduler state.",
+      goal: "Legacy goal text key. New events use goal_id. Preserve original historical attribution; maintain compatibility keys where required during transition.",
+      interval:
+        "Legacy integer duration. New events use fractional interval_days derived from practiced and due. A new value here is a compatibility projection, not a scheduling input.",
+      interval_days:
+        "Fractional days from persisted practiced to due. Legacy interval remains an integer projection.",
       last_modified_at: "Timestamp of last modification.",
       note_private: "Private practice note (not synced to others).",
       note_public: "Public practice note (shared).",
+      practice_record_id:
+        "Stable event UUID allocated during staging and reused on Submit retries; validated soft reference.",
       practiced: "Timestamp when practiced (staged).",
+      predecessor_record_id:
+        "Latest submitted event used for calculation, checked atomically at local Submit; validated soft reference.",
       purpose: "Purpose/context of this staged data.",
-      quality: "Quality rating (staged).",
+      quality:
+        "Historical FSRS rating or explicit compatibility projection of a new evaluation action. New events use evaluation_id and evaluation_snapshot; do not invent ratings for other schedulers.",
       recall_eval: "Recall evaluation selection.",
       repertoire_id: "Reference to the playlist.",
-      repetitions: "Repetitions count (staged).",
-      stability: "Memory stability (staged).",
-      state: "Scheduler state (staged).",
-      step: "Learning step (staged).",
+      repetitions:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (reps). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
+      scheduler_state:
+        "Authoritative versioned JSON state for all new scheduler results, including FSRS. Interpret using scheduler_id and scheduler_version; never fall back to typed columns for malformed new state.",
+      stability:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (stability). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
+      state:
+        "Historical FSRS storage; after goal-model cutover, compatibility projection only (status). New scheduler state is authoritative in scheduler_state; retain old values for legacy decoding.",
+      step: "Historical compatibility field with inconsistent old semantics. Not a ladder index or evidence of recorded FSRS learning progress. New learning progress belongs in scheduler_state.",
       sync_version: "Sync version for conflict resolution.",
-      technique: "Technique note (staged).",
+      technique:
+        "Legacy scheduler identifier. New events use scheduler_id and scheduler_version; any new value here is a compatibility projection.",
       tune_id: "Reference to the tune.",
       user_id: "User ID who owns this transient data.",
     },
@@ -655,36 +698,37 @@ export function parseOutboxRowId(
 }
 
 export const TABLE_SYNC_ORDER: Record<string, number> = {
-  daily_practice_queue: 6,
-  event: 28,
+  daily_practice_queue: 7,
+  event: 29,
   genre: 1,
   genre_tune_type: 3,
-  goal: 7,
-  group_member: 26,
-  instrument: 8,
-  media_asset: 19,
-  note: 16,
-  plugin: 9,
-  practice_record: 17,
-  prefs_scheduling_options: 10,
-  prefs_spaced_repetition: 11,
-  reference: 18,
-  repertoire: 12,
-  repertoire_tune: 20,
+  goal: 6,
+  goal_user_settings: 8,
+  group_member: 27,
+  instrument: 9,
+  media_asset: 20,
+  note: 17,
+  plugin: 10,
+  practice_record: 18,
+  prefs_scheduling_options: 11,
+  prefs_spaced_repetition: 12,
+  reference: 19,
+  repertoire: 13,
+  repertoire_tune: 21,
   rhythm_patterns: 4,
-  setlist: 27,
-  setlist_item: 30,
-  tab_group_main_state: 13,
-  table_state: 14,
-  table_transient_data: 21,
-  tag: 22,
-  tune: 15,
-  tune_override: 23,
-  tune_set: 29,
-  tune_set_item: 31,
+  setlist: 28,
+  setlist_item: 31,
+  tab_group_main_state: 14,
+  table_state: 15,
+  table_transient_data: 22,
+  tag: 23,
+  tune: 16,
+  tune_override: 24,
+  tune_set: 30,
+  tune_set_item: 32,
   tune_type: 2,
-  user_genre_selection: 24,
-  user_group: 25,
+  user_genre_selection: 25,
+  user_group: 26,
   user_profile: 5,
 };
 
@@ -694,6 +738,7 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   genre: "genre",
   genre_tune_type: "genreTuneType",
   goal: "goal",
+  goal_user_settings: "goalUserSettings",
   group_member: "groupMember",
   instrument: "instrument",
   media_asset: "mediaAsset",

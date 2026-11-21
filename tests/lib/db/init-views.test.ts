@@ -182,11 +182,29 @@ async function initializeTestViews(db: Database.Database): Promise<void> {
 }
 
 describe("initializeViews", () => {
-  it("uses the most recent practiced timestamp instead of the lexicographically largest id", async () => {
-    const db = new Database(":memory:");
-    createSchema(db);
+  it.each([
+    {
+      name: "different days",
+      older: "2026-04-19T10:00:00.000Z",
+      newer: "2026-04-20T10:00:00.000Z",
+    },
+    {
+      name: "equivalent offsets with microseconds",
+      older: "2026-04-20T11:00:00.999998+01:00",
+      newer: "2026-04-20T05:00:00.999999-05:00",
+    },
+    {
+      name: "equal practiced times resolved by modification time",
+      older: "2026-04-20T11:00:00+01:00",
+      newer: "2026-04-20T10:00:00Z",
+    },
+  ])(
+    "selects the canonical latest event in joined and staged views: $name",
+    async ({ older, newer }) => {
+      const db = new Database(":memory:");
+      createSchema(db);
 
-    db.exec(`
+      db.exec(`
       INSERT INTO instrument (id, instrument, deleted)
       VALUES ('inst-1', 'Irish Flute', 0);
 
@@ -214,7 +232,7 @@ describe("initializeViews", () => {
           'zzzz-older-hard',
           'rep-1',
           'tune-1',
-          '2026-04-19T10:00:00.000Z',
+          '${older}',
           2,
           'recall',
           'fsrs',
@@ -225,7 +243,7 @@ describe("initializeViews", () => {
           'aaaa-newer-good',
           'rep-1',
           'tune-1',
-          '2026-04-20T10:00:00.000Z',
+          '${newer}',
           3,
           'recall',
           'fsrs',
@@ -234,22 +252,23 @@ describe("initializeViews", () => {
         );
     `);
 
-    await initializeTestViews(db);
+      await initializeTestViews(db);
 
-    const joined = db
-      .prepare(
-        "SELECT latest_quality FROM practice_list_joined WHERE id = 'tune-1'"
-      )
-      .get() as { latest_quality: number | null } | undefined;
-    const staged = db
-      .prepare(
-        "SELECT latest_quality FROM practice_list_staged WHERE id = 'tune-1'"
-      )
-      .get() as { latest_quality: number | null } | undefined;
+      const joined = db
+        .prepare(
+          "SELECT latest_quality FROM practice_list_joined WHERE id = 'tune-1'"
+        )
+        .get() as { latest_quality: number | null } | undefined;
+      const staged = db
+        .prepare(
+          "SELECT latest_quality FROM practice_list_staged WHERE id = 'tune-1'"
+        )
+        .get() as { latest_quality: number | null } | undefined;
 
-    expect(joined?.latest_quality).toBe(3);
-    expect(staged?.latest_quality).toBe(3);
+      expect(joined?.latest_quality).toBe(3);
+      expect(staged?.latest_quality).toBe(3);
 
-    db.close();
-  });
+      db.close();
+    }
+  );
 });

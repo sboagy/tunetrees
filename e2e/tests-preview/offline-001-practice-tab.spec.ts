@@ -19,6 +19,7 @@ import {
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 import {
   getSyncOutboxCount,
   verifySyncOutboxEmpty,
@@ -206,7 +207,7 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
   }) => {
     // Make sure the Service Worker is not fully activated and controlling the
     // page before the network is disconnected.
-    await page.context().setOffline(false);
+    await setOfflineForTest(page.context(), false);
     const currentUrl = page.url();
     console.log("2. Waiting for Service Worker to register...");
     await waitForServiceWorker(page.context(), currentUrl);

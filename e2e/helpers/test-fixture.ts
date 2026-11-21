@@ -4,13 +4,13 @@
  */
 
 import { readFileSync } from "node:fs";
-import type { BrowserContext, Page } from "@playwright/test";
-import { test as base } from "@playwright/test";
+import type { BrowserContext } from "@playwright/test";
 import { isAuthFileFresh, mapAuthStateToOrigin } from "./auth-state";
 import {
   clearTunetreesClientStorage,
   gotoE2eOrigin,
 } from "./local-db-lifecycle";
+import { test as base } from "./sync-test";
 import {
   getTestUserByWorkerIndex,
   TEST_USERS,
@@ -48,10 +48,13 @@ export const test = base.extend<ITuneTreesFixtures>({
   // This reduces cross-test leakage and prevents unbounded IndexedDB growth.
   autoCleanupDb: [
     async (
-      { page }: { page: Page },
+      { page, syncErrorGuard },
       use: (value: undefined) => Promise<void>
     ) => {
       await use(undefined);
+
+      // Validate before navigating away destroys the app and its sync evidence.
+      await syncErrorGuard.finish();
 
       // If the test never loaded the app, skip cleanup quickly.
       try {
@@ -73,7 +76,7 @@ export const test = base.extend<ITuneTreesFixtures>({
         }
       }
     },
-    { auto: true },
+    { auto: true, timeout: 40000 },
   ],
 
   // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture pattern requires empty object

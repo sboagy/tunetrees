@@ -103,12 +103,19 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
     // Menu should close
     await expect(ttPage.userMenuPanel).not.toBeVisible();
   });
+});
 
+// Logout owns a disposable account. Do not run the shared-account setup first:
+// gotoLogin would immediately unload that app while its sync responses are
+// still being inspected, destroying Chromium's response bodies.
+test.describe("TOPNAV-003: Disposable-account sign-out", () => {
   test("should sign out and redirect to login when Sign Out clicked", async ({
     page,
     testUserKey,
     testUser,
   }) => {
+    const ttPage = new TuneTreesPage(page);
+
     // Registered-user logout revokes all sessions for that account. Never use
     // the shared worker account here: later browser projects load its saved
     // session again. A disposable account keeps this destructive auth action

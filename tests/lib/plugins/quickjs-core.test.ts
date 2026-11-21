@@ -8,7 +8,7 @@ import type {
   InvokeRequest,
   PluginBridge,
 } from "../../../src/lib/plugins/quickjs-protocol";
-import { DEFAULT_PLUGIN_SCRIPT } from "../../../src/lib/plugins/scheduling-template";
+import { GOAL_PLUGIN_SCRIPT } from "../../../src/lib/plugins/scheduling-template";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -58,7 +58,7 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
     expect(
       await run(`
       const alias = queryDb;
-      const cycle = { callback: parseCsv, scheduler: fsrsScheduler.processReview };
+      const cycle = { callback: parseCsv, parser: parseJson };
       cycle.self = cycle;
       globalThis.saved = [alias, cycle, log, parseJson, fetchUrl];
       function parseImport() { return 8; }
@@ -71,6 +71,44 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
       await run('function parseImport() { return {title: "Tune"}; }')
     ).toEqual({ title: "Tune" });
   });
+  it("runs a goal entry point without invoking the legacy scheduler factory", async () => {
+    const result = await executePlugin(
+      runtime,
+      invocation(
+        `
+        function createScheduler() { throw new Error("Legacy API invoked"); }
+        async function scheduleGoalV1(input) {
+          await Promise.resolve();
+          return { evaluationId: input.evaluationId, state: input.state };
+        }
+      `,
+        {
+          functionName: "scheduleGoalV1",
+          payload: { evaluationId: "played-from-memory", state: { step: 2 } },
+        }
+      ),
+      {}
+    );
+    expect(result).toEqual({
+      evaluationId: "played-from-memory",
+      state: { step: 2 },
+    });
+  });
+  it("propagates a goal scheduler error without running a legacy fallback", async () => {
+    await expect(
+      executePlugin(
+        runtime,
+        invocation(
+          `
+      function createScheduler() { return { processReview() { return 7; } }; }
+      function scheduleGoalV1() { throw new Error("Invalid practice state"); }
+    `,
+          { functionName: "scheduleGoalV1" }
+        ),
+        {}
+      )
+    ).rejects.toThrow("Invalid practice state");
+  });
   it("drains a promise without any host bridge calls", async () => {
     expect(
       await run(
@@ -78,56 +116,46 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
       )
     ).toBe(7);
   });
-  it("runs the production Fluency template against review history", async () => {
-    const queryDb = vi.fn(async () => [{ quality: 3 }, { quality: 3 }]);
+  it("runs the Test Runner goal payload without a host bridge", async () => {
     const result = await executePlugin(
       runtime,
-      invocation(DEFAULT_PLUGIN_SCRIPT, {
-        functionName: "createScheduler",
-        methodName: "processReview",
+      invocation(GOAL_PLUGIN_SCRIPT, {
+        functionName: "scheduleGoalV1",
+        payload: {
+          apiVersion: 1,
+          goalId: "goal-id",
+          options: {},
+          stateVersion: 1,
+          practiced: "2026-11-20T12:00:00.000Z",
+          evaluation: { id: "tomorrow", actionId: "tomorrow" },
+          previousState: null,
+        },
       }),
-      { queryDb }
+      {}
     );
-    expect(result).toMatchObject({
-      interval: 4,
-      scheduledDays: 4,
-      nextDue: "2026-01-24T12:00:00.000Z",
+    expect(result).toEqual({
+      due: "2026-11-21T12:00:00.000Z",
+      state: { count: 1 },
     });
-    expect(queryDb).toHaveBeenCalledWith(
-      expect.stringContaining("repertoire_ref = 'repertoire'")
+  });
+  it("runs the goal template with prior state", async () => {
+    const result = await executePlugin(
+      runtime,
+      invocation(GOAL_PLUGIN_SCRIPT, {
+        functionName: "scheduleGoalV1",
+        payload: {
+          practiced: "2026-01-20T12:00:00.000Z",
+          evaluation: { actionId: "three-days" },
+          previousState: { data: { count: 2 } },
+        },
+      }),
+      {}
     );
+    expect(result).toEqual({
+      due: "2026-01-23T12:00:00.000Z",
+      state: { count: 3 },
+    });
   });
-  it("runs the first-review template with no history", async () => {
-    expect(
-      await executePlugin(
-        runtime,
-        invocation(DEFAULT_PLUGIN_SCRIPT, {
-          functionName: "createScheduler",
-          methodName: "processFirstReview",
-        }),
-        { queryDb: async () => [] }
-      )
-    ).toMatchObject({ interval: 2 });
-  });
-  // History is newest first and follows the rating being scheduled.
-  it.each([
-    { quality: 4, history: [4, 4, 3], interval: 7 },
-    { quality: 3, history: [4, 4, 4], interval: 4 },
-  ])(
-    "counts the template's Easy streak from the newest rating only: $quality then $history",
-    async ({ quality, history, interval }) => {
-      const result = await executePlugin(
-        runtime,
-        invocation(DEFAULT_PLUGIN_SCRIPT, {
-          functionName: "createScheduler",
-          methodName: "processReview",
-          payload: { ...payload, input: { ...payload.input, quality } },
-        }),
-        { queryDb: async () => history.map((value) => ({ quality: value })) }
-      );
-      expect(result).toMatchObject({ interval });
-    }
-  );
   it("reaches a bridge after an initial guest await", async () => {
     expect(
       await run(
@@ -145,24 +173,6 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
       })
     ).rejects.toThrow("no such column: playlist_ref");
   });
-  it.each([
-    { method: "processFirstReview", expectedInterval: 9 },
-    { method: "processReview", expectedInterval: 11 },
-  ] as const)(
-    "supports the $method FSRS bridge",
-    async ({ method, expectedInterval }) => {
-      const bridge = {
-        processFirstReview: async () => ({ interval: 9 }),
-        processReview: async () => ({ interval: 11 }),
-      };
-      expect(
-        await run(
-          `async function parseImport(p) { return await fsrsScheduler.${method}(p); }`,
-          { fsrsScheduler: bridge }
-        )
-      ).toEqual({ interval: expectedInterval });
-    }
-  );
   it("keeps overlapping invocations isolated when replies arrive in reverse order", async () => {
     const first = deferred<unknown>();
     const second = deferred<unknown>();
@@ -234,17 +244,16 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
   ])("reports plugin errors: %s", async (script, error) => {
     await expect(run(script)).rejects.toThrow(error);
   });
-  it("reports a missing scheduler method", async () => {
+  it("reports a missing versioned scheduler entry point", async () => {
     await expect(
       executePlugin(
         runtime,
-        invocation("function createScheduler() {return {};}", {
-          functionName: "createScheduler",
-          methodName: "processReview",
+        invocation("function unrelated() {}", {
+          functionName: "scheduleGoalV1",
         }),
         {}
       )
-    ).rejects.toThrow("Scheduler missing processReview");
+    ).rejects.toThrow("Plugin did not define scheduleGoalV1");
   });
   it("parses imported text fetched through the proxy", async () => {
     const fetcher = vi

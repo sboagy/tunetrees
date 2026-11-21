@@ -16,9 +16,9 @@ vi.mock("solid-sonner", () => ({
   },
 }));
 
-vi.mock("@/lib/services/practice-staging", () => ({
-  clearStagedEvaluation: clearStagedEvaluationMock,
-  stagePracticeEvaluation: stagePracticeEvaluationMock,
+vi.mock("@/lib/goals/staging", () => ({
+  clearGoalPracticeEvaluation: clearStagedEvaluationMock,
+  stageGoalPracticeEvaluation: stagePracticeEvaluationMock,
 }));
 
 function makeTune(overrides: Partial<ITuneOverview> = {}): ITuneOverview {
@@ -80,7 +80,7 @@ describe("usePracticeEvaluations", () => {
   });
 
   it("counts optimistic evaluations before the practice list refreshes", async () => {
-    stagePracticeEvaluationMock.mockResolvedValue(undefined);
+    stagePracticeEvaluationMock.mockResolvedValue({ status: "staged" });
 
     const tune = makeTune();
     const [practiceListData] = createSignal<ITuneOverview[]>([tune]);
@@ -98,7 +98,8 @@ describe("usePracticeEvaluations", () => {
         currentRepertoireId: () => "rep-1",
         practiceListData,
         filteredPracticeList,
-        goalsMap: () => new Map(),
+        userId: () => "user-1",
+        windowStart: () => "2026-11-18T00:00:00Z",
         incrementPracticeListStagedChanged: () => undefined,
         suppressNextViewRefresh: () => undefined,
       });
@@ -117,8 +118,8 @@ describe("usePracticeEvaluations", () => {
     state.dispose();
   });
 
-  it("uses Recall for a cleared stored goal while the view still says Fluency", async () => {
-    stagePracticeEvaluationMock.mockResolvedValue(undefined);
+  it("delegates current goal resolution to the goal staging boundary", async () => {
+    stagePracticeEvaluationMock.mockResolvedValue({ status: "staged" });
     const tune = makeTune({ goal: "fluency" });
     // A goal change has reached SQLite, but the overview has not refreshed.
     const db = {
@@ -133,7 +134,8 @@ describe("usePracticeEvaluations", () => {
         currentRepertoireId: () => "rep-1",
         practiceListData: () => [tune],
         filteredPracticeList: () => [tune],
-        goalsMap: () => new Map(),
+        userId: () => "user-1",
+        windowStart: () => "2026-11-18T00:00:00Z",
         incrementPracticeListStagedChanged: () => undefined,
         suppressNextViewRefresh: () => undefined,
       }),
@@ -144,12 +146,13 @@ describe("usePracticeEvaluations", () => {
 
     expect(stagePracticeEvaluationMock).toHaveBeenCalledWith(
       db,
-      "user-1",
-      "rep-1",
-      tune.id,
-      "good",
-      "recall",
-      "fsrs",
+      {
+        userId: "user-1",
+        repertoireId: "rep-1",
+        tuneId: tune.id,
+        evaluationId: "good",
+        practiced: expect.any(Date),
+      },
       expect.any(Function)
     );
     state.dispose();
@@ -177,7 +180,8 @@ describe("usePracticeEvaluations", () => {
         currentRepertoireId: () => "rep-1",
         practiceListData,
         filteredPracticeList,
-        goalsMap: () => new Map(),
+        userId: () => "user-1",
+        windowStart: () => "2026-11-18T00:00:00Z",
         incrementPracticeListStagedChanged: () => undefined,
         suppressNextViewRefresh: () => undefined,
       });

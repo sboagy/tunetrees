@@ -1,4 +1,4 @@
-import type { PluginInvocation } from "./quickjs-protocol";
+import type { PluginBridge, PluginInvocation } from "./quickjs-protocol";
 
 function extractPluginMeta(meta: unknown): {
   pluginId?: string;
@@ -16,13 +16,7 @@ function extractPluginMeta(meta: unknown): {
 export async function runPluginFunction(
   params: PluginInvocation & {
     timeoutMs?: number;
-    bridge?: {
-      queryDb?: (sql: string) => Promise<unknown>;
-      fsrsScheduler?: {
-        processFirstReview: (payload: unknown) => Promise<unknown>;
-        processReview: (payload: unknown) => Promise<unknown>;
-      };
-    };
+    bridge?: PluginBridge;
   }
 ): Promise<unknown> {
   const startedAt = performance.now();
@@ -35,7 +29,6 @@ export async function runPluginFunction(
     const totalMs = performance.now() - startedAt;
     console.info("[QuickJS][runtime] runPluginFunction complete", {
       functionName: params.functionName,
-      methodName: params.methodName,
       importMs,
       executeMs: totalMs - importMs,
       totalMs,
@@ -46,7 +39,6 @@ export async function runPluginFunction(
     const totalMs = performance.now() - startedAt;
     console.warn("[QuickJS][runtime] runPluginFunction failed", {
       functionName: params.functionName,
-      methodName: params.methodName,
       importMs,
       executeMs: totalMs - importMs,
       totalMs,

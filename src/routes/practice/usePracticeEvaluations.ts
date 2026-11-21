@@ -5,16 +5,20 @@ import {
   createMemo,
   createSignal,
   onCleanup,
+  untrack,
 } from "solid-js";
 import { toast } from "solid-sonner";
 import type { ITuneOverview } from "../../components/grids/types";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
-import type { GoalRow } from "../../lib/db/queries/user-settings";
-import { repertoireTune, tableTransientData } from "../../lib/db/schema";
+import { tableTransientData } from "../../lib/db/schema";
+import { changePracticeGoals } from "../../lib/goals/assignment";
+import type { PracticeEvaluationModel } from "../../lib/goals/practice-session";
+import { readPracticeSession } from "../../lib/goals/practice-session";
+import { prepareLadderDuePreviews } from "../../lib/goals/preview";
 import {
-  clearStagedEvaluation,
-  stagePracticeEvaluation,
-} from "../../lib/services/practice-staging";
+  clearGoalPracticeEvaluation,
+  stageGoalPracticeEvaluation,
+} from "../../lib/goals/staging";
 
 export interface PracticeEvaluationsProps {
   localDb: Accessor<SqliteDatabase | null>;
@@ -22,7 +26,10 @@ export interface PracticeEvaluationsProps {
   currentRepertoireId: Accessor<string | null>;
   practiceListData: Accessor<ITuneOverview[]>;
   filteredPracticeList: Accessor<ITuneOverview[]>;
-  goalsMap: Accessor<Map<string, GoalRow>>;
+  userId: Accessor<string | null>;
+  windowStart: Accessor<string>;
+  settingsVersion?: Accessor<unknown>;
+  isSubmitting?: Accessor<boolean>;
   incrementPracticeListStagedChanged: () => void;
   suppressNextViewRefresh: (
     scope: "repertoire" | "practice" | "catalog",
@@ -31,6 +38,10 @@ export interface PracticeEvaluationsProps {
 }
 
 export interface PracticeEvaluationsState {
+  getEvaluationModel: (tuneId: string) => PracticeEvaluationModel;
+  practiceAgain: (tuneId: string) => void;
+  retryEvaluation: (tuneId: string) => Promise<void>;
+  hasEvaluationErrors: Accessor<boolean>;
   evaluations: Accessor<Record<string, string>>;
   isStaging: Accessor<boolean>;
   evaluationsCount: Accessor<number>;
@@ -45,6 +56,42 @@ export function usePracticeEvaluations(
   const [requests, setRequests] = createSignal(new Map<string, symbol>());
   const goalChanges = new Map<string, Promise<void>>();
   const revisions = new Map<string, symbol>();
+  const [repeating, setRepeating] = createSignal(new Set<string>());
+  const [errors, setErrors] = createSignal<Record<string, string>>({});
+  const attempted = new Map<string, string>();
+  const [revision, setRevision] = createSignal(0);
+  const session = createMemo<{
+    rows: ReturnType<typeof readPracticeSession>;
+    error: string;
+  }>(() => {
+    props.practiceListData();
+    props.settingsVersion?.();
+    revision();
+    const db = props.localDb(),
+      userId = props.userId(),
+      repertoireId = props.currentRepertoireId();
+    if (!db || !userId || !repertoireId)
+      return { rows: new Map(), error: "Practice data is not ready" };
+    try {
+      return {
+        rows: readPracticeSession(
+          db,
+          userId,
+          repertoireId,
+          props.windowStart()
+        ),
+        error: "",
+      };
+    } catch (error) {
+      return {
+        rows: new Map(),
+        error:
+          error instanceof Error
+            ? error.message
+            : "Cannot load evaluation choices",
+      };
+    }
+  });
   let disposed = false;
   const invalidate = () => {
     setRequests(new Map());
@@ -64,12 +111,16 @@ export function usePracticeEvaluations(
     revisions.set(key.slice(key.indexOf(":") + 1), token);
     const repertoireId = props.currentRepertoireId();
     const db = props.localDb();
+    const userId = props.userId();
+    const windowStart = props.windowStart();
     setRequests((prev) => new Map(prev).set(key, token));
     const isCurrent = () =>
       !disposed &&
       requests().get(key) === token &&
       props.currentRepertoireId() === repertoireId &&
-      props.localDb() === db;
+      props.localDb() === db &&
+      props.userId() === userId &&
+      props.windowStart() === windowStart;
     const finish = () => {
       if (requests().get(key) !== token) return;
       setRequests((prev) => {
@@ -128,7 +179,12 @@ export function usePracticeEvaluations(
   createEffect(() => {
     props.currentRepertoireId();
     props.localDb();
+    props.userId();
+    props.windowStart();
     invalidate();
+    setRepeating(new Set<string>());
+    setErrors({});
+    attempted.clear();
     setDidHydrateEvaluations(false);
     setEvaluations({});
   });
@@ -142,7 +198,11 @@ export function usePracticeEvaluations(
     const hydrated: Record<string, string> = {};
     for (const tune of list) {
       const recallEval = tune.recall_eval;
-      if (typeof recallEval === "string" && recallEval.length > 0) {
+      if (
+        Number(tune.has_staged) === 1 &&
+        typeof recallEval === "string" &&
+        recallEval.length > 0
+      ) {
         hydrated[String(tune.id)] = recallEval;
       }
     }
@@ -159,7 +219,7 @@ export function usePracticeEvaluations(
     const stagedTuneIds = new Set<string>();
 
     for (const tune of props.practiceListData()) {
-      if (Number(tune.has_staged) === 1) {
+      if (Number(tune.has_staged) === 1 && tune.recall_eval) {
         stagedTuneIds.add(String(tune.id));
       }
     }
@@ -176,7 +236,21 @@ export function usePracticeEvaluations(
   });
 
   const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
-    console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
+    if (props.isSubmitting?.()) return;
+    const row = untrack(() => session().rows.get(tuneId));
+    if (
+      evaluation &&
+      row?.queue.completedAt &&
+      !repeating().has(tuneId) &&
+      !row.draft?.evaluationId
+    )
+      return;
+    attempted.set(tuneId, evaluation);
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[tuneId];
+      return next;
+    });
 
     setEvaluations({
       ...evaluations(),
@@ -201,48 +275,37 @@ export function usePracticeEvaluations(
       if (!db || !repertoireId || !userIdValue)
         throw new Error("Practice data is not ready");
       if (evaluation === "") {
-        await clearStagedEvaluation(db, userIdValue, tuneId, repertoireId);
+        await clearGoalPracticeEvaluation(
+          db,
+          { userId: userIdValue, tuneId, repertoireId },
+          request.isCurrent
+        );
+        if (request.isCurrent())
+          setRepeating((prev) => {
+            const next = new Set(prev);
+            next.delete(tuneId);
+            return next;
+          });
         console.log(
           `🗑️  [PracticePage] Cleared staged evaluation for tune ${tuneId}`
         );
       } else {
-        const tuneEntry = props
-          .practiceListData()
-          .find((entry) => entry.id === tuneId);
-        // Read the current local goal: the view may not have refreshed after
-        // the goal write we just awaited.
-        const stored = db
-          .select({ goal: repertoireTune.goal })
-          .from(repertoireTune)
-          .where(
-            and(
-              eq(repertoireTune.tuneRef, tuneId),
-              eq(repertoireTune.repertoireRef, repertoireId)
-            )
-          )
-          .get();
-        // A stored null means the goal was cleared; do not revive a stale
-        // goal from the overview while its refresh is still pending.
-        const tuneGoal = stored
-          ? (stored.goal ?? "recall")
-          : (tuneEntry?.goal ?? "recall");
-        const goalDef = props.goalsMap().get(tuneGoal);
-        const technique = goalDef?.defaultTechnique ?? "fsrs";
-
-        await stagePracticeEvaluation(
+        const result = await stageGoalPracticeEvaluation(
           db,
-          userIdValue,
-          repertoireId,
-          tuneId,
-          evaluation,
-          tuneGoal,
-          technique,
+          {
+            userId: userIdValue,
+            repertoireId,
+            tuneId,
+            evaluationId: evaluation,
+            practiced: new Date(),
+          },
           request.isCurrent
         );
         if (!request.isCurrent()) return;
-        console.log(
-          `✅ [PracticePage] Staged preview for tune ${tuneId} (goal=${tuneGoal}, technique=${technique})`
-        );
+        if (result.status !== "staged")
+          throw new Error(
+            "Practice inputs changed. Choose the evaluation again to review a fresh result."
+          );
       }
 
       if (request.isCurrent()) props.incrementPracticeListStagedChanged();
@@ -254,10 +317,17 @@ export function usePracticeEvaluations(
       );
       restoreStagedEvaluation(db, userIdValue, repertoireId, tuneId);
       props.incrementPracticeListStagedChanged();
-      toast.error("Failed to stage evaluation. Please try again.");
+      setErrors((prev) => ({
+        ...prev,
+        [tuneId]:
+          error instanceof Error
+            ? error.message
+            : "Failed to stage evaluation. Retry.",
+      }));
     } finally {
       // An older request cannot clear the pending marker of a newer rating.
       request.finish();
+      if (!disposed) setRevision((value) => value + 1);
     }
   };
 
@@ -265,6 +335,7 @@ export function usePracticeEvaluations(
     tuneId: string,
     goal: string | null
   ): Promise<void> => {
+    if (props.isSubmitting?.()) return Promise.resolve();
     const request = beginRequest(`goal:${tuneId}`);
     const db = props.localDb();
     const repertoireId = props.currentRepertoireId();
@@ -288,20 +359,26 @@ export function usePracticeEvaluations(
         if (!db || !repertoireId || !userIdValue)
           throw new Error("Practice data is not ready");
         props.suppressNextViewRefresh("repertoire");
-        // SQLite writes are synchronous. Clear the old preview in the same
-        // turn, before yielding to persistence or allowing a new evaluation.
-        db.update(repertoireTune)
-          .set({ goal })
-          .where(
-            and(
-              eq(repertoireTune.tuneRef, tuneId),
-              eq(repertoireTune.repertoireRef, repertoireId)
-            )
-          )
-          .run();
-        await clearStagedEvaluation(db, userIdValue, tuneId, repertoireId);
-        // clearStagedEvaluation persists both local changes immediately.
-        if (request.isCurrent()) props.incrementPracticeListStagedChanged();
+        const changed = await changePracticeGoals(
+          db,
+          { userId: userIdValue, tuneIds: [tuneId], repertoireId, goal },
+          request.isCurrent
+        );
+        if (request.isCurrent()) {
+          if (changed.status === "changed" && changed.clearedEvaluations > 0)
+            toast.info(
+              "Goal changed. The previous pending evaluation was cleared; notes and submitted history were kept."
+            );
+          if (!requests().has(`evaluation:${tuneId}`)) {
+            attempted.delete(tuneId);
+            setErrors((prev) => {
+              const next = { ...prev };
+              delete next[tuneId];
+              return next;
+            });
+          }
+          props.incrementPracticeListStagedChanged();
+        }
       } catch (error) {
         if (!request.isCurrent()) return;
         // Do not roll back a newer rating selected while this goal was saving.
@@ -317,6 +394,7 @@ export function usePracticeEvaluations(
         throw error;
       } finally {
         request.finish();
+        if (!disposed) setRevision((value) => value + 1);
       }
     })();
     goalChanges.set(tuneId, task);
@@ -330,6 +408,63 @@ export function usePracticeEvaluations(
   };
 
   return {
+    getEvaluationModel: (tuneId) => {
+      const state = session();
+      const row = state.rows.get(tuneId);
+      const submittedLabel = row?.submittedLabel ?? "Not available";
+      const override = evaluations()[tuneId];
+      const hasDraft =
+        override === undefined ? !!row?.draft?.evaluationId : !!override;
+      return {
+        choices: row?.definition.config.evaluations ?? [],
+        loadDuePreviews:
+          row?.definition.config.scheduler.id === "builtin:interval-ladder"
+            ? async () => {
+                const db = props.localDb(),
+                  userId = props.userId(),
+                  repertoireId = props.currentRepertoireId();
+                if (!db || !userId || !repertoireId)
+                  throw new Error("Practice data is not ready");
+                const result = await prepareLadderDuePreviews(db, {
+                  userId,
+                  repertoireId,
+                  tuneId,
+                  practiced: new Date(),
+                });
+                if (
+                  disposed ||
+                  props.localDb() !== db ||
+                  props.userId() !== userId ||
+                  props.currentRepertoireId() !== repertoireId
+                )
+                  throw new Error("Practice context changed. Reopen the menu.");
+                return result;
+              }
+            : undefined,
+        completed:
+          !!row?.queue.completedAt && !repeating().has(tuneId) && !hasDraft,
+        submittedLabel,
+        submittedColor: row?.submittedColor,
+        pending:
+          requests().has(`evaluation:${tuneId}`) ||
+          requests().has(`goal:${tuneId}`) ||
+          !!props.isSubmitting?.(),
+        error: errors()[tuneId] || state.error || undefined,
+        unavailable: !row,
+      };
+    },
+    practiceAgain: (tuneId) => {
+      if (
+        props.isSubmitting?.() ||
+        !session().rows.get(tuneId)?.queue.completedAt
+      )
+        return;
+      setRepeating((prev) => new Set(prev).add(tuneId));
+      setEvaluations((prev) => ({ ...prev, [tuneId]: "" }));
+    },
+    retryEvaluation: (tuneId) =>
+      handleRecallEvalChange(tuneId, attempted.get(tuneId) ?? ""),
+    hasEvaluationErrors: () => Object.keys(errors()).length > 0,
     evaluations,
     isStaging,
     evaluationsCount,
@@ -348,6 +483,8 @@ export function usePracticeEvaluations(
           return;
         // Submission owns only the captured revisions. Later edits, including
         // the same rating selected again, retain their requests and overrides.
+        setRepeating(new Set<string>());
+        setRevision((value) => value + 1);
         setEvaluations((prev) => {
           const next = { ...prev };
           for (const tuneId of Object.keys(next)) {

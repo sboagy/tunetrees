@@ -15,10 +15,12 @@
  * @module contexts/UserSettingsDialogContext
  */
 
+import { useBeforeLeave } from "@solidjs/router";
 import {
   type Accessor,
   createContext,
   createSignal,
+  type JSX,
   type ParentComponent,
   useContext,
 } from "solid-js";
@@ -35,7 +37,16 @@ export type UserSettingsTab =
   | "avatar"
   | "goals";
 
+export interface SettingsDraftRegistration {
+  footer: (close: () => void) => JSX.Element;
+  pending: () => boolean;
+  requestExit: (action: () => void) => void;
+}
+
 interface UserSettingsDialogContextValue {
+  draft: Accessor<SettingsDraftRegistration | undefined>;
+  registerDraft: (draft: SettingsDraftRegistration) => () => void;
+  requestExit: (action: () => void) => void;
   /** Whether the settings overlay is currently visible. */
   isOpen: Accessor<boolean>;
   /** Currently selected settings tab slug. */
@@ -65,29 +76,57 @@ export function useUserSettingsDialog(): UserSettingsDialogContextValue {
 }
 
 /** Default tab shown when no tab is specified on open. */
-const DEFAULT_TAB: UserSettingsTab = "scheduling-options";
+const DEFAULT_TAB: UserSettingsTab = "goals";
+
+/** Old settings entry points resolve to the consolidated goal editor. */
+function normalizeSettingsTab(tab: UserSettingsTab): UserSettingsTab {
+  return tab === "scheduling-options" || tab === "spaced-repetition"
+    ? "goals"
+    : tab;
+}
 
 export const UserSettingsDialogProvider: ParentComponent = (props) => {
+  const [draft, setDraft] = createSignal<SettingsDraftRegistration>();
+  const registerDraft = (registration: SettingsDraftRegistration) => {
+    setDraft(registration);
+    return () => {
+      if (draft() === registration) setDraft(undefined);
+    };
+  };
+  const requestExit = (action: () => void) => {
+    const current = draft();
+    if (current) current.requestExit(action);
+    else action();
+  };
   const [isOpen, setIsOpen] = createSignal(false);
   const [currentTab, setCurrentTab] =
     createSignal<UserSettingsTab>(DEFAULT_TAB);
 
   const openUserSettings = (tab?: UserSettingsTab) => {
-    if (tab) setCurrentTab(tab);
-    setIsOpen(true);
+    const next = normalizeSettingsTab(tab ?? currentTab());
+    const open = () => {
+      setCurrentTab(next);
+      setIsOpen(true);
+    };
+    if (isOpen() && next !== currentTab()) requestExit(open);
+    else open();
   };
 
   const closeUserSettings = () => {
-    setIsOpen(false);
+    requestExit(() => setIsOpen(false));
   };
 
   const navigateToTab = (tab: UserSettingsTab) => {
-    setCurrentTab(tab);
+    if (normalizeSettingsTab(tab) !== currentTab())
+      requestExit(() => setCurrentTab(normalizeSettingsTab(tab)));
   };
 
   return (
     <UserSettingsDialogContext.Provider
       value={{
+        draft,
+        registerDraft,
+        requestExit,
         isOpen,
         currentTab,
         openUserSettings,
@@ -98,4 +137,15 @@ export const UserSettingsDialogProvider: ParentComponent = (props) => {
       {props.children}
     </UserSettingsDialogContext.Provider>
   );
+};
+
+/** Router hooks stay inside Router; the Settings overlay intentionally lives outside it. */
+export const SettingsNavigationBoundary: ParentComponent = (props) => {
+  const settings = useUserSettingsDialog();
+  useBeforeLeave((event) => {
+    if (!settings.draft()) return;
+    event.preventDefault();
+    settings.requestExit(() => event.retry(true));
+  });
+  return <>{props.children}</>;
 };

@@ -78,8 +78,10 @@ enabled = true
 # rhizome before TuneTrees migrations/seeds run. Apply the canonical
 # genre/rhythm update SQL after the baseline because the baseline truncates
 # tune_type/genre with CASCADE, which also clears rhythm_patterns.
+# Reapply current goal definitions after the legacy baseline overwrites them.
 sql_paths = [
 	"./seeds/baseline_local_20260217.sql",
+	"./seeds/seed_goal_configuration.sql",
 	"../sql_scripts/update_genre_tune_tempo_and_rhythms.sql",
 ]
 

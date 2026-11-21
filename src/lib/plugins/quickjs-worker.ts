@@ -12,7 +12,6 @@ import {
 } from "quickjs-emscripten";
 import { executePlugin } from "./quickjs-core";
 import {
-  type FsrsRequest,
   type InvokeRequest,
   isWorkerInput,
   type QueryRequest,
@@ -31,7 +30,6 @@ const QUICKJS_ASYNC_VARIANT = newVariant(RELEASE_ASYNC, {
 let runtimePromise: Promise<QuickJSAsyncRuntime> | null = null;
 let runtimeInitMs: number | null = null;
 let queryRequestId = 0;
-let fsrsRequestId = 0;
 const pendingQueries = new Map<
   number,
   {
@@ -41,17 +39,6 @@ const pendingQueries = new Map<
     invokeId: number;
   }
 >();
-const pendingFsrs = new Map<
-  number,
-  {
-    resolve: (value: unknown) => void;
-    reject: (error: Error) => void;
-    startedAt: number;
-    invokeId: number;
-    method: "processFirstReview" | "processReview";
-  }
->();
-
 function getRuntime(): Promise<QuickJSAsyncRuntime> {
   if (!runtimePromise) {
     const startedAt = performance.now();
@@ -95,52 +82,12 @@ function requestQuery(invokeId: number, sql: string): Promise<unknown> {
   });
 }
 
-function requestFsrs(params: {
-  invokeId: number;
-  method: "processFirstReview" | "processReview";
-  payload: unknown;
-}): Promise<unknown> {
-  fsrsRequestId += 1;
-  const id = fsrsRequestId;
-  const msg: FsrsRequest = {
-    type: "fsrs",
-    id,
-    invokeId: params.invokeId,
-    method: params.method,
-    payload: params.payload,
-  };
-  ctx.postMessage(msg);
-  return new Promise((resolve, reject) => {
-    pendingFsrs.set(id, {
-      resolve,
-      reject,
-      startedAt: performance.now(),
-      invokeId: params.invokeId,
-      method: params.method,
-    });
-  });
-}
-
 async function invoke(message: InvokeRequest): Promise<WorkerResponse> {
   const startedAt = performance.now();
   try {
     const runtime = await getRuntime();
     const result = await executePlugin(runtime, message, {
       queryDb: (query) => requestQuery(message.id, query),
-      fsrsScheduler: {
-        processFirstReview: (payload) =>
-          requestFsrs({
-            invokeId: message.id,
-            method: "processFirstReview",
-            payload,
-          }),
-        processReview: (payload) =>
-          requestFsrs({
-            invokeId: message.id,
-            method: "processReview",
-            payload,
-          }),
-      },
     });
     return {
       id: message.id,
@@ -161,12 +108,11 @@ async function invoke(message: InvokeRequest): Promise<WorkerResponse> {
   } finally {
     // Release fire-and-forget host requests too. Their rejection is observed by
     // the core bridge, which no longer accesses its disposed guest context.
-    for (const map of [pendingQueries, pendingFsrs]) {
-      for (const [id, pending] of map)
-        if (pending.invokeId === message.id) {
-          map.delete(id);
-          pending.reject(new Error("Plugin invocation finished"));
-        }
+    for (const [id, pending] of pendingQueries) {
+      if (pending.invokeId === message.id) {
+        pendingQueries.delete(id);
+        pending.reject(new Error("Plugin invocation finished"));
+      }
     }
   }
 }
@@ -194,7 +140,7 @@ ctx.addEventListener("message", (event: MessageEvent<unknown>) => { // NOSONAR: 
       });
     return;
   }
-  const map = message.type === "queryResult" ? pendingQueries : pendingFsrs;
+  const map = pendingQueries;
   const pending = map.get(message.id);
   if (!pending) return;
   map.delete(message.id);

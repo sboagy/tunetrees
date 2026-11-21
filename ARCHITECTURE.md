@@ -191,6 +191,77 @@ TuneTrees also uses the `browserSqlite` config block to drive the generated brow
 
 This keeps the generic browser runtime in oosync while preserving TuneTrees-specific behavior in a small, explicit hook surface.
 
+### Browser upgrade preservation
+
+The browser runtime refuses destructive rebuilds with outstanding outbox rows,
+unreplayed backups, or unapproved populated tables. TuneTrees implements its
+consumer policy in `src/lib/db/upgrade-policy.ts`, injected through the existing
+browser hooks. The approved table list is an audited pre-goals contract, not a
+projection of new generated metadata: adding a syncable table requires a new
+preservation review. Approval requires an authenticated initialization, a prior
+successful sync watermark, no pending full-pull recovery marker, and the old
+table's insert/update/delete tracking triggers. It relies on the normal outbox invariant and coordinated synchronization
+before cutover; it is not a remote row-by-row verification. Missing evidence
+blocks. Anonymous data, unknown/removed tables, `table_transient_data`, and `media_draft_outbox` are never
+automatically discarded. `view_column_meta` and `sync_change_log` are regenerable.
+
+The local-table inventory is recorded in `docs/development/database-upgrades.md`.
+Separate media/BYOS IndexedDB stores, cached blobs, OAuth secrets and localStorage
+preferences are not cleared by this rebuild. A blocked initialization replaces
+the application screen with recovery guidance and a reload-only retry action;
+it never calls the destructive reset or sign-out flow.
+
+A per-user `TT_UPGRADE_FULL_PULL_<userId>` marker is set on creation or migration
+clearing. Existing databases with that marker discard the sync watermark before
+starting a new sync engine. The marker survives failed/interrupted downloads and
+is cleared only after a successful sync has a download watermark, `result.errors`
+is empty, catalog setup is complete, and SQLite persistence resolves. This closes the window between the
+engine storing its watermark and the browser persisting downloaded rows. The
+completion carries the marker generation captured at pull start and checks the
+active user, database and service identities before persisting. Stop/reset invalidates
+completion ownership and pending startup lifetimes before asynchronous teardown;
+unmount permanently invalidates the provider lifetime. New services are published
+synchronously with creation. Callback continuations, deferred reconciliation, and
+post-sync persistence recheck ownership after awaiting work. Ownership and marker generation
+are rechecked after persistence before recovery is cleared. This guards completion
+side effects; it does not cancel an in-flight oosync request or an export already
+started while its owner was active. Persistence performed internally by oosync
+before invoking the callback is outside this consumer-side guard.
+Sign-out additionally invalidates the service, hides its local DB from the UI,
+and awaits `SyncService.destroy()` before closing SQLite and revoking credentials.
+Replacement sign-in waits for that cleanup; failed teardown blocks closing and
+replacement initialization. Reset and sign-out share pending service teardown so
+neither can close or clear SQLite while the other is still draining.
+
+A service operation may perform an upload/download followed by another download.
+Full-pull completion metadata retains the first full pull's generation across both
+engine requests and resets at the service callback, including failed operations.
+Genre-filter lookup failures propagate from the request-override provider to the
+sync service. They must not become a null override and a successful cursor advance;
+startup uses the service's existing bounded retries to obtain the intended catalog.
+Anonymous onboarding includes `goal` and `goal_user_settings` in both its initial
+restricted pull and its genre-filtered catalog pull, so starter queue allocation
+uses downloaded definitions and personal settings without authoring shared goals locally.
+The catalog pull also includes `user_profile`, because public notes and references
+require their authors as foreign-key parents after genre selection. Anonymous
+sessions download only: `forceSyncUp` skips uploads for device-only actions without
+publishing a sync completion. For registered users, it propagates unsuccessful
+upload results as errors, including after an in-progress-operation retry. Catalog
+reconciliation retains its pending refresh across failed attempts, including when
+the local selection has already been saved. Reconciliation is serialized per user
+and retried after successful sync callbacks rather than immediately looping on errors.
+A separate `data-sync-result-version` is published with status at transport callback
+entry, before asynchronous reconciliation. The existing UI refresh version remains
+separate, so delayed UI callbacks cannot report recovery from newer sync failures.
+
+The explicit injected-user test path can initialize local anonymous storage without
+an auth session. Its lifetime expires on unmount, reset or real sign-in; it starts
+no sync service without an authenticated identity. Real sign-in waits for pending
+injected initialization to settle before requesting another user's database, because
+the runtime shares an in-flight initialization promise. Explicit reset rechecks its
+session/lifetime after service teardown before clearing storage, and after clearing
+before starting a replacement.
+
 ### Table Metadata Overrides
 
 TuneTrees uses `tableMeta` overrides to keep app-specific semantics out of oosync core:
@@ -212,7 +283,7 @@ Examples in TuneTrees:
 
 - `plugin`, `goal`, and `tune` use declarative pull rules with ownership/public logic.
 - `note` and `reference` use RPC pull rules with explicit `paramMap` bindings.
-- `practice_record` push behavior is customized with `denyDelete`, minimal retry payloads, and timestamp sanitization.
+- `practice_record` push behavior is customized with `denyDelete`, stable event IDs, and timestamp sanitization. Its pull policy and `repertoire_tune` remain explicitly scoped to repertoire ownership, independent of goal foreign keys.
 - `user_profile` and related user-owned tables bind auth user IDs through worker rules instead of ad hoc client logic.
 
 This file is the first place to look when sync behavior is correct in principle but wrong for TuneTrees-specific policy.
@@ -300,12 +371,19 @@ These principles define the product behavior and should be preserved.
 4. Conflict resolution: Last-write-wins (based on timestamp).
 5. Graceful degradation: App fully functional when offline.
 
+## Browser route loading
+
+`src/App.tsx` loads secondary history, tune-editor/detail, group and debug routes
+on demand with Solid's `lazy`, as it does Settings. Route guards and providers
+stay in the existing shell. Vite/Workbox precaches the emitted route chunks so
+deferring their initial execution does not exclude them from offline installation.
+
 ## Spaced Repetition (FSRS)
 
 TuneTrees uses the FSRS algorithm (`ts-fsrs`):
 
-The app pins ts-fsrs 6.0.0 while retaining the FSRS-6 model through its
-compatibility API. `FSRSService` derives the persisted elapsed-day field from
+The app pins ts-fsrs 6.0.0 and explicitly selects the FSRS-6 model through
+the supported `DefaultScheduler` API. `goals/fsrs.ts` derives the persisted elapsed-day field from
 actual review timestamps; the library no longer returns that field. Existing
 weights and immutable history remain compatible with older clients. See
 [`ts-fsrs6-migration.md`](docs/development/ts-fsrs6-migration.md) for reviewed
@@ -326,15 +404,220 @@ Key tables:
 - `repertoire_tune`: current scheduling state per tune within a repertoire.
 - `daily_practice_queue`: frozen daily queue snapshot used to present the day's work.
 
+Goal-selected FSRS calculations apply the per-goal `allowSameDayReviews` due-date
+policy before staging. Missing/false preserves the shared next-day minimum;
+true retains short FSRS intervals. Model state is unchanged by this policy, and
+`interval_days` measures the final due timestamp minus practice time. Ladder and
+plugin calculations retain fractional intervals independently. Same-day repeats
+remain explicit Practice again actions on the frozen daily queue.
+
 Scheduling plugins run during evaluation, before the staged schedule is written.
 `src/lib/plugins/quickjs-host.ts` owns worker deadlines and reply routing;
 `quickjs-worker.ts` owns message validation and runtime initialization;
 `quickjs-core.ts` owns a separate VM context per invocation, promise-based host
 bridges, guest job draining, and handle cleanup. These use the shared protocol
 in `quickjs-protocol.ts`. A timed-out worker is replaced; replies from its old
-invocations cannot reach its replacement. Plugin failures preserve the practice
-flow's goal-ladder/FSRS fallback. Staging checks request ownership immediately
+invocations cannot reach its replacement. Active practice plugin failures remain
+unsubmitted with a retryable row error; they never substitute a built-in scheduler. Staging checks request ownership immediately
 before SQLite writes so older evaluations cannot overwrite newer selections.
+
+The sandbox protocol supports `parseImport`, `describeGoalSchedulerV1` and
+`scheduleGoalV1`. The legacy scheduler factory and host FSRS bridge have been
+removed; the developer Test Runner uses the same supported API. `plugins/goal-scheduler.ts` validates the compatibility declaration,
+restricts continuation to the supplied latest event with matching goal/plugin,
+and validates due dates and bounded JSON state. Script errors propagate without
+fallback. The state envelope records plugin identity, code version, script hash
+and state version; only plugin-declared compatible state versions can continue.
+Both calls use a captured script and the existing VM lifecycle and deadlines.
+Goal configuration supports explicit plugin IDs/options and named action mappings.
+The owner-scoped context resolves only that enabled, visible scheduling plugin
+from local SQLite. Preview fingerprints include its exact script and metadata;
+the existing staging/Submit checks reject intervening edits. The executor now
+feeds these service boundaries. Goals settings offer explicit plugin selection
+and named-action mappings through `goals/plugin-settings.ts`. The editor retains
+a reviewed script/declaration snapshot; Save revalidates the declaration and
+rechecks access, code, goal revision and caller lifetime before a local write.
+Reloading actions preserves existing evaluation identities, labels and options;
+missing actions require an explicit replacement. The active practice picker uses
+these effective choices and the goal-aware staging/Submit boundaries.
+For plugins, the staged calculation hash binds the current input fingerprints
+and checked event content. Submit verifies that receipt and commits the reviewed
+result without executing the script again, allowing nondeterministic plugins.
+Built-in schedulers retain their calculation replay check. The shared
+`practice-event-content.ts` canonicalization also governs exact event retries.
+
+The #426 domain foundation lives in `src/lib/goals`: `builtins.ts` holds the
+editable built-in definitions, `config.ts` validates JSON and resolves overrides,
+and `calculate.ts` dispatches previews to `fsrs.ts`, `ladder.ts`, or the selected
+plugin executor without DB writes. `state.ts` validates built-in JSON state;
+`practice-state.ts` also decodes plugin envelopes through the shared plugin-state
+validator, or unambiguous legacy Recall state. New JSON
+is authoritative; typed FSRS columns are historical decoder inputs or compatibility
+projections, never a fallback for malformed new JSON. Common timestamps and
+fractional durations stay outside scheduler state. Legacy learning progress that
+was not stored is initialized to zero with an explicit decoder limitation.
+The calculators feed the active guarded staging and Submit boundaries below.
+The superseded practice-recording, practice-staging and implicit plugin scheduling
+modules have been removed, together with unused test-API entrypoints. The shared
+QuickJS runtime remains. The older FSRS service has been removed; rating constants
+live in `goals/ratings.ts`, and unchanged numerical compatibility snapshots exercise
+the active goal calculator.
+
+`goals/settings.ts` owns local configuration edits using the same default decoder
+and validation as practice. Built-in and private-goal edits write personal overrides;
+unchanged fields inherit defaults. Goals Settings opens an independent dialog draft
+for each goal; its Cancel / Save changes footer commits that goal after plugin
+preparation. Reset to defaults changes the draft until saved. There is no outer
+Goals category save footer; dirty/pending exit handling is registered with
+`UserSettingsDialogContext`. The overlay remains outside
+Router to preserve the underlying page, while `SettingsNavigationBoundary` inside Router
+forwards navigation to the same exit guard. Editor snapshots reject stale saves. Custom goals
+use stable `custom:<UUID>` keys independent of display names. Deletion requires a
+visible replacement, moves owned assignments atomically, and preserves due dates,
+history and frozen queue attribution; pending drafts block deletion. SQLite writes
+complete before persistence, so a failed disk save can be retried without repeating
+the mutation. The Goals editor exposes these definitions and grid pickers show
+personal labels/descriptions. All queue mutations use `goals/queue.ts`;
+`services/practice-queue.ts` only reads queue windows for navigation. The global
+Spaced Repetition panel has been retired in favor of per-goal Advanced settings.
+
+Administrative data-conversion code lives under `scripts/`, outside browser entry
+points. Shared defaults, validation and owner-scoped goal identity resolution stay
+in `src/lib/goals/` for reuse by runtime and administrative code. Migration-only
+TypeScript is covered by `tsconfig.node.json` and the standard lint/format commands.
+See the [goals migration README](scripts/lib/goal-cutover/README.md) for the
+one-time conversion tools, their invariants and the operator runbook.
+
+`resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
+active tune assignments, visible goal definitions, personal overrides and history.
+It reconciles active legacy keys while preserving attributed history IDs, and exposes
+Recall fallback notices. Unknown custom/plugin definitions require explicit conversion;
+corrupt definitions never silently become built-in defaults. `utils/practice-history.ts` implements
+canonical timestamp/modified/ID order with UTC microsecond normalization. The goal
+resolver and existing latest/per-tune history queries share `readPracticeRecordsForTune`;
+the enriched per-tune query and history charts use the same generic ordering helper.
+Display callers explicitly tolerate invalid timestamps as missing; scheduling rejects
+them. Canonical JSON hashing lives once in `goals/config.ts` and serves ladders and
+preview fingerprints with unchanged digest bytes.
+`goals/practice-history.ts` presents immutable event labels and decoded scheduler
+state, assigning continuity groups before goal filtering. The tune history selector
+controls columns, metrics and graphs; All goals shows common event information.
+`goals/manual-practice.ts` records explicit manual entries using the shared goal
+resolver and calculator with the predecessor at the entered date. Future dates and
+timestamp collisions are rejected. A synchronous transaction rechecks captured
+inputs and inserts the event; older insertions preserve later events and the current
+due date. Latest insertions update the due date without changing the assigned goal,
+manual schedule override, queue completion or staged work. Retained receipts make
+device-save retries idempotent. This is not a history replay or correction service.
+
+`queue-allocation.ts` owns shared goal-based date classification and allocation:
+due/recent/old backlog up to each maximum, then unscheduled/future top-ups only to
+the minimum. It does not impose a combined repertoire limit. `queue.ts` reads the
+same owner-scoped goal snapshot as practice previews, selects canonical latest
+due dates and applies queue mutations in one synchronous SQLite transaction.
+Frozen allocation goals account for retained completed/staged rows; evaluation
+continues to use the current goal. Refresh deactivates unselected rows and reuses
+natural-key rows rather than deleting them. Explicit manual/add-more selections
+are budget exceptions and recorded as manual. Disk-save failures retain a result
+receipt for persistence-only retry without repeating selection. Runtime queue load,
+Refresh, Add more, Add to review and starter-repertoire setup use this allocator
+through `queue-commands.ts`. Commands serialize within each database session,
+coalesce consecutive overlapping identical requests, and retain failed-save receipts across
+component navigation. A different command cannot consume an unsaved receipt;
+retry the original action or use the save-only recovery action, which works after
+a date change or navigation. Callers supply selection/session ownership guards.
+Explicitly refreshed empty days retain a user/repertoire-scoped device-local date
+marker because no queue rows exist to discover on reload. This is navigation
+intent, not a cached assertion that the window still has no rows: synced rows remain
+visible through the normal database query. Queue notices expose unavailable-goal fallback
+and minimum shortfalls. Add to
+review creates queue rows directly, without placeholder practice-history events.
+Legacy queue functions remain for test/compatibility callers; they are no longer
+the interactive queue allocation path. Evaluation, staging and Submit now use
+the goal-aware services.
+
+`preview.ts` calculates from that snapshot and fingerprints its relevant inputs without
+writing. These fingerprints are preparation for, not a substitute for, atomic Submit
+validation. `db/practice-history-sql.ts` supplies canonical SQLite ordering for
+repertoire-wide limited history, queue candidate selection and local practice views.
+It converts whole seconds to UTC separately from the six-digit fraction to avoid
+SQLite millisecond rounding. Analysis selects the latest event before filtering
+stability or due dates, so older eligible events cannot stand in for newer events.
+Analysis scopes history to the requested repertoire before ranking. Retention reads
+valid FSRS state through the shared History decoder (JSON is authoritative),
+excluding newer ladder/plugin or malformed state rather than reviving old FSRS
+columns. Its current curve remains an explicitly labeled approximation; model-specific
+retention and elapsed-time handling are tracked in #953. Queue candidate
+generation rejects malformed non-null timestamps; display queries rank them as
+missing. Shared fixtures compare JavaScript, SQLite WASM and Postgres ordering. The main
+Postgres practice view already uses the corresponding timestamp/modified/ID order;
+its schema and the sync contract remain unchanged.
+
+`goals/assignment.ts` is the shared Practice/Repertoire assignment boundary. It
+validates all selected members and the target goal, writes its ID and key, and
+clears incompatible performance drafts in one synchronous transaction. Notes,
+submitted history, due dates and queue membership survive. An unchanged effective
+goal keeps its draft. SQLite persistence follows the transaction and can be retried.
+
+`goals/staging.ts` supplies the active practice staging boundary. It calculates asynchronously, then rechecks the caller lifetime,
+owner-scoped context and original draft in one synchronous SQLite transaction before
+upserting. The synchronous comparison and durable fingerprints share the same input
+projection in `preview.ts`. A changed context returns `stale`; a superseded request
+or changed draft returns `superseded`, without writes. Successful staging preserves
+notes and the pending event UUID, writes complete JSON/compatibility projections and
+persists SQLite. Persistence failures remain visible to the caller with the draft
+retained in memory. Submit performs its own atomic recheck. The UI captures only
+selected-queue receipts, blocks overlapping Submit actions, and retains exact
+receipts for a failed persistence retry. A stale input refresh requires another
+Submit; a changed or cleared draft is not overwritten by that refresh. Conflicts
+retain drafts and link to Practice History. Legacy notes blocking submission are
+shown for explicit copy/save-elsewhere-and-clear recovery; clearing rechecks the
+shown text and never submits automatically. Ladder menu estimates invoke the same
+preview calculator on demand without staging or running plugins during render.
+
+`goals/practice-session.ts` provides one local queue snapshot for evaluation controls.
+Completed labels use the queue's linked event, while choices use the tune's current
+goal. The shared `PracticeEvaluationCell` serves grid, stacked list and flashcards.
+Its completed-label menu offers Practice again, restoring the existing picker;
+clearing cancels the draft without deleting history or changing the prior completion.
+The active hooks retain per-tune request ownership across asynchronous calculations.
+
+Goal storage now adds nullable display/description/default-config fields and a
+composite `(user_id, goal_id)` settings table. Configurations/overrides use bounded
+JSON TEXT. Generated Worker rules bind camelCase ownership properties; Postgres
+triggers protect goal ownership and settings visibility even for privileged Worker
+writes. Built-in definitions are seeded from the typed source; trusted migration
+and staging-restore transactions explicitly enable shared-goal writes. Staging
+refresh reapplies generated defaults after importing production rows. Local/CI
+baseline restores likewise apply the generated goal seed afterward, via both
+Supabase seed configuration and Rhizome’s seed-directory discovery. The goal
+seed check keeps these restore inputs aligned with the typed defaults. SQLite v28
+uses the guarded rebuild/full-pull path. Active evaluation and daily allocation
+read per-goal settings. Goals owns Advanced FSRS options, daily settings and a
+shared read-only calendar summary. Old Scheduling Options and Spaced Repetition
+links resolve to Goals; inactive weekly rules/exceptions remain stored unchanged. See
+[`goals-implementation.md`](docs/development/goals-implementation.md) for the
+checkpoint boundary and remaining integration work.
+
+Practice-event storage (SQLite v29) adds nullable goal/evaluation/scheduler identity,
+bounded JSON TEXT snapshots/state, and fractional `interval_days`. Staging adds
+predecessor/config fingerprints and a stable prospective event UUID; queue rows gain
+allocation and displayed-event references. Queue allocation metadata is now written
+by the queue UI; the active evaluation/Submit path writes event identity/state
+and displayed-event commit links. Legacy integer interval projections remain intact. Postgres
+serializes inserts sharing a practice natural key, rejects different event UUIDs at
+that key when either event uses the new format, and permits only transport metadata
+updates to submitted new-format events. Legacy-only upserts remain compatible.
+The same event UUID/content can be retried. `src/lib/goals/commit.ts` implements the
+new-format batch Submit boundary used by the active practice UI. The shared
+manual-schedule consumption policy lives in `services/scheduled-override.ts`, so
+this boundary does not import legacy recording/plugin orchestration. It validates
+reviewed draft receipts against current predecessor/configuration, then synchronously
+rechecks ownership, queue and draft snapshots before atomically writing events,
+current due dates, queue completion/display links and draft removal. Stale previews
+require review; event identity/time conflicts fail explicitly. Identical completed
+retries flush persistence without reapplying schedules or queue counters.
+Production cutover execution remains pending.
 
 This domain logic is independent of oosync. oosync moves the rows; TuneTrees services decide what those rows mean.
 

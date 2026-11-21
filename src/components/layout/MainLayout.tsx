@@ -13,7 +13,14 @@
  */
 
 import type { ParentComponent } from "solid-js";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { AudioPlayerProvider } from "../audio/AudioPlayerContext";
 import { AudioPlayerOverlay } from "../audio/AudioPlayerOverlay";
@@ -49,6 +56,17 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
   const [sidebarWidth, setSidebarWidth] = createSignal(320); // Default 320px
   const [isDragging, setIsDragging] = createSignal(false);
+  const [shortViewport, setShortViewport] = createSignal(
+    globalThis.innerHeight <= 480
+  );
+  const [shortPanelExpanded, setShortPanelExpanded] = createSignal(false);
+  const shortBottomPanel = () => shortViewport() && dockPosition() === "bottom";
+  const panelCollapsed = () =>
+    shortBottomPanel() ? !shortPanelExpanded() : sidebarCollapsed();
+
+  // Short-window collapse is temporary: keep the saved normal-height preference.
+  // Explicit expansion remains available until the constrained layout changes.
+  createEffect(on(shortBottomPanel, () => setShortPanelExpanded(false)));
 
   // Track drag state globally for drop zone visibility
   const handleDragStart = () => {
@@ -93,6 +111,7 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
     // outgoing key and restore the saved state for the incoming viewport type.
     let wasMobile = isMobileNow;
     const handleViewportChange = () => {
+      setShortViewport(globalThis.innerHeight <= 480);
       const nowMobile = globalThis.innerWidth < 768;
       if (nowMobile !== wasMobile) {
         // Save current collapsed state under the outgoing viewport key
@@ -117,6 +136,10 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
   });
 
   const handleSidebarToggle = () => {
+    if (shortBottomPanel()) {
+      setShortPanelExpanded((expanded) => !expanded);
+      return;
+    }
     const newState = !sidebarCollapsed();
     setSidebarCollapsed(newState);
     // Save under the correct viewport key
@@ -151,20 +174,18 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
             </Show>
 
             <div
-              class={`flex flex-1 overflow-hidden relative ${
-                dockPosition() === "bottom"
-                  ? "flex-col-reverse"
-                  : dockPosition() === "right"
-                    ? "flex-row-reverse"
-                    : "flex-row"
-              }`} // NOSONAR
+              class={`flex flex-1 overflow-hidden relative ${(() => {
+                if (dockPosition() === "bottom") return "flex-col-reverse";
+                if (dockPosition() === "right") return "flex-row-reverse";
+                return "flex-row";
+              })()}`} // NOSONAR
             >
               {/* Drop Zone Overlays (shown during drag) */}
               <DropZoneOverlays isDragging={isDragging()} />
 
               {/* Sidebar */}
               <Sidebar
-                collapsed={sidebarCollapsed()}
+                collapsed={panelCollapsed()}
                 onToggle={handleSidebarToggle}
                 width={sidebarWidth()}
                 onWidthChange={() => {}} // No-op during drag

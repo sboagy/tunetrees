@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ITuneOverview } from "@/components/grids/types";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import { repertoireTune } from "@/lib/db/schema";
-import type { NextReviewSchedule } from "@/lib/db/types";
 import { usePracticeEvaluations } from "@/routes/practice/usePracticeEvaluations";
 
 const mocks = vi.hoisted(() => ({
@@ -18,8 +17,51 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 vi.mock("@/lib/db/client-sqlite", () => ({ persistDb: mocks.persist }));
-vi.mock("@/lib/services/practice-recording", () => ({
-  evaluatePractice: mocks.evaluate,
+vi.mock("@/lib/goals/staging", () => ({
+  stageGoalPracticeEvaluation: async (
+    _db: unknown,
+    input: { tuneId: string; evaluationId: string },
+    current: () => boolean
+  ) => {
+    const result = await mocks.evaluate(_db, "user", {
+      goal: goals.get(input.tuneId),
+    });
+    if (!current()) return { status: "superseded" };
+    stagedRows.set(input.tuneId, {
+      recall_eval: input.evaluationId,
+      interval: result.schedule.interval,
+    });
+    await mocks.persist();
+    return { status: "staged" };
+  },
+  clearGoalPracticeEvaluation: async (
+    _db: unknown,
+    input: { tuneId: string },
+    current: () => boolean
+  ) => {
+    if (!current()) return { status: "superseded" };
+    stagedRows.delete(input.tuneId);
+    await mocks.persist();
+    return { status: "cleared" };
+  },
+}));
+vi.mock("@/lib/goals/assignment", () => ({
+  changePracticeGoals: async (
+    _db: unknown,
+    input: { tuneIds: string[]; goal: string },
+    current: () => boolean
+  ) => {
+    if (!current()) return { status: "superseded" };
+    for (const tuneId of input.tuneIds) {
+      goals.set(tuneId, input.goal);
+      stagedRows.delete(tuneId);
+    }
+    await mocks.persist();
+    return { status: "changed", clearedEvaluations: 0 };
+  },
+}));
+vi.mock("@/lib/goals/practice-session", () => ({
+  readPracticeSession: () => new Map(),
 }));
 vi.mock("solid-sonner", () => ({ toast: { error: mocks.error } }));
 function deferred<T>() {
@@ -31,25 +73,10 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
-function schedule(interval: number): { schedule: NextReviewSchedule } {
-  const now = new Date();
-  const due = new Date(now);
-  due.setDate(due.getDate() + interval);
-  return {
-    schedule: {
-      nextDue: due,
-      last_review: now,
-      interval,
-      state: 2,
-      stability: 3,
-      difficulty: 4,
-      elapsed_days: 1,
-      scheduled_days: interval,
-      reps: 2,
-      lapses: 0,
-    },
-  };
+function schedule(interval: number) {
+  return { schedule: { interval } };
 }
+
 let practiceRows: ITuneOverview[];
 let stagedRows: Map<string, { recall_eval: string; interval: number }>;
 let goals: Map<string, string | null>;
@@ -91,7 +118,7 @@ function createDbFake(): SqliteDatabase {
           where: (predicate: SQL) => ({
             run: () => {
               const { params } = dialect.sqlToQuery(predicate);
-              goals.set(String(params[0]), goal);
+              goals.set(String(params[1]), goal);
             },
           }),
         }),
@@ -128,7 +155,8 @@ beforeEach(async () => {
       currentRepertoireId: repertoire,
       practiceListData: () => practiceRows,
       filteredPracticeList: () => [],
-      goalsMap: () => new Map(),
+      userId: () => "user",
+      windowStart: () => "2026-11-18T00:00:00Z",
       incrementPracticeListStagedChanged: mocks.refresh,
       suppressNextViewRefresh: () => {},
     });
@@ -296,6 +324,13 @@ describe("staging request ownership with synchronous writes", () => {
     await first.task;
     expect(row()).toBeUndefined();
     expect(state.evaluationsCount()).toBe(0);
+  });
+  it("clears the old evaluation error after a successful goal change", async () => {
+    mocks.evaluate.mockRejectedValueOnce(new Error("Plugin failed"));
+    await state.handleRecallEvalChange("tune", "good");
+    expect(state.hasEvaluationErrors()).toBe(true);
+    await state.handleGoalChange("tune", "recall");
+    expect(state.hasEvaluationErrors()).toBe(false);
   });
   it("invalidates scheduling when the goal changes", async () => {
     const first = await begin("good");

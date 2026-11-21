@@ -16,12 +16,9 @@
 
 import { ChevronDown, ChevronRight } from "lucide-solid";
 import { For, type JSX, Show } from "solid-js";
-import {
-  getRecallEvalDisplay,
-  getSubmittedEvaluationDisplay,
-} from "./evaluation-display";
+import { getRecallEvalDisplay } from "./evaluation-display";
 import { GoalBadge } from "./GoalBadge";
-import { RecallEvalComboBox } from "./RecallEvalComboBox";
+import { PracticeEvaluationCell } from "./PracticeEvaluationCell";
 import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
@@ -785,49 +782,46 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                           isColVisible("evaluation")
                         }
                       >
-                        <Show
-                          when={item.completed_at}
-                          fallback={
-                            <div class="pointer-events-auto relative z-20 ml-auto w-40 flex-shrink-0">
-                              <RecallEvalComboBox
-                                tuneId={String(itemId)}
-                                value={item.recall_eval ?? ""}
-                                open={props.cellCallbacks?.getRecallEvalOpen?.(
-                                  String(itemId)
-                                )}
-                                onOpenChange={(isOpen) =>
-                                  props.cellCallbacks?.setRecallEvalOpen?.(
-                                    String(itemId),
-                                    isOpen
-                                  )
-                                }
-                                onChange={(val) => {
-                                  props.cellCallbacks?.onRecallEvalChange?.(
-                                    String(itemId),
-                                    val
-                                  );
-                                }}
-                              />
-                            </div>
-                          }
-                        >
-                          {/* Tune already submitted: show static evaluation text */}
-                          {(() => {
-                            const evaluationDisplay =
-                              getSubmittedEvaluationDisplay({
-                                latestQuality: item.latest_quality,
-                                latestTechnique: item.latest_technique,
-                                recallEval: item.recall_eval,
-                              });
-                            return (
-                              <span
-                                class={`ml-auto text-sm italic font-medium ${evaluationDisplay.colorClass}`}
-                              >
-                                {evaluationDisplay.label}
-                              </span>
-                            );
-                          })()}
-                        </Show>
+                        <div class="pointer-events-auto relative z-20 ml-auto w-40 flex-shrink-0">
+                          <PracticeEvaluationCell
+                            tuneId={String(itemId)}
+                            value={item.recall_eval ?? ""}
+                            completed={!!item.completed_at}
+                            model={props.cellCallbacks?.getEvaluationModel?.(
+                              String(itemId)
+                            )}
+                            legacy={{
+                              latestQuality: item.latest_quality,
+                              latestTechnique: item.latest_technique,
+                              recallEval: item.recall_eval,
+                            }}
+                            open={props.cellCallbacks?.getRecallEvalOpen?.(
+                              String(itemId)
+                            )}
+                            onOpenChange={(open) =>
+                              props.cellCallbacks?.setRecallEvalOpen?.(
+                                String(itemId),
+                                open
+                              )
+                            }
+                            onChange={(value) =>
+                              props.cellCallbacks?.onRecallEvalChange?.(
+                                String(itemId),
+                                value
+                              )
+                            }
+                            onPracticeAgain={() =>
+                              props.cellCallbacks?.onPracticeAgain?.(
+                                String(itemId)
+                              )
+                            }
+                            onRetry={() =>
+                              props.cellCallbacks?.onRetryEvaluation?.(
+                                String(itemId)
+                              )
+                            }
+                          />
+                        </div>
                       </Show>
                     </div>
 

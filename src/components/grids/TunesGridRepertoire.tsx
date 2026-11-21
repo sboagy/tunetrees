@@ -39,7 +39,7 @@ import {
   isTuneSetGridRow,
 } from "./grouped-grid-rows";
 import { TunesGrid } from "./TunesGrid";
-import type { VisibilityState } from "./tanstack-table";
+import type { Table, VisibilityState } from "./tanstack-table";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 interface ITunesGridRepertoireProps extends IGridBaseProps {
@@ -52,6 +52,7 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
   const {
     localDb,
     repertoireListChanged,
+    remoteSyncDownCompletionVersion,
     catalogListChanged,
     initialSyncComplete,
     user,
@@ -106,9 +107,11 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
     }
   );
 
-  // Goals: load once per user for the GoalBadge dropdown.
+  // Goals: reload after local settings changes or synchronized updates for the GoalBadge dropdown.
   const [goalsData] = createResource(
     () => {
+      repertoireListChanged?.();
+      remoteSyncDownCompletionVersion?.();
       const db = localDb();
       const uid = props.userId;
       return db && uid ? { db, uid } : null;
@@ -240,13 +243,15 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
   const handleRowDoubleClick = (row: IMixedTuneGridRow): void => {
     if (isTuneSetGridRow(row)) return;
     // Double click: open tune editor via callback
-    props.onTuneSelect?.(row as ITuneOverview);
+    props.onTuneSelect?.(row);
   };
 
   // Selection summary from inner grid
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let innerTable: any | null = null;
+  let innerTable: Pick<
+    Table<IMixedTuneGridRow>,
+    "toggleAllRowsSelected"
+  > | null = null;
 
   // Rhythm dialog state
   const [rhythmDialog, setRhythmDialog] = createSignal<{
@@ -353,8 +358,8 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
               props.onSelectionChange?.(count);
             }}
             onTableReady={(tbl) => {
-              innerTable = tbl as any;
-              props.onTableReady?.(tbl as any);
+              innerTable = tbl;
+              props.onTableReady?.(tbl);
             }}
           />
         </div>
@@ -387,7 +392,7 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
               <button
                 type="button"
                 class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
-                onClick={() => innerTable?.toggleAllRowsSelected?.(false)}
+                onClick={() => innerTable?.toggleAllRowsSelected(false)}
               >
                 Clear selection
               </button>

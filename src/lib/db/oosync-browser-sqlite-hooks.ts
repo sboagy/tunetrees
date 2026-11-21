@@ -8,6 +8,12 @@ import { initializeViewColumnMeta } from "./init-view-column-meta";
 import { initializeViews, recreateViews } from "./init-views";
 import { clearLocalDatabaseForMigration } from "./migration-version";
 
+import {
+  canDiscardLocalTable,
+  requireUpgradeFullPull,
+  resumeUpgradeFullPull,
+} from "./upgrade-policy";
+
 let latestRawDb: SqliteRawDatabase | null = null;
 
 function ensureTuneTreesCompatibilityObjects(rawDb: SqliteRawDatabase): void {
@@ -132,13 +138,16 @@ function ensureTuneTreesCompatibilityObjects(rawDb: SqliteRawDatabase): void {
 
 export const browserSqliteHooks: IBrowserSqliteHooks = {
   logger: log,
+  canDiscardLocalTable,
   onExistingDatabaseLoaded: async (db, context) => {
     latestRawDb = context.rawDb;
+    resumeUpgradeFullPull(context.userId);
     await recreateViews(db);
   },
   onDatabaseReady: async (db, context) => {
     latestRawDb = context.rawDb;
     if (context.phase === "created") {
+      requireUpgradeFullPull(context.userId);
       await initializeViews(db);
     }
     await initializeViewColumnMeta(db);
@@ -147,6 +156,10 @@ export const browserSqliteHooks: IBrowserSqliteHooks = {
   onDatabaseClosed: () => {
     latestRawDb = null;
   },
-  clearLocalDataForMigration: (db) =>
-    clearLocalDatabaseForMigration(db, { rawDb: latestRawDb ?? undefined }),
+  clearLocalDataForMigration: async (db, context) => {
+    requireUpgradeFullPull(context.userId);
+    await clearLocalDatabaseForMigration(db, {
+      rawDb: latestRawDb ?? undefined,
+    });
+  },
 };

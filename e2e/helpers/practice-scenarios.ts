@@ -10,6 +10,8 @@ import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
 import postgres from "postgres";
 import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../../src/lib/db/catalog-instrument-ids.js";
+import type { DailyGoalSettings } from "../../src/lib/goals/config";
+import { setOfflineForTest } from "./sync-error-guard";
 
 log.setLevel("info");
 
@@ -90,27 +92,10 @@ export async function navigateToTabForTest(
 // All new tests should use the parallel-safe functions below
 // ============================================================================
 
-/**
- * Fast local seeding via browser Test API (preferred for E2E)
- *
- * This avoids slow remote DB resets by writing directly to the app's
- * local SQLite database and regenerating the daily queue.
- */
-export async function seedAddToReviewLocally(
-  page: Page,
-  opts: { repertoireId: string; tuneIds: string[]; userIdInt?: string }
-) {
-  return await page.evaluate(async (input) => {
-    if (!(globalThis as any).__ttTestApi) {
-      throw new Error("__ttTestApi not attached on window");
-    }
-    return await (globalThis as any).__ttTestApi.seedAddToReview(input);
-  }, opts);
-}
-
 export async function seedSchedulingPluginLocally(
   page: Page,
   opts?: {
+    goalId?: string;
     script?: string;
     goals?: string[];
     userId?: string;
@@ -822,6 +807,7 @@ const DETERMINISTIC_TABLES = [
   "practice_record",
   "tune_override",
   "prefs_scheduling_options",
+  "goal_user_settings",
   "prefs_spaced_repetition",
   "tab_group_main_state",
   "table_state",
@@ -1218,7 +1204,7 @@ export async function setupDeterministicTestParallel(
   const shouldIsolateSync = isAppUrl(currentUrl);
   let setupSucceeded = false;
   if (shouldIsolateSync) {
-    await page.context().setOffline(true);
+    await setOfflineForTest(page.context(), true);
   }
 
   try {
@@ -1247,7 +1233,7 @@ export async function setupDeterministicTestParallel(
           );
         });
       }
-      await page.context().setOffline(false);
+      await setOfflineForTest(page.context(), false);
     }
   }
 
@@ -1377,7 +1363,10 @@ function applyTableQueryFilters<
     query = query.eq("user_id", user.userId);
   } else if (tableName === "table_transient_data") {
     query = query.eq("user_id", user.userId);
-  } else if (tableName === "prefs_scheduling_options") {
+  } else if (
+    tableName === "prefs_scheduling_options" ||
+    tableName === "goal_user_settings"
+  ) {
     // prefs_scheduling_options is keyed by user_id (not user_ref)
     query = query.eq("user_id", user.userId);
   } else if (tableName === "prefs_spaced_repetition") {
@@ -1585,7 +1574,14 @@ async function clearUserTable(
   // flag `app.allow_practice_record_delete` is set. Supabase requests are each
   // their own transaction, so we use an RPC that sets the flag and deletes in
   // one call.
-  if (tableName === "practice_record") {
+  if (tableName === "goal_user_settings") {
+    // Runtime clients only soft-delete overrides. Fixture resets require a hard
+    // delete, scoped to this worker's user through the existing admin connection.
+    await getE2eSqlClient().unsafe(
+      "DELETE FROM public.goal_user_settings WHERE user_id = $1::uuid",
+      [user.userId]
+    );
+  } else if (tableName === "practice_record") {
     try {
       await clearPracticeRecordForUser(user);
     } catch (practiceRecordError) {
@@ -1618,6 +1614,22 @@ async function clearUserTable(
   }
 }
 
+async function seedGoalDailySettings(
+  user: TestUser,
+  settings: { goalId: string; daily: Partial<DailyGoalSettings> }[] = []
+): Promise<void> {
+  if (!settings.length) return;
+  const { supabase } = await getTestUserClient(user.email.split(".")[0]);
+  const { error } = await supabase.from("goal_user_settings").upsert(
+    settings.map(({ goalId, daily }) => ({
+      user_id: user.userId,
+      goal_id: goalId,
+      overrides: JSON.stringify({ daily }),
+    }))
+  );
+  if (error) throw new Error(`Failed to seed goal settings: ${error.message}`);
+}
+
 /**
  * PARALLEL-SAFE PRACTICE SETUP
  * Works with any test user - safe for parallel execution
@@ -1627,6 +1639,7 @@ export async function setupForPracticeTestsParallel(
   user: TestUser,
   opts?: {
     repertoireTunes?: string[];
+    goalDailySettings?: { goalId: string; daily: Partial<DailyGoalSettings> }[];
     startTab?: "practice" | "repertoire" | "catalog";
     /**
      * If provided, marks all repertoireTunes as scheduled this many days ago.
@@ -1652,7 +1665,7 @@ export async function setupForPracticeTestsParallel(
 
   // Always ensure we're online at the start of setup.
   // Browser-context offline state is sticky across tests within a worker.
-  await page.context().setOffline(false);
+  await setOfflineForTest(page.context(), false);
 
   // Avoid racing the app's sync engine while we clear/seed remote tables.
   const currentUrlBeforeSetup = page.url();
@@ -1661,7 +1674,7 @@ export async function setupForPracticeTestsParallel(
     currentUrlBeforeSetup !== "about:blank" &&
     !currentUrlBeforeSetup.startsWith("data:");
   if (shouldIsolateSync) {
-    await page.context().setOffline(true);
+    await setOfflineForTest(page.context(), true);
   }
 
   try {
@@ -1671,6 +1684,7 @@ export async function setupForPracticeTestsParallel(
     await clearUserTable(user, "table_transient_data");
     await clearUserTable(user, "tune_override");
     await clearUserTable(user, "prefs_scheduling_options");
+    await clearUserTable(user, "goal_user_settings");
     await clearUserTable(user, "prefs_spaced_repetition");
     await clearUserTable(user, "tab_group_main_state");
     await clearUserTable(user, "table_state");
@@ -1686,6 +1700,7 @@ export async function setupForPracticeTestsParallel(
       "table_transient_data",
       "tune_override",
       "prefs_scheduling_options",
+      "goal_user_settings",
       "prefs_spaced_repetition",
       "tab_group_main_state",
       "table_state",
@@ -1694,6 +1709,7 @@ export async function setupForPracticeTestsParallel(
       "user_genre_selection",
     ]);
     await normalizeUserRepertoireRow(user);
+    await seedGoalDailySettings(user, opts?.goalDailySettings);
 
     if (repertoireTunes.length > 0) {
       await seedUserRepertoire(user, repertoireTunes, true);
@@ -1725,7 +1741,7 @@ export async function setupForPracticeTestsParallel(
     }
   } finally {
     if (shouldIsolateSync) {
-      await page.context().setOffline(false);
+      await setOfflineForTest(page.context(), false);
     }
   }
 
@@ -1880,6 +1896,8 @@ export async function setupForRepertoireTestsParallel(
   user: TestUser,
   opts: {
     repertoireTunes: string[];
+    /** Seed per-goal policy before initial sync can allocate a queue. */
+    goalDailySettings?: { goalId: string; daily: Partial<DailyGoalSettings> }[];
     tuneSets?: {
       name: string;
       tuneIds: string[];
@@ -1905,7 +1923,7 @@ export async function setupForRepertoireTestsParallel(
   log.debug(`🔧 [${user.name}] setupForRepertoireTests Starting...`);
 
   // Ensure online state before setup (offline state is sticky across tests).
-  await page.context().setOffline(false);
+  await setOfflineForTest(page.context(), false);
 
   // 1. Clear practice state
   await clearUserTable(user, "practice_record");
@@ -1913,6 +1931,7 @@ export async function setupForRepertoireTestsParallel(
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "goal_user_settings");
   await clearUserTable(user, "prefs_spaced_repetition");
   await clearUserTable(user, "tab_group_main_state");
   await clearUserTable(user, "table_state");
@@ -1929,6 +1948,7 @@ export async function setupForRepertoireTestsParallel(
     "table_transient_data",
     "tune_override",
     "prefs_scheduling_options",
+    "goal_user_settings",
     "prefs_spaced_repetition",
     "tab_group_main_state",
     "table_state",
@@ -1938,6 +1958,8 @@ export async function setupForRepertoireTestsParallel(
     "user_genre_selection",
   ]);
   await normalizeUserRepertoireRow(user);
+
+  await seedGoalDailySettings(user, opts.goalDailySettings);
 
   await seedUserRepertoire(user, repertoireTunes);
   await seedUserTuneSets(user, tuneSets);
@@ -2071,6 +2093,7 @@ export async function setupForCatalogTestsParallel(
     "table_transient_data",
     "tune_override",
     "prefs_scheduling_options",
+    "goal_user_settings",
     "prefs_spaced_repetition",
     "tab_group_main_state",
     "table_state",
@@ -2091,6 +2114,7 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "goal_user_settings");
   await clearUserTable(user, "prefs_spaced_repetition");
   await clearUserTable(user, "tab_group_main_state");
   await clearUserTable(user, "table_state");

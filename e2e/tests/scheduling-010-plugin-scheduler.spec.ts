@@ -21,7 +21,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * SCHEDULING-010: Plugin Scheduler Override
  * Priority: HIGH
  *
- * Ensures scheduling plugins can override FSRS output deterministically.
+ * Ensures an explicitly selected goal plugin determines the schedule.
  */
 
 test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
@@ -180,15 +180,21 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
     });
 
     await seedSchedulingPluginLocally(page, {
-      // 17 days is distinct from the first-review fallback for this fixture.
-      script: `function createScheduler() {
-        function apply(p) { const due = new Date(p.input.practiced); due.setDate(due.getDate() + 17);
-          return {...p.fallback, interval:17, scheduledDays:17, nextDue:due.toISOString()}; }
-        return {processFirstReview:apply,processReview:apply};
+      // Keep the same exact 17-day assertion, using the explicit scheduler
+      // contract rather than the removed automatic FSRS-override path.
+      goalId: "00000000-0000-0000-0000-000000000001",
+      script: `function describeGoalSchedulerV1() {
+        return {apiVersion:1, stateVersion:1, compatibleStateVersions:[1],
+          actions:[{id:"good", label:"Good", description:"Review in 17 days"}]};
+      }
+      function scheduleGoalV1(input) {
+        return {due:new Date(Date.parse(input.practiced)+17*86400000).toISOString(), state:{}};
       }`,
       goals: ["recall"],
       userId: testUser.userId,
     });
+    // Reload settings seeded outside the live editor before selecting an action.
+    await page.reload();
 
     await verifyClockFrozen(
       page,

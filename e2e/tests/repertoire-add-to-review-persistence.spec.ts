@@ -8,6 +8,7 @@ import {
   CATALOG_TUNE_ALEXANDERS_ID,
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { getBuiltInGoals } from "../../src/lib/goals/builtins";
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { waitForPracticeViewSettled } from "../helpers/practice-view";
@@ -15,6 +16,10 @@ import {
   queryPracticeQueue,
   queryScheduledDates,
 } from "../helpers/scheduling-queries";
+import {
+  expectSyncFailures,
+  setOfflineForTest,
+} from "../helpers/sync-error-guard";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -32,10 +37,16 @@ test.describe("Add To Review persistence", () => {
       (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId =
         userId;
     }, testUser.userId);
-    // Future overrides keep automatic queue generation empty. Explicit additions
-    // must still work and must leave those overrides unchanged.
+    // Disable Recall top-up so future overrides leave the automatic queue empty.
+    // Explicit additions must work and leave those overrides unchanged.
     await setupForRepertoireTestsParallel(page, testUser, {
       repertoireTunes: tuneIds,
+      goalDailySettings: [
+        {
+          goalId: getBuiltInGoals().find((goal) => goal.name === "recall")!.id,
+          daily: { minimum: 0 },
+        },
+      ],
       scheduleTunes: true,
       scheduleDaysAgo: -30,
       scheduleBaseDate: STANDARD_TEST_DATE,
@@ -44,6 +55,11 @@ test.describe("Add To Review persistence", () => {
     await ttPage.expectGridHasContent(ttPage.repertoireGrid);
     expect(await queryPracticeQueue(page, testUser.repertoireId)).toEqual([]);
     // Isolate local durability from remote recovery, including after reload.
+    expectSyncFailures(
+      page.context(),
+      "Verify local durability without remote recovery through the end of this test",
+      ["/api/sync"]
+    );
     await page.route("**/api/sync**", (route) => route.abort());
   });
 
@@ -101,13 +117,13 @@ test.describe("Add To Review persistence", () => {
       CATALOG_TUNE_ABBY_REEL,
       ttPage.repertoireGrid
     );
-    await context.setOffline(true);
+    await setOfflineForTest(context, true);
     await ttPage.clickRepertoireAddToReview();
     await expect(
       page.getByText("Added 1 tune to practice queue.", { exact: true })
     ).toBeVisible({ timeout: 10000 });
     // The dev server must be reachable to reload its assets; sync stays blocked.
-    await context.setOffline(false);
+    await setOfflineForTest(context, false);
     await page.reload();
     await ttPage.navigateToTab("practice");
     await waitForPracticeViewSettled(page, ttPage, {

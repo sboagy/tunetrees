@@ -5,7 +5,7 @@
  * bypassing slow remote DB resets. Attached as globalThis.__ttTestApi.
  */
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   clearDb,
   getDb,
@@ -23,7 +23,6 @@ import {
 } from "@/lib/db/queries/setlists";
 import { addTuneToTuneSet, createTuneSet } from "@/lib/db/queries/tune-sets";
 import {
-  dailyPracticeQueue,
   genre as genreTable,
   note,
   plugin,
@@ -31,6 +30,7 @@ import {
   reference,
   repertoireTune,
   rhythmPatterns,
+  tableTransientData,
   userProfile,
 } from "@/lib/db/schema";
 import {
@@ -38,21 +38,20 @@ import {
   type SyncBaselineDiagnostics,
   setSyncBaselineDiagnosticsEnabled,
 } from "@/lib/diagnostics/sync-baseline";
+import { inspectGoalPlugin } from "@/lib/goals/plugin-settings";
+import { updateGoalPracticeQueue } from "@/lib/goals/queue";
+import {
+  readGoalSettingsCatalog,
+  saveGoalSettings,
+} from "@/lib/goals/settings";
 import { serializeCapabilities } from "@/lib/plugins/capabilities";
-import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
+import { GOAL_PLUGIN_SCRIPT } from "@/lib/plugins/scheduling-template";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
 import { isTransientRemoteRead } from "./remote-read";
 
-type SeedAddToReviewInput = {
-  repertoireId: string; // UUID
-  tuneIds: string[]; // UUIDs
-  // Optional explicit user id (Supabase Auth UUID). If omitted, we will
-  // resolve from current Supabase session via user_profile lookup.
-  userId?: string;
-};
-
 type SeedSchedulingPluginInput = {
+  goalId?: string;
   script?: string;
   goals?: string[];
   userId?: string;
@@ -89,31 +88,6 @@ type SeedSetlistsScenarioInput = {
   }>;
 };
 
-const DEFAULT_SCHEDULING_PLUGIN_SCRIPT = `function createScheduler() {
-  function apply(payload) {
-    const practiced = new Date(payload.input.practiced);
-    const nextDue = new Date(practiced);
-    nextDue.setDate(nextDue.getDate() + 1);
-
-    return {
-      ...payload.fallback,
-      lastReview: payload.input.practiced,
-      nextDue: nextDue.toISOString(),
-      interval: 1,
-      scheduledDays: 1,
-    };
-  }
-
-  return {
-    async processFirstReview(payload) {
-      return apply(payload);
-    },
-    async processReview(payload) {
-      return apply(payload);
-    },
-  };
-}`;
-
 /**
  * Injected test user ID - set via globalThis.__ttTestUserId to bypass Supabase auth lookup.
  * This allows tests to run without requiring a valid Supabase session.
@@ -149,123 +123,16 @@ async function resolveUserId(_db: SqliteDatabase): Promise<string> {
   return userId;
 }
 
-async function seedAddToReview(input: SeedAddToReviewInput) {
+/** Exercise the same Refresh boundary as the practice UI, preserving completed work. */
+async function refreshPracticeQueue(repertoireId: string) {
   const db = await ensureDb();
-  const now = new Date().toISOString().replace("T", " ").substring(0, 19);
-  const repertoireId = input.repertoireId;
-
-  if (!repertoireId) {
-    throw new Error("seedAddToReview requires repertoireId");
-  }
-
-  const userRef = input.userId ?? (await resolveUserId(db));
-
-  // 1) Update repertoire_tune.scheduled for provided tuneIds
-  let updated = 0;
-  for (const tuneId of input.tuneIds) {
-    const res = await db
-      .update(repertoireTune)
-      .set({
-        scheduled: now,
-        syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
-        lastModifiedAt: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(repertoireTune.repertoireRef, repertoireId),
-          eq(repertoireTune.tuneRef, tuneId),
-          eq(repertoireTune.deleted, 0)
-        )
-      )
-      .returning();
-    if (res && res.length > 0) updated++;
-  }
-
-  // 2) Ensure practice_record exists for each tune
-  for (const tuneId of input.tuneIds) {
-    const existing = await db
-      .select()
-      .from(practiceRecord)
-      .where(
-        and(
-          eq(practiceRecord.repertoireRef, repertoireId),
-          eq(practiceRecord.tuneRef, tuneId)
-        )
-      )
-      .limit(1);
-
-    if (!existing || existing.length === 0) {
-      db.insert(practiceRecord)
-        .values({
-          id: generateId(),
-          repertoireRef: repertoireId,
-          tuneRef: tuneId,
-          practiced: null,
-          quality: null,
-          easiness: null,
-          difficulty: 0,
-          stability: null,
-          interval: null,
-          step: null,
-          repetitions: 0,
-          lapses: 0,
-          elapsedDays: 0,
-          state: 0,
-          due: null,
-          backupPracticed: null,
-          goal: "recall",
-          technique: null,
-          syncVersion: 1,
-          lastModifiedAt: new Date().toISOString(),
-          deviceId: "local",
-        })
-        .run();
-    }
-  }
-
-  // 3) Clear existing queue snapshot for the most recent window (or today)
-  const latestWindow = await db
-    .select({ windowStart: dailyPracticeQueue.windowStartUtc })
-    .from(dailyPracticeQueue)
-    .where(
-      and(
-        eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.repertoireRef, repertoireId),
-        eq(dailyPracticeQueue.active, 1)
-      )
-    )
-    .orderBy(desc(dailyPracticeQueue.windowStartUtc))
-    .limit(1);
-
-  if (latestWindow.length > 0) {
-    db.delete(dailyPracticeQueue)
-      .where(
-        and(
-          eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.repertoireRef, repertoireId),
-          eq(dailyPracticeQueue.windowStartUtc, latestWindow[0].windowStart)
-        )
-      )
-      .run();
-  }
-
-  // 4) Force-regenerate queue so Practice picks up the latest changes
-  const regenerated = await generateOrGetPracticeQueue(
+  const userId = await resolveUserId(db);
+  const result = await updateGoalPracticeQueue(
     db,
-    userRef,
-    repertoireId,
-    new Date(),
-    null,
-    "per_day",
-    true
+    { userId, repertoireId, practiceDate: new Date() },
+    { kind: "refresh" }
   );
-
-  // Return a compact summary
-  return {
-    updated,
-    queueCount: regenerated.length,
-    userRef,
-  };
+  return { queueCount: result.rows.length };
 }
 
 async function seedSchedulingPlugin(input: SeedSchedulingPluginInput = {}) {
@@ -273,7 +140,7 @@ async function seedSchedulingPlugin(input: SeedSchedulingPluginInput = {}) {
   const userRef = input.userId ?? (await resolveUserId(db));
   const now = new Date().toISOString();
   const goals = Array.isArray(input.goals) ? input.goals : ["recall"];
-  const script = input.script ?? DEFAULT_SCHEDULING_PLUGIN_SCRIPT;
+  const script = input.script ?? GOAL_PLUGIN_SCRIPT;
 
   const [created] = await db
     .insert(plugin)
@@ -299,6 +166,37 @@ async function seedSchedulingPlugin(input: SeedSchedulingPluginInput = {}) {
     .returning();
 
   if (!created) throw new Error("Failed to seed scheduling plugin");
+  if (input.goalId) {
+    const entry = readGoalSettingsCatalog(db, userRef).entries.find(
+      (row) => row.row.id === input.goalId
+    );
+    if (!entry) throw new Error("Missing goal fixture");
+    const selection = await inspectGoalPlugin(db, userRef, created.id);
+    await saveGoalSettings(
+      db,
+      userRef,
+      entry,
+      {
+        ...entry.effective,
+        config: {
+          ...entry.effective.config,
+          scheduler: {
+            id: "plugin",
+            version: 1,
+            pluginId: created.id,
+            options: {},
+          },
+          evaluations: selection.manifest.actions.map((action) => ({
+            id: action.id,
+            label: action.label,
+            description: action.description,
+            action: { kind: "plugin" as const, actionId: action.id },
+          })),
+        },
+      },
+      { reviewedPlugin: selection }
+    );
+  }
   return created;
 }
 
@@ -511,6 +409,10 @@ async function getLatestPracticeRecord(tuneId: string, repertoireId: string) {
   }
   const db = await ensureDb();
   const rows = db.all<{
+    goal_id: string | null;
+    evaluation_id: string | null;
+    scheduler_id: string | null;
+    interval_days: number | null;
     id: string;
     tune_ref: string;
     repertoire_ref: string;
@@ -531,6 +433,7 @@ async function getLatestPracticeRecord(tuneId: string, repertoireId: string) {
     last_modified_at: string;
   }>(sql`
     SELECT 
+      goal_id, evaluation_id, scheduler_id, interval_days,
       id, tune_ref, repertoire_ref, practiced, due, quality,
       interval, repetitions, stability, difficulty, state, step,
       goal, technique, elapsed_days, lapses, sync_version, last_modified_at
@@ -1167,6 +1070,81 @@ async function seedSetlistsScenario(input: SeedSetlistsScenarioInput) {
   };
 }
 
+/** Recovery fixtures modify only the current test user's already-staged draft. */
+async function getPracticeDraft(repertoireId: string, tuneId: string) {
+  const db = await ensureDb();
+  const userId = await resolveUserId(db);
+  return (
+    db
+      .select()
+      .from(tableTransientData)
+      .where(
+        and(
+          eq(tableTransientData.userId, userId),
+          eq(tableTransientData.repertoireId, repertoireId),
+          eq(tableTransientData.tuneId, tuneId)
+        )
+      )
+      .get() ?? null
+  );
+}
+async function seedPracticeSubmissionRecovery(input: {
+  repertoireId: string;
+  tuneId: string;
+  kind: "notes" | "time-conflict" | "id-conflict";
+}) {
+  const db = await ensureDb();
+  const draft = await getPracticeDraft(input.repertoireId, input.tuneId);
+  if (
+    !draft?.practiceRecordId ||
+    !draft.practiced ||
+    !draft.due ||
+    draft.intervalDays === null
+  )
+    throw new Error("Stage an evaluation before seeding recovery");
+  if (input.kind === "notes") {
+    db.update(tableTransientData)
+      .set({
+        notePrivate: "Private text to preserve",
+        notePublic: "Public text to preserve",
+      })
+      .where(
+        and(
+          eq(tableTransientData.userId, draft.userId),
+          eq(tableTransientData.repertoireId, input.repertoireId),
+          eq(tableTransientData.tuneId, input.tuneId)
+        )
+      )
+      .run();
+  } else {
+    db.insert(practiceRecord)
+      .values({
+        id:
+          input.kind === "id-conflict" ? draft.practiceRecordId : generateId(),
+        tuneRef: input.tuneId,
+        repertoireRef: input.repertoireId,
+        practiced: draft.practiced,
+        due:
+          input.kind === "id-conflict"
+            ? new Date(Date.parse(draft.due) + 86400000).toISOString()
+            : draft.due,
+        intervalDays:
+          draft.intervalDays + (input.kind === "id-conflict" ? 1 : 0),
+        goal: draft.goal,
+        goalId: draft.goalId,
+        evaluationId: draft.evaluationId,
+        evaluationSnapshot: draft.evaluationSnapshot,
+        schedulerId: draft.schedulerId,
+        schedulerVersion: draft.schedulerVersion,
+        schedulerState: draft.schedulerState,
+        lastModifiedAt: new Date().toISOString(),
+      })
+      .run();
+  }
+  await persistDb();
+  return await getPracticeDraft(input.repertoireId, input.tuneId);
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -1198,14 +1176,14 @@ declare global {
         title: string;
         genreId?: string | null;
       }) => Promise<string>;
-      seedAddToReview: (input: SeedAddToReviewInput) => Promise<{
-        updated: number;
-        queueCount: number;
-        userRef: string; // UUID
-      }>;
+      refreshPracticeQueue: (
+        repertoireId: string
+      ) => Promise<{ queueCount: number }>;
       seedSchedulingPlugin: (input?: SeedSchedulingPluginInput) => Promise<{
         id: string;
       }>;
+      getPracticeDraft: typeof getPracticeDraft;
+      seedPracticeSubmissionRecovery: typeof seedPracticeSubmissionRecovery;
       seedPracticeHistory: (input: {
         repertoireId: string;
         tuneId: string;
@@ -1238,31 +1216,6 @@ declare global {
       setBaselineDiagnosticsEnabled: (enabled: boolean) => void;
       getBaselineDiagnostics: () => SyncBaselineDiagnostics;
       dispose: () => Promise<void>;
-      // Staging & committing helpers
-      stageEvaluation: (
-        tuneId: string,
-        repertoireId: string,
-        evaluation: string,
-        goal?: string,
-        technique?: string
-      ) => Promise<{
-        quality: number;
-        easiness: number | null;
-        difficulty: number | null;
-        stability: number | null;
-        interval: number;
-        step: number | null;
-        repetitions: number;
-        practiced: string;
-        due: string;
-        state: number;
-        goal: string;
-        technique: string;
-      }>;
-      commitStaged: (
-        repertoireId: string,
-        windowStartUtc?: string
-      ) => Promise<{ success: boolean; count: number; error?: string }>;
       getPracticeListStaged: (
         repertoireId: string,
         tuneIds?: string[]
@@ -1631,8 +1584,10 @@ if (globalThis.window !== undefined) {
 
         return tuneId;
       },
-      seedAddToReview,
+      refreshPracticeQueue,
       seedSchedulingPlugin,
+      getPracticeDraft,
+      seedPracticeSubmissionRecovery,
       seedPracticeHistory: async ({
         repertoireId,
         tuneId,
@@ -1683,41 +1638,6 @@ if (globalThis.window !== undefined) {
       getDistinctPracticeRecordCount,
       getAllQueueWindows,
       getTunesByTitles,
-      stageEvaluation: async (
-        tuneId: string,
-        repertoireId: string,
-        evaluation: string,
-        goal?: string,
-        technique?: string
-      ) => {
-        const { stagePracticeEvaluation } = await import(
-          "@/lib/services/practice-staging"
-        );
-        const db = await ensureDb();
-        const userRef = await resolveUserId(db);
-        return await stagePracticeEvaluation(
-          db,
-          userRef,
-          repertoireId,
-          tuneId,
-          evaluation,
-          goal,
-          technique
-        );
-      },
-      commitStaged: async (repertoireId: string, windowStartUtc?: string) => {
-        const { commitStagedEvaluations } = await import(
-          "@/lib/services/practice-recording"
-        );
-        const db = await ensureDb();
-        const userRef = await resolveUserId(db);
-        return await commitStagedEvaluations(
-          db,
-          userRef,
-          repertoireId,
-          windowStartUtc
-        );
-      },
       getPracticeListStaged: async (
         repertoireId: string,
         tuneIds?: string[]

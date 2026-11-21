@@ -13,6 +13,7 @@ import {
   saveMockStorageSettings,
 } from "../helpers/byos-provider";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -24,7 +25,7 @@ test.describe("BYOS-001: private storage regressions", () => {
   let app: TuneTreesPage;
   test.afterEach(async ({ context }) => {
     // Restore connectivity even after a failed assertion so fixture cleanup works.
-    await context.setOffline(false);
+    await setOfflineForTest(context, false);
   });
   test.beforeEach(async ({ page, testUser }) => {
     app = new TuneTreesPage(page);
@@ -89,7 +90,7 @@ test.describe("BYOS-001: private storage regressions", () => {
     );
     await expect(app.audioPlayerPlayToggle).toBeEnabled({ timeout: 10000 });
     await app.audioPlayerCloseButton.click();
-    await context.setOffline(true);
+    await setOfflineForTest(context, true);
     await reference.click();
     await expect(app.audioPlayerPlayToggle).toBeEnabled({ timeout: 10000 });
     await expect(page.getByTestId("audio-player-source-status")).toContainText(
@@ -97,7 +98,7 @@ test.describe("BYOS-001: private storage regressions", () => {
       { timeout: 10000 }
     );
     expect(downloads).toHaveLength(1);
-    await context.setOffline(false);
+    await setOfflineForTest(context, false);
   });
 
   test("keeps tokens and binary bytes out of the real SQLite outbox", async ({
@@ -295,6 +296,11 @@ test.describe("BYOS-001: private storage regressions", () => {
     test(`preserves the file and fields after Dropbox OAuth ${outcome}`, async ({
       page,
     }) => {
+      // OAuth restores an unsaved draft; it must not create a reference. Catalog
+      // references can vary by fixture/user, so preserve the actual starting count.
+      const originalReferenceCount =
+        (await app.referencesCount.textContent()) ?? "";
+      expect(originalReferenceCount).toMatch(/^\d+ references?$/i);
       await app.referenceTitleInput.fill("Keep my Dropbox draft");
       const returnUrl = page.url();
       await page.route(
@@ -332,7 +338,7 @@ test.describe("BYOS-001: private storage regressions", () => {
         "Keep my Dropbox draft",
         { timeout: 10000 }
       );
-      await expect(app.referencesCount).toHaveText(/^1 reference$/i, {
+      await expect(app.referencesCount).toHaveText(originalReferenceCount, {
         timeout: 10000,
       });
     });

@@ -3,7 +3,11 @@ import {
   getPrivateTuneIds,
   TEST_TUNE_BANISH_ID,
 } from "../../tests/fixtures/test-data";
-import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
+import { resetLocalDbAndResync } from "../helpers/local-db-lifecycle";
+import {
+  navigateToTabForTest,
+  setupForCatalogTestsParallel,
+} from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -169,4 +173,62 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Verify grid is present and functional
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 5000 });
   });
+});
+
+// Inject on the final clean-client load, after fixture setup. No later reload or
+// test-only sync may hide the failed startup; the normal sync guard stays enabled.
+test("catalog startup recovers a genre RPC 502 and keeps public and private tunes", async ({
+  page,
+  testUser,
+}) => {
+  test.setTimeout(120_000);
+  await setupForCatalogTestsParallel(page, testUser, {
+    emptyRepertoire: true,
+    startTab: "catalog",
+  });
+  const endpoint = "**/rest/v1/rpc/get_effective_genres_for_user";
+  const failedResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/rpc/get_effective_genres_for_user") &&
+      response.status() === 502,
+    { timeout: 30_000 }
+  );
+  // Register both waits before reload: recovery can finish before reset returns.
+  const recoveredResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/rpc/get_effective_genres_for_user") &&
+      response.status() === 200,
+    { timeout: 30_000 }
+  );
+  await page.route(
+    endpoint,
+    (route) =>
+      route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({
+          message: "Injected transient upstream failure",
+        }),
+      }),
+    { times: 1 }
+  );
+  await resetLocalDbAndResync(page);
+  expect((await failedResponse).status()).toBe(502);
+  expect((await recoveredResponse).status()).toBe(200);
+  await navigateToTabForTest(page, "catalog");
+  const catalog = new TuneTreesPage(page);
+  await catalog.ensureGridView("catalog");
+  await catalog.searchForTune("Banish Misfortune", catalog.catalogGrid);
+  await catalog.ensureGridColumnVisible("catalog", "Ownership");
+  await page.waitForLoadState("networkidle", { timeout: 15000 });
+  const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
+  await expect(
+    await catalog.getCatalogOwnershipCell(privateTune1Id)
+  ).toHaveText("🔒 Private", { timeout: 10_000 });
+  await expect(
+    catalog.getTuneRowById(TEST_TUNE_BANISH_ID, catalog.catalogGrid)
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    await catalog.getCatalogOwnershipCell(TEST_TUNE_BANISH_ID)
+  ).not.toContainText("Private", { timeout: 10_000 });
 });

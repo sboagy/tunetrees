@@ -24,7 +24,11 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
 import { getStarterTemplateById } from "../../lib/db/starter-repertoire-templates";
-import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
+import { runGoalQueueCommand } from "../../lib/goals/queue-commands";
+import {
+  offerGoalQueueSaveRecovery,
+  reportGoalQueueNotices,
+} from "../../lib/goals/queue-feedback";
 import {
   createStarterRepertoire,
   populateStarterRepertoireFromCatalog,
@@ -282,15 +286,19 @@ export const OnboardingOverlay: Component = () => {
               `✅ Added ${result.added} tunes to starter repertoire (${result.skipped} already present)`
             );
             if (result.added > 0 || result.skipped > 0) {
-              await generateOrGetPracticeQueue(
+              const isCurrent = () => localDb() === db && user()?.id === userId;
+              const queue = await runGoalQueueCommand(
                 db,
-                userId,
-                starterRepertoireId,
-                getPracticeDate(),
-                null,
-                "per_day",
-                true
+                {
+                  userId,
+                  repertoireId: starterRepertoireId,
+                  practiceDate: getPracticeDate(),
+                },
+                { kind: "load" },
+                isCurrent
               );
+              if (!isCurrent()) return;
+              reportGoalQueueNotices(queue);
               await forceSyncUp();
               incrementPracticeListStagedChanged();
             }
@@ -302,6 +310,12 @@ export const OnboardingOverlay: Component = () => {
               );
             }
           } catch (popErr) {
+            offerGoalQueueSaveRecovery(
+              db,
+              userId,
+              () => localDb() === db && user()?.id === userId,
+              incrementPracticeListStagedChanged
+            );
             // Non-fatal: user can add tunes manually from catalog
             console.warn(
               "Failed to auto-populate starter repertoire tunes:",

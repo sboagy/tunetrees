@@ -8,6 +8,7 @@
  */
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
+import { sql } from "drizzle-orm";
 import {
   ChevronDown,
   ChevronRight,
@@ -31,16 +32,26 @@ import { buildDefaultTuneSetName } from "@/lib/tune-sets/name";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentTuneSet } from "../../lib/context/CurrentTuneSetContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
-import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { removeTuneFromRepertoire } from "../../lib/db/queries/repertoires";
 import {
   addTunesToTuneSet,
   createTuneSetFromTunes,
   getPersonalTuneSets,
 } from "../../lib/db/queries/tune-sets";
-import { addSpecificTunesToExistingQueue } from "../../lib/services/practice-queue";
-import { getPracticeDate } from "../../lib/utils/practice-date";
-import { getPreferredQueueWindowStart } from "../../lib/utils/queue-date-storage";
+import { runGoalQueueCommand } from "../../lib/goals/queue-commands";
+import {
+  offerGoalQueueSaveRecovery,
+  reportGoalQueueNotices,
+} from "../../lib/goals/queue-feedback";
+import { getLatestActiveQueueWindow } from "../../lib/services/practice-queue";
+import {
+  formatAsWindowStart,
+  getPracticeDate,
+} from "../../lib/utils/practice-date";
+import {
+  getEmptyQueueDate,
+  getPreferredQueueWindowStart,
+} from "../../lib/utils/queue-date-storage";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
@@ -209,21 +220,53 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     setIsAddingToReview(true);
     try {
       const db = getDb();
-      const prepared = await addTunesToPracticeQueue(db, repertoireId, tuneIds);
-      if (prepared.skipped > 0) {
-        throw new Error(
-          "Some selected tunes could not be prepared for review. Please retry."
-        );
-      }
-      const added = await addSpecificTunesToExistingQueue(
+      const isCurrent = () =>
+        localDb() === db &&
+        user()?.id === currentUserId &&
+        props.repertoireId === repertoireId;
+      // With no explicit date, target the same latest session shown by Practice.
+      const storedPreference = getPreferredQueueWindowStart();
+      // The legacy preference is global, so validate it in this repertoire.
+      // Once chosen, the command stays pinned to this click's window.
+      const preferred =
+        storedPreference &&
+        db.all(sql`
+        SELECT 1 FROM daily_practice_queue
+        WHERE user_ref = ${currentUserId} AND repertoire_ref = ${repertoireId}
+          AND active = 1
+          AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${storedPreference}
+        LIMIT 1
+      `).length > 0
+          ? storedPreference
+          : null;
+      const latest = await getLatestActiveQueueWindow(
         db,
         currentUserId,
-        repertoireId,
-        prepared.tuneIds,
-        getPracticeDate(),
-        null,
-        getPreferredQueueWindowStart()
+        repertoireId
       );
+      const emptyDate = getEmptyQueueDate(currentUserId, repertoireId);
+      const emptyStart = emptyDate ? formatAsWindowStart(emptyDate) : null;
+      const useEmpty =
+        !preferred &&
+        emptyStart &&
+        (!latest.windowStartUtc ||
+          emptyStart.slice(0, 10) >= latest.windowStartUtc.slice(0, 10));
+      const windowStart =
+        preferred ?? (useEmpty ? emptyStart : latest.windowStartUtc);
+      if (!isCurrent()) return;
+      const result = await runGoalQueueCommand(
+        db,
+        {
+          userId: currentUserId,
+          repertoireId,
+          practiceDate: useEmpty && emptyDate ? emptyDate : getPracticeDate(),
+        },
+        { kind: "manual", tuneIds, ...(windowStart ? { windowStart } : {}) },
+        isCurrent
+      );
+      if (!isCurrent()) return;
+      reportGoalQueueNotices(result);
+      const added = result.addedTuneIds;
       const alreadyPresent = new Set(tuneIds).size - added.length;
       const messages: string[] = [];
       if (added.length > 0)
@@ -244,6 +287,14 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         });
       }
     } catch (error) {
+      const db = localDb();
+      if (db && user()?.id === currentUserId)
+        offerGoalQueueSaveRecovery(
+          db,
+          currentUserId,
+          () => localDb() === db && user()?.id === currentUserId,
+          incrementPracticeListStagedChanged
+        );
       console.error("Error adding tunes to practice queue:", error);
       toast.error(
         error instanceof Error

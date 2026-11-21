@@ -15,12 +15,16 @@
  * @module components/layout/UserSettingsDialog
  */
 
+import { Dialog } from "@kobalte/core/dialog";
 import { Menu, X } from "lucide-solid";
 import {
   type Component,
   createSignal,
+  For,
+  type JSX,
   lazy,
   Match,
+  type ParentProps,
   Show,
   Suspense,
   Switch,
@@ -36,9 +40,6 @@ const CatalogSyncPage = lazy(
 );
 const SchedulingOptionsPage = lazy(
   () => import("@/routes/user-settings/scheduling-options")
-);
-const SpacedRepetitionPage = lazy(
-  () => import("@/routes/user-settings/spaced-repetition")
 );
 const PluginsPage = lazy(() => import("@/routes/user-settings/plugins"));
 const AccountPage = lazy(() => import("@/routes/user-settings/account"));
@@ -57,8 +58,6 @@ const sidebarNavItems: NavItem[] = [
   { title: "Storage provider", tab: "storage-provider" },
   { title: "Appearance", tab: "appearance" },
   { title: "Catalog & Sync", tab: "catalog-sync" },
-  { title: "Scheduling Options", tab: "scheduling-options" },
-  { title: "Spaced Repetition", tab: "spaced-repetition" },
   { title: "Plugins", tab: "plugins" },
   { title: "Goals", tab: "goals" },
   { title: "Account", tab: "account" },
@@ -84,9 +83,6 @@ const TabContent: Component<{ tab: UserSettingsTab }> = (props) => (
       <Match when={props.tab === "scheduling-options"}>
         <SchedulingOptionsPage />
       </Match>
-      <Match when={props.tab === "spaced-repetition"}>
-        <SpacedRepetitionPage />
-      </Match>
       <Match when={props.tab === "plugins"}>
         <PluginsPage />
       </Match>
@@ -104,123 +100,155 @@ const TabContent: Component<{ tab: UserSettingsTab }> = (props) => (
 );
 
 export const UserSettingsDialog: Component = () => {
-  const { isOpen, currentTab, closeUserSettings, navigateToTab } =
-    useUserSettingsDialog();
-  const [isSidebarOpen, setIsSidebarOpen] = createSignal(false);
+  const settings = useUserSettingsDialog();
+  return (
+    <SettingsShell
+      open={settings.isOpen()}
+      tab={settings.currentTab()}
+      onClose={settings.closeUserSettings}
+      onNavigate={settings.navigateToTab}
+      pending={settings.draft()?.pending()}
+      footer={settings.draft()?.footer(settings.closeUserSettings)}
+    >
+      <TabContent tab={settings.currentTab()} />
+    </SettingsShell>
+  );
+};
 
+/** Shared modal shell for overlay and route entry points (E2/E6, L2, R2). */
+export function SettingsShell(
+  props: ParentProps<{
+    open: boolean;
+    tab: UserSettingsTab;
+    onClose: () => void;
+    onNavigate: (tab: UserSettingsTab) => void;
+    pending?: boolean;
+    footer?: JSX.Element;
+  }>
+) {
+  const [isSidebarOpen, setIsSidebarOpen] = createSignal(false);
+  let title!: HTMLHeadingElement;
   const handleTabClick = (tab: UserSettingsTab) => {
-    navigateToTab(tab);
+    props.onNavigate(tab);
     setIsSidebarOpen(false);
   };
 
   return (
-    <Show when={isOpen()}>
-      <button
-        type="button"
-        class="fixed inset-0 bg-black/50 z-40"
-        onClick={closeUserSettings}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") closeUserSettings();
-        }}
-        aria-label="Close settings"
-        data-testid="settings-modal-backdrop"
-      />
-
-      <div
-        class="fixed inset-0 z-50 flex items-start justify-center pt-2 md:pt-8 pb-2 md:pb-16 pointer-events-none"
-        data-testid="settings-modal-wrapper"
-      >
-        <dialog
-          class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.key === "Escape" && e.stopPropagation()}
-          aria-labelledby="settings-dialog-title"
-          data-testid="settings-modal"
+    <Dialog
+      open={props.open}
+      onOpenChange={(open) => {
+        if (!open) props.onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay
+          class="fixed inset-0 bg-black/50 z-40"
+          data-testid="settings-modal-backdrop"
+        />
+        <div
+          class="settings-dialog-wrapper fixed inset-0 z-50 flex items-start justify-center sm:pt-8 sm:pb-16 pointer-events-none"
+          data-testid="settings-modal-wrapper"
         >
-          <div class="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between shrink-0">
-            <div class="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen())}
-                class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                aria-label="Toggle menu"
-                data-testid="settings-menu-toggle"
-              >
-                <Menu class="w-5 h-5" aria-hidden="true" />
-              </button>
-
-              <div>
-                <h2
-                  id="settings-dialog-title"
-                  class="text-xl md:text-2xl font-semibold text-gray-900 dark:text-gray-100"
+          <Dialog.Content
+            class="settings-dialog bg-background text-foreground sm:rounded-lg shadow-2xl border border-border w-full max-w-full sm:max-w-6xl h-dvh sm:max-h-[calc(100dvh-8rem)] flex flex-col pointer-events-auto"
+            onInteractOutside={(event) => event.preventDefault()}
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              title.focus();
+            }}
+            data-testid="settings-modal"
+          >
+            <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex items-start justify-between shrink-0">
+              <div class="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen())}
+                  class="sm:hidden min-h-11 min-w-11 p-2 text-foreground hover:bg-accent rounded-md"
+                  aria-label="Settings navigation"
+                  aria-expanded={isSidebarOpen()}
+                  aria-controls="settings-sidebar"
+                  data-testid="settings-menu-toggle"
                 >
-                  Settings
-                </h2>
-                <p class="hidden md:block text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Manage your account settings and set scheduling preferences.
-                </p>
+                  <Menu class="size-5" aria-hidden="true" />
+                </button>
+                <div>
+                  <Dialog.Title
+                    ref={title}
+                    tabIndex={-1}
+                    class="text-lg font-semibold"
+                  >
+                    Settings
+                  </Dialog.Title>
+                  <Dialog.Description class="hidden sm:block text-sm text-muted-foreground mt-1">
+                    Manage your account settings and set scheduling preferences.
+                  </Dialog.Description>
+                </div>
               </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={closeUserSettings}
-              class="relative z-10 flex h-10 w-10 items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
-              aria-label="Close settings"
-              data-testid="settings-close-button"
-            >
-              <X class="w-5 h-5" aria-hidden="true" />
-            </button>
-          </div>
-
-          <div class="flex-1 flex min-h-0 overflow-hidden relative">
-            <Show when={isSidebarOpen()}>
               <button
                 type="button"
-                class="md:hidden fixed inset-0 bg-black/30 z-10"
-                onClick={() => setIsSidebarOpen(false)}
-                aria-label="Close menu"
-              />
-            </Show>
-
-            <aside
-              class="absolute md:relative z-20 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 h-full transition-transform md:transition-none"
-              classList={{
-                "translate-x-0 w-64": isSidebarOpen(),
-                "-translate-x-full w-0 p-0": !isSidebarOpen(),
-                "md:translate-x-0 md:w-64 md:p-4": true,
-              }}
-              data-testid="settings-sidebar"
-            >
-              <nav class="flex flex-col space-y-1">
-                {sidebarNavItems.map((item) => (
-                  <button
-                    type="button"
-                    onClick={() => handleTabClick(item.tab)}
-                    class="px-3 py-2 text-sm rounded-md transition-colors text-left"
-                    classList={{
-                      "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium":
-                        currentTab() === item.tab,
-                      "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700":
-                        currentTab() !== item.tab,
-                    }}
-                    data-testid={`settings-tab-${item.tab}`}
-                  >
-                    {item.title}
-                  </button>
-                ))}
-              </nav>
-            </aside>
-
-            <main
-              class="flex-1 overflow-y-auto p-4 md:p-6 w-full"
-              data-testid="settings-content"
-            >
-              <TabContent tab={currentTab()} />
-            </main>
-          </div>
-        </dialog>
-      </div>
-    </Show>
+                onClick={props.onClose}
+                disabled={props.pending}
+                class="relative z-10 flex size-11 items-center justify-center text-muted-foreground hover:text-foreground rounded-md hover:bg-accent shrink-0 disabled:opacity-50"
+                aria-label="Close settings"
+                data-testid="settings-close-button"
+              >
+                <X class="size-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div class="settings-dialog-body flex-1 flex min-h-0 overflow-hidden relative">
+              <Show when={isSidebarOpen()}>
+                <button
+                  type="button"
+                  class="sm:hidden absolute inset-0 bg-black/30 z-10"
+                  onClick={() => setIsSidebarOpen(false)}
+                  aria-label="Close menu"
+                />
+              </Show>
+              <aside
+                id="settings-sidebar"
+                class="sm:block sm:relative absolute z-20 bg-background border-r border-border overflow-y-auto p-4 h-full w-64 shrink-0"
+                classList={{ hidden: !isSidebarOpen() }}
+                data-testid="settings-sidebar"
+              >
+                <nav
+                  class="flex flex-col space-y-1"
+                  aria-label="Settings categories"
+                >
+                  <For each={sidebarNavItems}>
+                    {(item) => (
+                      <button
+                        type="button"
+                        onClick={() => handleTabClick(item.tab)}
+                        disabled={props.pending}
+                        class="min-h-11 px-3 py-2 text-sm rounded-md text-left disabled:opacity-50"
+                        aria-current={
+                          props.tab === item.tab ? "page" : undefined
+                        }
+                        classList={{
+                          "bg-accent text-accent-foreground font-medium":
+                            props.tab === item.tab,
+                          "text-foreground hover:bg-accent":
+                            props.tab !== item.tab,
+                        }}
+                        data-testid={`settings-tab-${item.tab}`}
+                      >
+                        {item.title}
+                      </button>
+                    )}
+                  </For>
+                </nav>
+              </aside>
+              <main
+                class="settings-dialog-content flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 w-full"
+                data-testid="settings-content"
+              >
+                {props.children}
+              </main>
+            </div>
+            <div class="shrink-0">{props.footer}</div>
+          </Dialog.Content>
+        </div>
+      </Dialog.Portal>
+    </Dialog>
   );
-};
+}

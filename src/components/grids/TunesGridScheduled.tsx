@@ -28,9 +28,12 @@ import { TunesGrid } from "./TunesGrid";
 import type { VisibilityState } from "./tanstack-table";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
-export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
+export const TunesGridScheduled: Component<
+  IGridBaseProps & Required<Pick<IGridBaseProps, "getEvaluationModel">>
+> = (props) => {
   // No direct staging here; parent handles DB side-effects.
-  const { localDb } = useAuth();
+  const { localDb, repertoireListChanged, remoteSyncDownCompletionVersion } =
+    useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -38,9 +41,11 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // handle so it is easy to find and tap on mobile.
   const { handlers: resizeHandlers } = useSidebarResize();
 
-  // Goals: load once per user, used by GoalBadge dropdown in the grid.
+  // Goals: reload after local settings changes or synchronized updates, used by GoalBadge dropdown in the grid.
   const [goalsData] = createResource(
     () => {
+      repertoireListChanged?.();
+      remoteSyncDownCompletionVersion?.();
       const db = localDb();
       const uid = props.userId;
       return db && uid ? { db, uid } : null;
@@ -213,6 +218,9 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           onColumnVisibilityChange={setColumnVisibility}
           cellCallbacks={{
             onRecallEvalChange: handleRecallEvalChange,
+            getEvaluationModel: props.getEvaluationModel,
+            onPracticeAgain: props.onPracticeAgain,
+            onRetryEvaluation: props.onRetryEvaluation,
             getRecallEvalOpen,
             setRecallEvalOpen,
             onGoalChange: props.onGoalChange,

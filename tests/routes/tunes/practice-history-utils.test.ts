@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PracticeRecord } from "../../../src/lib/db/types";
-import { FSRS_QUALITY_MAP } from "../../../src/lib/scheduling/fsrs-service";
+import { FSRS_QUALITY_MAP } from "../../../src/lib/goals/ratings";
 import {
   buildPracticeHistoryQualityChart,
   buildPracticeHistoryStabilityChart,
   buildPracticeHistorySummary,
+  formatPracticeHistoryDate,
   getPracticeHistoryQualityDisplay,
   getPracticeHistoryStateLabel,
 } from "../../../src/routes/tunes/[id]/practice-history/practice-history-utils";
@@ -39,6 +40,51 @@ function createPracticeRecord(
 }
 
 describe("practice-history utils", () => {
+  it("displays offset-free UTC history consistently in charts and table dates", () => {
+    const rows = [createPracticeRecord({ practiced: "2026-11-16 00:30:00" })];
+    const instant = new Date("2026-11-16T00:30:00Z");
+    const label = instant.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    expect(buildPracticeHistoryQualityChart(rows)?.labels).toEqual([label]);
+    expect(buildPracticeHistoryStabilityChart(rows)?.labels).toEqual([label]);
+    expect(formatPracticeHistoryDate(rows[0].practiced)).toBe(
+      instant.toLocaleString(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    );
+  });
+
+  it("uses canonical tie-breaking for charts and the current streak", () => {
+    const rows = [
+      createPracticeRecord({ id: "b", quality: FSRS_QUALITY_MAP.AGAIN }),
+      createPracticeRecord({ id: "a", quality: FSRS_QUALITY_MAP.GOOD }),
+    ];
+    expect(buildPracticeHistoryQualityChart(rows)?.datasets[0].data).toEqual([
+      3, 1,
+    ]);
+    expect(buildPracticeHistorySummary(rows).currentStreak).toBe(0);
+    expect(rows.map((row) => row.id)).toEqual(["b", "a"]);
+  });
+  it("retains malformed historical dates as missing instead of crashing charts", () => {
+    const rows = [
+      createPracticeRecord({ practiced: "damaged", quality: 1 }),
+      createPracticeRecord({ quality: 3 }),
+    ];
+    expect(buildPracticeHistoryQualityChart(rows)?.datasets[0].data).toEqual([
+      1, 3,
+    ]);
+    expect(buildPracticeHistorySummary(rows).currentStreak).toBe(1);
+    expect(buildPracticeHistoryQualityChart(rows)?.labels?.[0]).toBe("#1");
+    expect(buildPracticeHistoryStabilityChart(rows)?.labels?.[0]).toBe("#1");
+    expect(formatPracticeHistoryDate("damaged")).toBe("—");
+  });
+
   it("builds summary metrics from FSRS records", () => {
     const records = [
       createPracticeRecord({

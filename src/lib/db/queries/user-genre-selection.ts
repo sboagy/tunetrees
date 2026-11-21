@@ -97,10 +97,12 @@ export async function upsertUserGenreSelection(
 ): Promise<void> {
   const now = new Date().toISOString();
 
+  // SQLite mutations run synchronously so teardown cannot interleave a partial
+  // selection replacement after the caller checks ownership.
   // Clear existing selections for this user
-  await db
-    .delete(userGenreSelection)
-    .where(eq(userGenreSelection.userId, userId));
+  db.delete(userGenreSelection)
+    .where(eq(userGenreSelection.userId, userId))
+    .run();
 
   // Insert new selections if any provided
   if (genreIds.length > 0) {
@@ -115,7 +117,7 @@ export async function upsertUserGenreSelection(
 
     // Insert in batches if needed
     for (const row of rows) {
-      await db.insert(userGenreSelection).values(row);
+      db.insert(userGenreSelection).values(row).run();
     }
   }
 }
@@ -256,9 +258,10 @@ export async function getUserRepertoireStats(
 export async function purgeLocalCatalogForGenres(
   db: SqliteDatabase,
   userId: string,
-  genreIds: string[]
+  genreIds: string[],
+  isCurrent: () => boolean = () => true
 ): Promise<{ tuneIds: string[] }> {
-  if (genreIds.length === 0) return { tuneIds: [] };
+  if (!isCurrent() || genreIds.length === 0) return { tuneIds: [] };
 
   const escaped = genreIds.map((id) => `'${id.replaceAll("'", "''")}'`);
   const genreList = escaped.join(", ");
@@ -287,27 +290,29 @@ export async function purgeLocalCatalogForGenres(
   if (tuneIds.length === 0) return { tuneIds };
 
   const sqliteDb = await getSqliteInstance();
+  if (!isCurrent()) return { tuneIds: [] };
   const wasSuppressed = sqliteDb ? areSyncTriggersSuppressed(sqliteDb) : false;
   if (sqliteDb) suppressSyncTriggers(sqliteDb);
 
+  // Keep the guarded, trigger-suppressed SQLite batch in one JS turn.
   try {
-    await db.delete(note).where(inArray(note.tuneRef, tuneIds));
-    await db.delete(reference).where(inArray(reference.tuneRef, tuneIds));
-    await db.delete(tag).where(inArray(tag.tuneRef, tuneIds));
-    await db
-      .delete(practiceRecord)
-      .where(inArray(practiceRecord.tuneRef, tuneIds));
-    await db
-      .delete(dailyPracticeQueue)
-      .where(inArray(dailyPracticeQueue.tuneRef, tuneIds));
-    await db
-      .delete(tableTransientData)
-      .where(inArray(tableTransientData.tuneId, tuneIds));
-    await db
-      .delete(repertoireTune)
-      .where(inArray(repertoireTune.tuneRef, tuneIds));
-    await db.delete(tuneOverride).where(inArray(tuneOverride.tuneRef, tuneIds));
-    await db.delete(tune).where(inArray(tune.id, tuneIds));
+    db.delete(note).where(inArray(note.tuneRef, tuneIds)).run();
+    db.delete(reference).where(inArray(reference.tuneRef, tuneIds)).run();
+    db.delete(tag).where(inArray(tag.tuneRef, tuneIds)).run();
+    db.delete(practiceRecord)
+      .where(inArray(practiceRecord.tuneRef, tuneIds))
+      .run();
+    db.delete(dailyPracticeQueue)
+      .where(inArray(dailyPracticeQueue.tuneRef, tuneIds))
+      .run();
+    db.delete(tableTransientData)
+      .where(inArray(tableTransientData.tuneId, tuneIds))
+      .run();
+    db.delete(repertoireTune)
+      .where(inArray(repertoireTune.tuneRef, tuneIds))
+      .run();
+    db.delete(tuneOverride).where(inArray(tuneOverride.tuneRef, tuneIds)).run();
+    db.delete(tune).where(inArray(tune.id, tuneIds)).run();
   } finally {
     if (sqliteDb && !wasSuppressed) enableSyncTriggers(sqliteDb);
   }

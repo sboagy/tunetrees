@@ -1124,7 +1124,8 @@ export const TopNav: Component = () => {
                         onClick={async () => {
                           setShowUserMenu(false);
                           await signOut();
-                          globalThis.location.href = "/login";
+                          // Auth route guards already redirect to login. A second
+                          // document navigation can interrupt immediate sign-in.
                         }}
                       >
                         <LogOut class="w-4 h-4" aria-hidden="true" />

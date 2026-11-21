@@ -69,3 +69,31 @@ export function getPreferredQueueWindowStart(): string | null {
     return null;
   return formatAsWindowStart(date);
 }
+
+function emptyQueueWindowKey(userId: string, repertoireId: string) {
+  return `TT_EMPTY_QUEUE_WINDOW:${userId}:${repertoireId}`;
+}
+
+/** Device-local intent for an explicitly refreshed day with no queue rows. */
+export function getEmptyQueueDate(
+  userId: string,
+  repertoireId: string
+): Date | null {
+  const date = parseStoredDate(
+    localStorage.getItem(emptyQueueWindowKey(userId, repertoireId))
+  );
+  return date &&
+    formatAsWindowStart(date) <= formatAsWindowStart(getPracticeDate())
+    ? date
+    : null;
+}
+
+export function rememberEmptyQueueDate(
+  userId: string,
+  repertoireId: string,
+  date: Date | null
+) {
+  const key = emptyQueueWindowKey(userId, repertoireId);
+  if (date) localStorage.setItem(key, date.toISOString());
+  else localStorage.removeItem(key);
+}

@@ -16,6 +16,10 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
+import {
+  tuneTaskReturn,
+  tuneTaskReturnState,
+} from "@/lib/tune-task-navigation";
 import type { TuneEditorData } from "../../../components/tunes";
 import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
@@ -118,8 +122,7 @@ const EditTunePage: Component = () => {
 
   // Store the location we came from (referrer) for proper back navigation
   const returnPath = createMemo(() => {
-    const state = location.state as any;
-    return state?.from || "/";
+    return tuneTaskReturn(location.state, params.id);
   });
 
   // Fetch tune data with user-specific fields
@@ -207,7 +210,7 @@ const EditTunePage: Component = () => {
       incrementRepertoireListChanged();
 
       // Navigate back to where we came from
-      navigate(returnPath());
+      navigate(returnPath(), { state: tuneTaskReturnState(location.state) });
       return tuneId;
     } catch (error) {
       console.error("Error updating tune:", error);
@@ -217,7 +220,7 @@ const EditTunePage: Component = () => {
 
   const handleCancel = () => {
     // Navigate back to where we came from
-    navigate(returnPath());
+    navigate(returnPath(), { state: tuneTaskReturnState(location.state) });
   };
 
   return (
