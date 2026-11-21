@@ -4609,7 +4609,7 @@ export class TuneTreesPage {
     await expect(evalTrigger).toBeEnabled({ timeout: 5000 });
 
     const expectedLabel =
-      evalValue === "not-set" ? String.raw`\(Not Set\)` : `${evalValue}:`;
+      evalValue === "not-set" ? String.raw`^\(Not Set\)$` : `^${evalValue}$`;
 
     const triggerAlreadySelected = async () => {
       const text = (await evalTrigger.textContent().catch(() => null)) ?? "";
@@ -4638,13 +4638,13 @@ export class TuneTreesPage {
     );
   }
 
-  private pauseIfNotClosed(doTimeouts: boolean | number) {
+  private async pauseIfNotClosed(doTimeouts: boolean | number) {
     if (!doTimeouts || this.page.isClosed()) return;
     const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
-    this.page
+    await this.page
       .waitForLoadState("domcontentloaded", { timeout: 1500 })
       .catch(() => undefined);
-    this.page.waitForTimeout(delay);
+    await this.page.waitForTimeout(delay);
   }
 
   private async isEvalMenuOpen(
@@ -4720,7 +4720,7 @@ export class TuneTreesPage {
     evalValue: string,
     expectedLabel: string,
     isAlreadySelected: () => Promise<boolean>,
-    settle: () => void
+    settle: () => Promise<void>
   ): Promise<boolean> {
     await this.closeEvalMenu(menu, trigger);
 
@@ -4728,7 +4728,7 @@ export class TuneTreesPage {
       await this.openEvalMenu(menu, trigger, row);
     } catch (error) {
       if (this.page.isClosed()) throw error;
-      settle();
+      await settle();
       return false;
     }
 
@@ -4741,7 +4741,7 @@ export class TuneTreesPage {
       await whichOption.click({ timeout: 3000 });
     } catch {
       await this.closeEvalMenu(menu, trigger);
-      settle();
+      await settle();
       return false;
     }
 
@@ -4765,7 +4765,7 @@ export class TuneTreesPage {
         });
     } catch {
       await this.closeEvalMenu(menu, trigger);
-      settle();
+      await settle();
       return false;
     }
 
@@ -4777,7 +4777,7 @@ export class TuneTreesPage {
       ]);
       if (!stillSelected || !submitReady) {
         await this.closeEvalMenu(menu, trigger);
-        settle();
+        await settle();
         return false;
       }
     }
@@ -5006,7 +5006,7 @@ export class TuneTreesPage {
    * @remarks
    * - Uses multiple retry loops to mitigate flakiness due to animations, delayed renders, or focus issues.
    * - Assumes the first matching `recall-eval-*` control is the intended combobox for the card.
-   * - Verifies the final selected value by matching the evaluation button text (e.g., `"good:"` or `"(Not Set)"`).
+   * - Verifies the final selected value by matching the evaluation button text (e.g., `"Good"` or `"(Not Set)"`).
    */
   async selectFlashcardEvaluation(
     value: "again" | "hard" | "good" | "easy" | "not-set" = "good",
@@ -5024,7 +5024,8 @@ export class TuneTreesPage {
         this.logFlashcard("tune", { tuneId, value, attempt });
 
         const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
-        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
+        const expectedLabel =
+          value === "not-set" ? String.raw`^\(Not Set\)$` : `^${value}$`;
         const elapsed = () => Date.now() - startedAt;
 
         if (

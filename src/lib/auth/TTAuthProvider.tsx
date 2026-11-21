@@ -500,6 +500,10 @@ const TTInner: ParentComponent = (props) => {
   let disposed = false;
   let lifecycleVersion = 0;
   let injectedTestInitialization: Promise<void> | null = null;
+  let signOutCleanup: Promise<void> | null = null;
+  let syncShutdown: Promise<void> | null = null;
+  const retiringSyncServices = new Set<SyncService>();
+  let needsSignOutCleanup = false;
   const captureLifetime = (userId: string) => {
     const version = lifecycleVersion;
     return () =>
@@ -513,6 +517,22 @@ const TTInner: ParentComponent = (props) => {
     stopSyncWorker?.();
     stopSyncWorker = null;
     syncServiceInstance = null;
+  };
+  const drainSync = () => {
+    const service = syncServiceInstance;
+    invalidateSync();
+    if (service) retiringSyncServices.add(service);
+    // Keep detached services until teardown succeeds, including across an
+    // overlapping reset/sign-out or a retry after subscription cleanup fails.
+    syncShutdown ??= (async () => {
+      for (const retiring of retiringSyncServices) {
+        await retiring.destroy();
+        retiringSyncServices.delete(retiring);
+      }
+    })().finally(() => {
+      syncShutdown = null;
+    });
+    return syncShutdown;
   };
   onCleanup(() => {
     disposed = true;
@@ -1668,27 +1688,31 @@ const TTInner: ParentComponent = (props) => {
     }
   }
 
-  async function cleanupOnSignOut() {
+  function cleanupOnSignOut(): Promise<void> {
+    if (signOutCleanup) return signOutCleanup;
+    needsSignOutCleanup = true;
     setUpgradeBlocked(null);
     catalogSelectionReconciledKey = null;
     reconcileRunCount = 0;
 
-    invalidateSync();
-
-    try {
-      await closeSqliteDb();
-    } catch (closeError) {
-      console.warn("⚠️ Failed to close database:", closeError);
-    }
-
-    if (autoPersistCleanup) {
-      autoPersistCleanup();
-      autoPersistCleanup = null;
-    }
-
+    const drained = drainSync();
+    autoPersistCleanup?.();
+    autoPersistCleanup = null;
+    // Stop exposing this database while shutdown drains its outstanding work.
     setLocalDb(null);
     setUserIdInt(null);
     setInitialSyncComplete(false);
+
+    signOutCleanup = (async () => {
+      // A timer stop alone cannot protect SQLite: a request may already be
+      // applying remote rows or persisting. Do not close if draining fails.
+      await drained;
+      await closeSqliteDb();
+      needsSignOutCleanup = false;
+    })().finally(() => {
+      signOutCleanup = null;
+    });
+    return signOutCleanup;
   }
 
   // ---------------------------------------------------------------------------
@@ -1699,6 +1723,19 @@ const TTInner: ParentComponent = (props) => {
     on(rhizome.user, async (currentUser, prevUser) => {
       // User signed in (null → User)
       if (currentUser && !prevUser) {
+        if (needsSignOutCleanup) {
+          const isCurrent = captureLifetime(currentUser.id);
+          try {
+            await cleanupOnSignOut();
+          } catch (error) {
+            console.error(
+              "[TTAuthProvider] Previous database shutdown failed:",
+              error
+            );
+            return;
+          }
+          if (!isCurrent()) return;
+        }
         const pendingInjection = injectedTestInitialization;
         if (pendingInjection) {
           invalidateSync();
@@ -1728,7 +1765,11 @@ const TTInner: ParentComponent = (props) => {
         });
         // For anonymous users: the signOut path preserves their session in localStorage;
         // only clean up in-process state (DB close, sync stop).
-        await cleanupOnSignOut();
+        try {
+          await cleanupOnSignOut();
+        } catch (error) {
+          console.error("[TTAuthProvider] Database shutdown failed:", error);
+        }
       }
     })
   );
@@ -1913,22 +1954,43 @@ const TTInner: ParentComponent = (props) => {
           })
         );
       }
-      // Close DB and clear in-process state (no supabase signOut)
+    }
+
+    // Drain while credentials are still valid. Revocation during an upload
+    // could otherwise turn an ordinary sign-out into a failed sync.
+    let cleanupError: unknown;
+    let cleanupFailed = false;
+    try {
       await cleanupOnSignOut();
-      // Manually clear rhizome's in-memory state by calling supabase signOut
-      // Note: this will also trigger cleanupOnSignOut via the createEffect, but
-      // cleanupOnSignOut is idempotent so double-calling is safe.
+    } catch (error) {
+      cleanupError = error;
+      cleanupFailed = true;
     }
 
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
 
-    if (isAnon) {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      if (error) throw error;
-    } else {
-      await rhizome.signOut();
+    try {
+      if (isAnon) {
+        const { error } = await supabase.auth.signOut({ scope: "local" });
+        if (error) throw error;
+      } else {
+        await rhizome.signOut();
+      }
+    } catch (error) {
+      // Rhizome retains the user when revocation fails. Restore its database
+      // only after successful cleanup; never replace an undrained connection.
+      const remainingUser = rhizome.user();
+      if (!needsSignOutCleanup && remainingUser) {
+        if (isUserAnonymous(remainingUser)) {
+          await initializeAnonymousDatabase(remainingUser.id);
+        } else {
+          await initializeLocalDatabase(remainingUser);
+        }
+      }
+      throw error;
     }
+    if (cleanupFailed) throw cleanupError;
 
     setLocalDb(null);
     setUserIdInt(null);
@@ -2053,20 +2115,10 @@ const TTInner: ParentComponent = (props) => {
       catalogSelectionReconciledKey = null;
       reconcileRunCount = 0;
 
-      const serviceWithDestroy = syncServiceInstance;
       // Invalidate completion ownership before asynchronous teardown starts.
-      invalidateSync();
+      const drained = drainSync();
       const ownsReset = captureLifetime(currentUser.id);
-      if (serviceWithDestroy?.destroy) {
-        try {
-          await serviceWithDestroy.destroy();
-        } catch (error) {
-          console.warn(
-            "[ForceCleanLocalReset] Failed to destroy sync service cleanly:",
-            error
-          );
-        }
-      }
+      await drained;
 
       if (!ownsReset()) {
         throw new Error(

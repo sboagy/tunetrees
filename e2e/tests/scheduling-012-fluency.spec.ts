@@ -58,7 +58,7 @@ test.describe("Fluency scheduling", () => {
     await page.getByTestId(`recall-eval-${TEST_TUNE_BANISH_ID}`).click();
     await expect(
       page.getByTestId("recall-eval-option-effortless")
-    ).toContainText("If practiced now: due", { timeout: 10000 });
+    ).toContainText("Due ", { timeout: 10000 });
     expect(
       await page.evaluate(
         async ({ rep, tune }) =>
@@ -259,6 +259,14 @@ test.describe("Fluency scheduling", () => {
     await tt.setShowSubmitted(true);
     const completed = page.getByTestId(`practice-again-${TEST_TUNE_BANISH_ID}`);
     await expect(completed).toContainText("Effortless", { timeout: 10000 });
+    await completed.click();
+    const submittedMenu = page.getByTestId(
+      `submitted-eval-menu-${TEST_TUNE_BANISH_ID}`
+    );
+    await expect(submittedMenu).toHaveCSS("width", "320px", { timeout: 10000 });
+    await expect(completed).toContainText("Effortless", { timeout: 10000 });
+    await page.keyboard.press("Escape");
+    await expect(completed).toBeFocused({ timeout: 10000 });
     await completed.click();
     await page.getByTestId("practice-again-action").click();
     await selectEvaluation(page, "not-set");

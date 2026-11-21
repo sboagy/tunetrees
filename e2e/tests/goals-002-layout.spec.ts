@@ -322,7 +322,31 @@ test("ladder evaluations use available height and keep the final choice reachabl
   await evaluation.click();
   const menu = page.getByTestId(`recall-eval-menu-${CATALOG_TUNE_KESH_ID}`);
   const last = page.getByTestId("recall-eval-option-session_ready");
-  await expect(last).toContainText("If practiced now: due", { timeout: 10000 });
+  await expect(last).toContainText("Due ", { timeout: 10000 });
+  await expect(menu).toHaveCSS("width", "320px");
+  const triggerBounds = await evaluation.boundingBox();
+  expect(triggerBounds).not.toBeNull();
+  // Popper settles after due estimates load; the popup should cover its trigger.
+  await expect
+    .poll(
+      async () => {
+        const bounds = await menu.boundingBox();
+        return (
+          bounds &&
+          triggerBounds &&
+          bounds.y <= triggerBounds.y + triggerBounds.height / 2 &&
+          bounds.y + bounds.height >= triggerBounds.y + triggerBounds.height / 2
+        );
+      },
+      { timeout: 10000 }
+    )
+    .toBe(true);
+  await page.getByTestId("recall-eval-explain").click();
+  await expect(last).toContainText("Plays confidently with others", {
+    timeout: 10000,
+  });
+  await expect(evaluation).toContainText("(Not Set)");
+  await page.getByTestId("recall-eval-explain").click();
   // Once preview lines arrive, all choices must fit without the old fixed-height cap.
   await expect
     .poll(() => menu.evaluate((el) => el.scrollHeight - el.clientHeight), {
@@ -333,9 +357,34 @@ test("ladder evaluations use available height and keep the final choice reachabl
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 667, height: 320 });
   await evaluation.click();
-  await expect(last).toContainText("If practiced now: due", { timeout: 10000 });
+  await expect(last).toContainText("Due ", { timeout: 10000 });
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport({ ratio: 1 });
   await last.click();
   await expect(evaluation).toContainText("Session-ready", { timeout: 10000 });
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await evaluation.click();
+  await expect(last).toContainText("Current selection", { timeout: 10000 });
+  await expect(last).toContainText("Due ", { timeout: 10000 });
+  // Align the selected row with the control, allowing the 16px top viewport margin.
+  await expect
+    .poll(
+      async () => {
+        const trigger = await evaluation.boundingBox();
+        const choice = await last.boundingBox();
+        const popup = await menu.boundingBox();
+        if (!trigger || !choice || !popup) return Number.POSITIVE_INFINITY;
+        const choiceOffset = choice.y - popup.y + choice.height / 2;
+        const expectedCenter = Math.max(
+          trigger.y + trigger.height / 2,
+          16 + choiceOffset
+        );
+        return Math.abs(expectedCenter - choice.y - choice.height / 2);
+      },
+      { timeout: 10000 }
+    )
+    .toBeLessThanOrEqual(2);
+  await page.screenshot({ path: `/tmp/426-overlap-${testUser.userId}.png` });
+  await page.keyboard.press("Escape");
+  await expect(evaluation).toBeFocused({ timeout: 10000 });
 });

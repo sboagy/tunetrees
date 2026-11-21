@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, expect, it, vi } from "vitest";
 import { RecallEvalComboBox } from "@/components/grids/RecallEvalComboBox";
 import type { EvaluationChoice } from "@/lib/goals/config";
@@ -67,12 +67,13 @@ it("calculates estimates for an initially open controlled menu without selecting
       loadDuePreviews={load}
     />
   ));
-  expect(await screen.findByText(/If practiced now: due/)).toBeDefined();
+  expect(await screen.findByText(/Due /)).toBeDefined();
   expect(load).toHaveBeenCalledOnce();
   expect(change).not.toHaveBeenCalled();
 });
 
-it("keeps ladder explanations and scheduling effects in the open menu", () => {
+it("discloses explanations without changing the selected evaluation", () => {
+  const change = vi.fn();
   render(() => (
     <RecallEvalComboBox
       tuneId="tune"
@@ -85,14 +86,43 @@ it("keeps ladder explanations and scheduling effects in the open menu", () => {
         },
       ]}
       value="back"
-      onChange={vi.fn()}
+      onChange={change}
       open={true}
     />
   ));
   expect(screen.getByTestId("recall-eval-tune").textContent).toBe(
     "Loses the flow"
   );
-  expect(screen.getByTestId("recall-eval-option-back").textContent).toContain(
+  const option = screen.getByTestId("recall-eval-option-back");
+  expect(option.textContent).toContain("Step back");
+  expect(option.textContent).toContain("Current selection");
+  expect(option.textContent).not.toContain("Drops out");
+  fireEvent.keyDown(screen.getByTestId("recall-eval-explain"), {
+    key: "Enter",
+  });
+  expect(option.textContent).toContain(
     "Drops out or loses the tune — Move back one interval"
   );
+  expect(change).not.toHaveBeenCalled();
+  fireEvent.keyDown(screen.getByTestId("recall-eval-explain"), {
+    key: "Enter",
+  });
+  expect(option.textContent).not.toContain("Drops out");
+});
+
+it("clears the evaluation through the separate clear action", () => {
+  const change = vi.fn();
+  render(() => (
+    <RecallEvalComboBox
+      tuneId="tune"
+      choices={choices}
+      value="good"
+      onChange={change}
+      open={true}
+    />
+  ));
+  fireEvent.keyDown(screen.getByTestId("recall-eval-option-not-set"), {
+    key: "Enter",
+  });
+  expect(change).toHaveBeenCalledWith("");
 });

@@ -188,6 +188,71 @@ afterEach(() => {
 });
 
 describe("provider sync completion lifetime", () => {
+  it("drains sync before closing SQLite and revoking credentials", async () => {
+    mount();
+    await started();
+    const gate = deferred<void>();
+    mocks.destroy.mockReturnValueOnce(gate.promise);
+    const pending = state.signOut();
+    await waitFor(() => expect(mocks.destroy).toHaveBeenCalledOnce());
+    expect(mocks.close).not.toHaveBeenCalled();
+    expect(mocks.auth.signOut).not.toHaveBeenCalled();
+    expect(state.localDb()).toBeNull();
+    gate.resolve();
+    await pending;
+    expect(mocks.close).toHaveBeenCalledOnce();
+    expect(mocks.auth.signOut).toHaveBeenCalledOnce();
+  });
+
+  it("waits for sign-out cleanup before initializing a replacement account", async () => {
+    mount();
+    await started();
+    const gate = deferred<void>();
+    mocks.destroy.mockReturnValueOnce(gate.promise);
+    setUser(null);
+    await waitFor(() => expect(mocks.destroy).toHaveBeenCalledOnce());
+    setUser({ ...user, id: "replacement" });
+    await Promise.resolve();
+    expect(mocks.initialize).toHaveBeenCalledOnce();
+    expect(mocks.close).not.toHaveBeenCalled();
+    gate.resolve();
+    await waitFor(() => expect(mocks.initialize).toHaveBeenCalledTimes(2));
+    expect(mocks.close).toHaveBeenCalledOnce();
+    expect(mocks.initialize).toHaveBeenLastCalledWith("replacement");
+  });
+
+  it("does not close SQLite when sync teardown fails", async () => {
+    mount();
+    await started();
+    mocks.destroy.mockRejectedValueOnce(new Error("teardown failed"));
+    await expect(state.signOut()).rejects.toThrow("teardown failed");
+    expect(mocks.close).not.toHaveBeenCalled();
+    expect(mocks.auth.signOut).toHaveBeenCalledOnce();
+    await state.signOut();
+    expect(mocks.destroy).toHaveBeenCalledTimes(2);
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
+  it("restores the authenticated database when credential revocation fails", async () => {
+    mount();
+    await started();
+    mocks.auth.signOut.mockRejectedValueOnce(new Error("revocation failed"));
+    await expect(state.signOut()).rejects.toThrow("revocation failed");
+    expect(mocks.close).toHaveBeenCalledOnce();
+    expect(mocks.initialize).toHaveBeenCalledTimes(2);
+    expect(state.localDb()).toBe(db);
+  });
+
+  it("retries a failed database close without losing the shutdown guarantee", async () => {
+    mount();
+    await started();
+    mocks.close.mockRejectedValueOnce(new Error("close failed"));
+    await expect(state.signOut()).rejects.toThrow("close failed");
+    await state.signOut();
+    expect(mocks.destroy).toHaveBeenCalledOnce();
+    expect(mocks.close).toHaveBeenCalledTimes(2);
+  });
+
   it("propagates a genre lookup failure and retries the initial filter on the next operation", async () => {
     setUser({ ...user, email: "owner-a@example.test" });
     mocks.selectRows.mockResolvedValue([{ id: user.id }]);
@@ -329,12 +394,13 @@ describe("provider sync completion lifetime", () => {
     const rejected = expect(reset).rejects.toThrow("Local reset did not run");
     await waitFor(() => expect(mocks.destroy).toHaveBeenCalledOnce());
     setUser(null);
-    await waitFor(() => expect(mocks.close).toHaveBeenCalledOnce());
+    expect(mocks.close).not.toHaveBeenCalled();
     const replacementDb = { ...db };
     mocks.initialize.mockResolvedValue(replacementDb);
     setUser({ ...user, id: "owner-b" });
-    await waitFor(() => expect(state.localDb()).toBe(replacementDb));
+    expect(mocks.initialize).toHaveBeenCalledOnce();
     gate.resolve();
+    await waitFor(() => expect(state.localDb()).toBe(replacementDb));
     await rejected;
     expect(mocks.clear).not.toHaveBeenCalled();
     expect(state.localDb()).toBe(replacementDb);

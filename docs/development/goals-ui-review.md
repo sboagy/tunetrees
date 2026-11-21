@@ -100,3 +100,101 @@ Focus-return follow-up: the explicit assertions reproduced lost focus in all fou
 User screenshot exposed the evaluation menu’s fixed 288px cap. Removed it in favor of Kobalte’s available viewport height, with 16px viewport padding, wrapped text, and scrolling only when needed. Added a desktop/mobile regression asserting the full ladder menu fits after due estimates load, then asserting the final choice is fully visible and selectable in short landscape. All three browser tests (setup + two projects), four picker unit tests, typecheck, and changed-file Biome checks pass.
 
 Selected evaluation label follow-up: the closed picker now displays only the goal-provided label, retaining its outcome color. Descriptions and scheduling effects remain in open menu items. Five focused picker tests, typecheck, and changed-file Biome checks pass.
+
+
+### Compact evaluation chooser trial — 2026-11-21
+
+User approved trying a bounded, compact version of the existing chooser, without a separate dialog. Choices retain their labels/colors and show a current-selection checkmark; ladder effects and relative due estimates remain visible. Explain choices reveals descriptions, full ladder semantics, and exact due times without selecting or closing. Clear evaluation is separated at the bottom. Applied V1/V3, F3, C2/C3, R2/R3; recorded the menu disclosure semantics in C3.
+
+Six component tests pass, including keyboard disclosure without a value change and explicit clearing. Typecheck and focused Biome checks pass. Desktop/mobile layout and disclosure E2E coverage was updated, but its launch timed out at 1Password before Playwright started. Browser layout, theme, and pointer interaction verification remain pending, as does the user's visual acceptance of this trial.
+
+
+Overlay placement trial: the user approved positioning the menu over its trigger, aligning the current choice where room permits. Kobalte retains viewport shifting and size constraints; actual choice heights determine alignment, with the opening offset retained during explanation disclosure. The initial browser run exposed pointerdown-open/pointerup-select on the newly overlaid option. A capture-phase opening-release guard now prevents that accidental selection without changing intentional choice activation. The expanded regression verifies unchanged value on opening/disclosure, popup overlap, selected-choice alignment (including the 16px viewport boundary), short-landscape reachability, selection, Escape, and focus restoration. Final Chromium/Mobile Chrome run: three passed (including setup). Six component tests, typecheck and focused Biome checks pass. Inspected the light-theme screenshot; broader theme/zoom audit and user acceptance remain pending. Changes remain an uncommitted trial.
+
+
+Submitted-menu follow-up: shared the raised surface, bounded width, wrapping/scrolling, overlap placement, and opening-release protection with the submitted evaluation action menu. Extracted shared menu classes and positioning/pointer behavior into evaluation-menu.ts. Practice again remains an ordinary menu item; further actions need no layout redesign. Eleven unit tests, typecheck, Biome, and five focused E2E tests (setup plus chooser/layout and Practice again on Chromium/Mobile Chrome) pass, including cancellation preserving the prior completion and explicitly appending a new event.
+
+
+### Full E2E regression investigation — 2026-11-21
+
+The full local run reported 60 failures. Fifty-nine involve the shared grid or
+flashcard evaluation helpers: they still expected a colon after labels (for
+example `Good:`), while the approved closed-picker presentation is label-only
+(`Good`). Updated both helpers to match the complete label and retained their
+selection/menu/Submit checks. Also awaited existing retry delays that otherwise
+continued after timed-out tests. All 1,483 unit tests, typecheck, lint, and
+formatting pass. The focused browser rerun stopped at a 1Password authorization
+timeout before Playwright; browser verification is still pending.
+
+The remaining failure is Mobile Chrome sign-out in `topnav-003-user-menu`: sync
+accessed SQLite after it closed. The installed oosync service's stop method only
+clears periodic timers; its startup retry loop and in-flight operations can
+continue, and `destroy()` does not drain them. This needs a lifecycle fix in
+oosync plus awaited teardown before TuneTrees closes the database. The sync
+guard remains unchanged. Awaiting the user's chosen oosync worktree; no runtime
+workaround or test suppression was added.
+
+
+Sign-out follow-up: the next full local run had one failure, on Chromium. This
+failure contained only Playwright's unreadable-response-body error after
+navigation, not the earlier closed-database errors. The logout test inherited
+shared-account setup and immediately unloaded it in `gotoLogin()` to create its
+disposable account. Moved logout into its own describe scope without that
+unrelated setup; retained real signup/logout, redirect and shared-session
+assertions, and the unchanged sync-error guard. Three repetitions each on
+Chromium and Mobile Chrome passed (seven tests including setup). Typecheck and
+changed-file Biome checks pass. This does not resolve or dismiss the separately
+identified oosync shutdown race.
+
+
+Runtime shutdown follow-up: implemented oosync's permanent `destroy()` drain in
+`/Users/sboag/gittt/oosync.worktrees/426_goals_2_oo`, with regression tests for
+active operations, persistence, startup retries, online listeners, periodic
+outbox probes, and Realtime debounce. TuneTrees now awaits teardown before
+closing SQLite/revoking credentials and serializes replacement sign-in with
+cleanup. Overlapping reset/sign-out share the same outstanding drain. This is
+schema-independent and applicable to main. The dependency has not been pinned
+yet: oosync must be reviewed/committed/pushed first, then TuneTrees pinned before
+claiming browser verification of the new runtime. Existing dev/preview servers
+have not been restarted.
+
+
+Shutdown review/validation: CodeRabbit reviewed both runtime repositories. Fixed
+its startup retry, Realtime retry, failed-cleanup retry, and sign-out recovery
+findings. Confirmed Rhizome retains the authenticated user when revocation
+rejects; TuneTrees restores that user's DB only after successful cleanup.
+Credential revocation is still attempted after a cleanup failure, while failed
+teardown resources remain available for retry. The dependency-contract finding
+is addressed in the oosync worktree and remains a rollout prerequisite until
+published/pinned. Final validation: 70 oosync unit tests and 1,488 TuneTrees unit
+tests pass; both repositories pass typecheck and Biome checks. No commits,
+pushes, dependency changes, server restarts, or browser-validation claims for
+this runtime fix.
+
+### Anonymous sign-in after sign-out regression (2026-11-21)
+
+After merging oosync #86, TuneTrees pins oosync `2b57c68f` and Rhizome
+`9eae7d08`; all 1,488 unit tests and static/schema-contract checks pass.
+The subsequent full E2E run failed anonymous re-entry on both Chromium and
+Mobile Chrome. Both traces show the login route rendering, the test clicking
+anonymous sign-in, then TopNav's redundant full-document `/login` navigation
+reloading that form. Removed that navigation: existing auth route guards own
+the redirect. This preserves the login destination (L4) without interrupting a
+new action (B2). Existing E2E assertions and synchronization enforcement remain
+unchanged. Typecheck and focused Biome checks pass; repeated anonymous and
+registered sign-out browser verification is pending 1Password authorization.
+
+The authorized rerun exposed a second issue after the duplicate navigation was
+removed: CurrentRepertoireProvider survived sign-out and retained the previous
+account's repertoire ID, leaving the fresh account on “Loading repertoire.”
+It now clears selection on user-ID changes (including sign-out), while preserving
+selection for auth refreshes of the same user. Three unit regression cases cover
+those boundaries. No E2E assertions or waits were changed. Final verification:
+13 focused Playwright tests pass (setup plus three repetitions of anonymous
+re-entry and registered sign-out on Chromium and Mobile Chrome); all 1,491 unit
+tests, typecheck, and focused Biome checks pass. Full local E2E remains for the
+next user-run verification.
+
+Checkpoint acceptance: the developer reports the full local CI run passing after
+these fixes. Committing this evaluation-chooser and shutdown/re-entry batch for
+hosted CI; manual UI review and the final design-system review remain open.

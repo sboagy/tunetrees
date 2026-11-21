@@ -227,6 +227,11 @@ are rechecked after persistence before recovery is cleared. This guards completi
 side effects; it does not cancel an in-flight oosync request or an export already
 started while its owner was active. Persistence performed internally by oosync
 before invoking the callback is outside this consumer-side guard.
+Sign-out additionally invalidates the service, hides its local DB from the UI,
+and awaits `SyncService.destroy()` before closing SQLite and revoking credentials.
+Replacement sign-in waits for that cleanup; failed teardown blocks closing and
+replacement initialization. Reset and sign-out share pending service teardown so
+neither can close or clear SQLite while the other is still draining.
 
 A service operation may perform an upload/download followed by another download.
 Full-pull completion metadata retains the first full pull's generation across both
@@ -460,10 +465,11 @@ the active goal calculator.
 
 `goals/settings.ts` owns local configuration edits using the same default decoder
 and validation as practice. Built-in and private-goal edits write personal overrides;
-unchanged fields inherit defaults. Goals Settings retains one category draft, including
-collapsed editors, and commits changed/new goals in one synchronous transaction after
-plugin preparation. The shared Settings footer saves that category; dirty/pending exit
-handling is registered with `UserSettingsDialogContext`. The overlay remains outside
+unchanged fields inherit defaults. Goals Settings opens an independent dialog draft
+for each goal; its Cancel / Save changes footer commits that goal after plugin
+preparation. Reset to defaults changes the draft until saved. There is no outer
+Goals category save footer; dirty/pending exit handling is registered with
+`UserSettingsDialogContext`. The overlay remains outside
 Router to preserve the underlying page, while `SettingsNavigationBoundary` inside Router
 forwards navigation to the same exit guard. Editor snapshots reject stale saves. Custom goals
 use stable `custom:<UUID>` keys independent of display names. Deletion requires a
