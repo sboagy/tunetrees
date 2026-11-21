@@ -10,6 +10,7 @@
 import { useLocation, useNavigate } from "@solidjs/router";
 import { History, Music, Pencil } from "lucide-solid";
 import { type Component, createResource, Show } from "solid-js";
+import { registerTuneTaskFocus } from "@/components/sidebar/tune-task-focus";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import {
@@ -17,6 +18,7 @@ import {
   useUIPreferences,
 } from "@/lib/context/UIPreferencesContext";
 import { getTuneForUserById } from "@/lib/db/queries/tunes";
+import { tuneTaskEntryState } from "@/lib/tune-task-navigation";
 
 /**
  * TuneInfoHeader - Display current tune information
@@ -54,8 +56,14 @@ export const TuneInfoHeader: Component = () => {
   const handleEdit = () => {
     const tuneId = currentTuneId();
     if (tuneId) {
-      const fullPath = location.pathname + location.search;
-      navigate(`/tunes/${tuneId}/edit`, { state: { from: fullPath } });
+      navigate(`/tunes/${tuneId}/edit`, {
+        state: tuneTaskEntryState(
+          location.pathname + location.search,
+          location.state,
+          tuneId,
+          "sidebar-edit-tune-button"
+        ),
+      });
     }
   };
 
@@ -104,6 +112,7 @@ export const TuneInfoHeader: Component = () => {
               title="Edit tune"
               aria-label="Edit tune"
               data-testid="sidebar-edit-tune-button"
+              ref={registerTuneTaskFocus}
             >
               <span class="hidden sm:inline">Edit</span>
               <Pencil class={fontClasses().iconSmall} />
@@ -125,13 +134,18 @@ export const TuneInfoHeader: Component = () => {
             <button
               type="button"
               onClick={() => {
-                const fullPath = location.pathname + location.search;
                 navigate(`/tunes/${tune()!.id}/practice-history`, {
-                  state: { from: fullPath },
+                  state: tuneTaskEntryState(
+                    location.pathname + location.search,
+                    location.state,
+                    tune()!.id,
+                    "sidebar-practice-history-link"
+                  ),
                 });
               }}
               class={`inline-flex items-center gap-2 rounded-md border border-blue-300 px-3 py-1.5 ${fontClasses().textSmall} font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300`}
               data-testid="sidebar-practice-history-link"
+              ref={registerTuneTaskFocus}
             >
               <History class={fontClasses().iconSmall} />
               Practice History

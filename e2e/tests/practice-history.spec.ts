@@ -115,12 +115,34 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     const grid = page.locator("table").first();
     await expect(grid).toBeVisible({ timeout: 10_000 });
     await expect(grid.getByText("Easy")).toBeVisible({ timeout: 10_000 });
+    // A sole recorded goal opens with its analytics, but All goals remains
+    // an explicit user choice and must not be immediately overridden.
+    const filter = page.getByTestId("practice-history-goal-filter");
+    await expect(filter.locator("option:checked")).toHaveText("Recall");
+    await expect(
+      page.getByTestId("practice-history-quality-chart")
+    ).toBeVisible({ timeout: 10_000 });
+    const details = grid.getByRole("button", { name: "Details", exact: true });
+    await details.click();
+    const detailRow = page.locator(
+      `#${await details.getAttribute("aria-controls")}`
+    );
+    await expect(detailRow).toBeVisible({ timeout: 10_000 });
+    await expect(detailRow.locator("td")).toHaveAttribute(
+      "colspan",
+      String(await grid.getByRole("columnheader").count())
+    );
+    await expect(
+      detailRow.getByText("State sequence", { exact: true })
+    ).toBeVisible();
+    await details.click();
+    await expect(detailRow).toHaveCount(0);
+    await filter.selectOption("");
+    await expect(filter).toHaveValue("");
     await expect(
       page.getByTestId("practice-history-quality-chart")
     ).toHaveCount(0);
-    await page
-      .getByTestId("practice-history-goal-filter")
-      .selectOption({ label: "Recall" });
+    await filter.selectOption({ label: "Recall" });
     await expect(page.getByTestId("practice-history-analytics")).toBeVisible({
       timeout: 10_000,
     });
@@ -313,7 +335,7 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
     await ttPage.navigateToTab("repertoire");
   });
 
-  test("cancel returns to the previous grid route when opened from the sidebar", async ({
+  test("Close returns to the previous grid route when opened from the sidebar", async ({
     page,
   }) => {
     await ttPage.searchForTune("Kesh", ttPage.repertoireGrid);
@@ -332,7 +354,7 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
 
     await expect(
       page,
-      "cancel should restore the originating repertoire grid URL"
+      "Close should restore the originating repertoire grid URL"
     ).toHaveURL(
       (url) =>
         url.pathname === "/" &&
@@ -341,5 +363,37 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
       { timeout: 20_000 }
     );
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("sidebar-practice-history-link")).toBeFocused(
+      { timeout: 10_000 }
+    );
+  });
+
+  test("switching History to Edit keeps the original return destination", async ({
+    page,
+  }) => {
+    await ttPage.searchForTune("Kesh", ttPage.repertoireGrid);
+    const firstRow = ttPage.getRows("repertoire").first();
+    await expect(firstRow).toBeVisible({ timeout: 10_000 });
+    await ttPage.selectGridRow(firstRow);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
+    await page.getByTestId("sidebar-practice-history-link").click();
+    await expect(page.getByTestId("practice-history-container")).toBeVisible({
+      timeout: 20_000,
+    });
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
+    await page.getByTestId("sidebar-edit-tune-button").click();
+    await expect(page).toHaveURL(/\/tunes\/[^/]+\/edit/, { timeout: 20_000 });
+    await page.getByTestId("tune-editor-cancel-button").click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === "/" &&
+        url.searchParams.get("tab") === "repertoire" &&
+        url.searchParams.get("r_q") === "Kesh",
+      { timeout: 20_000 }
+    );
+    await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("sidebar-practice-history-link")).toBeFocused(
+      { timeout: 10_000 }
+    );
   });
 });

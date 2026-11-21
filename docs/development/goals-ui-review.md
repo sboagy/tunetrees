@@ -78,3 +78,25 @@ being redesigned by this feature audit.
   The palette change preserves existing built-in hues and deterministic custom
   colors. The short-height layout does not write the temporary collapsed state
   into the saved normal-height preference.
+
+
+## Manual review round 1 — in progress (2026-11-20)
+
+Source: [user review](https://github.com/sboagy/tunetrees/pull/940#issuecomment-7055146074).
+Approved changes: shorter default names, violet Polish identity, independent goal dialogs (superseding the earlier category draft), read-only calendar dialog, sole-goal History default, full-row Details, and task-based Close/Cancel/Back rules. Implementation and focused validation are in progress; this is not a completed second audit.
+
+Follow-ups: [#954](https://github.com/sboagy/tunetrees/issues/954) tracks other Settings footer/save consistency (RhizomeEcosystem, Invited Alpha); [#955](https://github.com/sboagy/tunetrees/issues/955) tracks queue removal and toolbar clarity.
+
+Outcome colors are restored from recorded FSRS ratings/ladder actions, independently of the current goal. Custom-plugin picker choices use declared order; old plugin events do not preserve that order, so unknown historical outcomes remain neutral rather than borrowing a potentially changed definition.
+
+Round-one validation so far: 114 unit files / 1,478 tests pass; typecheck, lint, formatting, and goal seed validation pass. Added regression coverage for return-path loops and outcome colors. CodeRabbit completed with zero findings across 30 files. The additional browser navigation scenario was added after the review started. Dialog layout and modal save/dirty-exit cases are now browser-verified. Navigation destination and focus-return checks now pass on Chromium and Mobile Chrome.
+
+Browser retry: 83 tests ran across Chromium/Mobile Chrome; 79 passed, four failed (two cases in both browsers). History navigation, dirty-entry guards, full-row details, sole-goal analytics, and all responsive layout scenarios passed. Fixed the shared X accessible name (Kobalte supplied “Dismiss” despite visible “Close”) and changed the reset test to the stable Recall row ID because the background heading is intentionally inaccessible during modal editing; all saved-value assertions remain. Typecheck, focused Goals unit tests, and changed-file Biome checks pass. After another authorization attempt, the targeted rerun passed all five tests (setup plus both corrected scenarios on Chromium/Mobile Chrome). All previously failing cases are now confirmed; the full 83-test selection was not repeated after these two fixes. Inspected light desktop and dark narrow goal-dialog screenshots.
+
+Focus-return follow-up: the explicit assertions reproduced lost focus in all four desktop/mobile navigation cases while URL restoration passed. Added a validated invoking-control identity to tune-task route state, preserved through History → Edit, and a one-shot ref-based focus restoration when the destination button renders. No timers or DOM polling. Typecheck, eight navigation unit tests, and changed-file Biome checks pass. The authorized post-fix browser rerun passed all five tests (setup plus Close and History → Edit → Cancel on Chromium/Mobile Chrome), including explicit original-trigger focus assertions, in 10.5 seconds.
+
+### Ladder menu clipping — 2026-11-21
+
+User screenshot exposed the evaluation menu’s fixed 288px cap. Removed it in favor of Kobalte’s available viewport height, with 16px viewport padding, wrapped text, and scrolling only when needed. Added a desktop/mobile regression asserting the full ladder menu fits after due estimates load, then asserting the final choice is fully visible and selectable in short landscape. All three browser tests (setup + two projects), four picker unit tests, typecheck, and changed-file Biome checks pass.
+
+Selected evaluation label follow-up: the closed picker now displays only the goal-provided label, retaining its outcome color. Descriptions and scheduling effects remain in open menu items. Five focused picker tests, typecheck, and changed-file Biome checks pass.

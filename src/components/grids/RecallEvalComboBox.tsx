@@ -9,7 +9,7 @@ import {
   type EvaluationChoice,
   LADDER_ACTION_LABELS,
 } from "../../lib/goals/config";
-import { getSubmittedEvaluationDisplay } from "./evaluation-display";
+import { evaluationChoiceColor } from "../../lib/goals/evaluation-colors";
 
 interface RecallEvalComboBoxProps {
   choices: readonly EvaluationChoice[];
@@ -86,7 +86,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
       description: "",
       color: "text-muted-foreground",
     },
-    ...props.choices.map((choice) => ({
+    ...props.choices.map((choice, index) => ({
       value: choice.id,
       label: choice.label,
       description: [
@@ -97,12 +97,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
       ]
         .filter(Boolean)
         .join(" — "),
-      color:
-        choice.action.kind === "fsrs"
-          ? getSubmittedEvaluationDisplay({
-              latestQuality: choice.action.rating,
-            }).colorClass
-          : "text-foreground",
+      color: evaluationChoiceColor(choice, index, props.choices.length),
     })),
   ];
   const selectedOption = () =>
@@ -120,6 +115,9 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
         onOpenChange={handleOpenChange}
         // Non-modal prevents aggressive focus stealing which can contribute to closes
         modal={false}
+        fitViewport
+        overflowPadding={16}
+        gutter={4}
       >
         <DropdownMenu.Trigger
           disabled={props.disabled}
@@ -130,12 +128,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
           // evaluation interaction as a row-selection click.
           onClick={(event) => event.stopPropagation()}
         >
-          <span class={selectedOption().color}>
-            {selectedOption().label}
-            {selectedOption().description
-              ? `: ${selectedOption().description}`
-              : ""}
-          </span>
+          <span class={selectedOption().color}>{selectedOption().label}</span>
           <ChevronDown
             class="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2"
             aria-hidden="true"
@@ -145,7 +138,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
         <DropdownMenu.Portal>
           <DropdownMenu.Content
             data-testid={`recall-eval-menu-${props.tuneId}`}
-            class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-popover text-popover-foreground border border-border rounded shadow-lg max-h-72 overflow-auto"
+            class="z-50 w-max min-w-[var(--kb-popper-anchor-width)] max-w-[calc(100vw-2rem)] max-h-[min(var(--kb-popper-content-available-height,100dvh),calc(100dvh-2rem))] bg-popover text-popover-foreground border border-border rounded shadow-lg overflow-y-auto overscroll-contain break-words whitespace-normal"
           >
             <Show when={previewStatus()}>
               <output class="block px-3 py-2 text-sm text-muted-foreground">

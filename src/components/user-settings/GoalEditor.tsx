@@ -232,6 +232,7 @@ export interface GoalEditorDraft {
 }
 
 export function GoalEditor(props: {
+  disabled?: boolean;
   initial: EditableGoalDefinition;
   baseline?: EditableGoalDefinition;
   plugins?: { id: string; name: string }[];
@@ -397,7 +398,7 @@ export function GoalEditor(props: {
       class="space-y-4 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
       data-testid="goal-editor"
     >
-      <fieldset class="min-w-0 space-y-4">
+      <fieldset disabled={props.disabled} class="min-w-0 space-y-4">
         <label class="block space-y-1 text-sm">
           <span>Name</span>
           <input

@@ -38,7 +38,9 @@ import {
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import { ReferencesPanel } from "@/components/references/ReferencesPanel";
 import { TuneInfoHeader } from "@/components/sidebar";
+import { registerTuneTaskFocus } from "@/components/sidebar/tune-task-focus";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
+import { tuneTaskEntryState } from "@/lib/tune-task-navigation";
 import type { DockPosition } from "./SidebarDockContext";
 import { SidebarDragHandle } from "./SidebarDragHandle";
 import { useSidebarResize } from "./SidebarResizeContext";
@@ -450,8 +452,14 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   const handleEdit = () => {
     const tuneId = currentTuneId();
     if (tuneId) {
-      const fullPath = location.pathname + location.search;
-      navigate(`/tunes/${tuneId}/edit`, { state: { from: fullPath } });
+      navigate(`/tunes/${tuneId}/edit`, {
+        state: tuneTaskEntryState(
+          location.pathname + location.search,
+          location.state,
+          tuneId,
+          "sidebar-edit-tune-button-collapsed"
+        ),
+      });
     }
   };
 
@@ -631,6 +639,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
             title="Edit tune"
             aria-label="Edit tune"
             data-testid="sidebar-edit-tune-button-collapsed"
+            ref={registerTuneTaskFocus}
           >
             <Pencil class="w-3.5 h-3.5" />
           </button>

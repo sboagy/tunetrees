@@ -115,39 +115,45 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("saves edits from both expanded and collapsed goals", async () => {
+it("saves only the active goal and closes its dialog without closing Settings", async () => {
   const { first, second } = setup();
+  expect(screen.queryByTestId("goal-save")).toBeNull();
   fireEvent.click(first.getByRole("button", { name: "Edit" }));
-  fireEvent.input(first.getByTestId("goal-minimum"), {
+  fireEvent.input(screen.getByTestId("goal-minimum"), {
     target: { value: "2" },
-  });
-  fireEvent.click(first.getByRole("button", { name: "Collapse" }));
-  fireEvent.click(second.getByRole("button", { name: "Edit" }));
-  fireEvent.input(second.getByTestId("goal-minimum"), {
-    target: { value: "1" },
   });
   fireEvent.click(screen.getByTestId("goal-save"));
   await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
-  expect(
-    mocks.save.mock.calls[0][2].map(
-      (change: { definition: GoalSettingsEntry["effective"] }) =>
-        change.definition.config.daily.minimum
-    )
-  ).toEqual([2, 1]);
+  expect(mocks.save.mock.calls[0][2]).toHaveLength(1);
+  expect(mocks.save.mock.calls[0][2][0].definition.config.daily.minimum).toBe(
+    2
+  );
+  await waitFor(() =>
+    expect(screen.queryByTestId("goal-editor-dialog")).toBeNull()
+  );
+  expect(screen.getByTestId("goals-settings")).toBeTruthy();
+  fireEvent.click(second.getByRole("button", { name: "Edit" }));
+  expect((screen.getByTestId("goal-minimum") as HTMLInputElement).value).toBe(
+    "0"
+  );
 });
 
 it("keeps the category and draft when declining navigation, then discards on explicit confirmation", async () => {
   const { first } = setup();
   fireEvent.click(first.getByRole("button", { name: "Edit" }));
-  fireEvent.input(first.getByTestId("goal-name"), {
+  fireEvent.input(screen.getByTestId("goal-name"), {
     target: { value: "My recall" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Appearance", hidden: true })
+  );
   fireEvent.click(await screen.findByRole("button", { name: "Keep editing" }));
-  expect((first.getByTestId("goal-name") as HTMLInputElement).value).toBe(
+  expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
     "My recall"
   );
-  fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Appearance", hidden: true })
+  );
   fireEvent.click(
     await screen.findByRole("button", { name: "Discard changes" })
   );
@@ -164,12 +170,16 @@ it("blocks close and category changes during a local save and keeps failed draft
   );
   const { first } = setup();
   fireEvent.click(first.getByRole("button", { name: "Edit" }));
-  fireEvent.input(first.getByTestId("goal-name"), {
+  fireEvent.input(screen.getByTestId("goal-name"), {
     target: { value: "My recall" },
   });
   fireEvent.click(screen.getByTestId("goal-save"));
-  fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
-  fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close settings", hidden: true })
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Appearance", hidden: true })
+  );
   expect(screen.getByTestId("goals-settings")).toBeTruthy();
   expect((screen.getByTestId("goal-save") as HTMLButtonElement).disabled).toBe(
     true
@@ -178,7 +188,7 @@ it("blocks close and category changes during a local save and keeps failed draft
   await waitFor(() =>
     expect(screen.getByRole("alert").textContent).toContain("Conflicting edit")
   );
-  expect((first.getByTestId("goal-name") as HTMLInputElement).value).toBe(
+  expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
     "My recall"
   );
   expect((screen.getByTestId("goal-save") as HTMLButtonElement).disabled).toBe(

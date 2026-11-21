@@ -15,7 +15,7 @@ const NAMED_COLORS: Record<string, string> = {
   fluency: "bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200",
   session_ready: "bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200",
   performance_polish:
-    "bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-200",
+    "bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200",
 };
 
 // Simple deterministic hash → one of a discrete set of pastel palettes

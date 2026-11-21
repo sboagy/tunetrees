@@ -1,7 +1,8 @@
-import { ChevronDown, LoaderCircle, Plus, Save, Trash2 } from "lucide-solid";
+import { LoaderCircle, Plus, Save, SquarePen, Trash2 } from "lucide-solid";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import {
   AlertDialog,
+  AlertDialogCloseButton,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogTitle,
@@ -53,8 +54,8 @@ export default function GoalsPage() {
     []
   );
   const settings = useUserSettingsDialog();
-  const [expanded, setExpanded] = createSignal<Record<string, boolean>>({});
-  const [visited, setVisited] = createSignal<Record<string, boolean>>({});
+  const [editing, setEditing] = createSignal<GoalSettingsEntry>();
+  let editorTrigger: HTMLElement | undefined;
   const [editors, setEditors] = createSignal<Record<string, GoalEditorDraft>>(
     {}
   );
@@ -73,13 +74,8 @@ export default function GoalsPage() {
       })
     );
   };
-  const toggleGoal = (id: string) => {
-    setVisited((old) => ({ ...old, [id]: true }));
-    setExpanded((old) => ({ ...old, [id]: !old[id] }));
-  };
   const clearDraft = () => {
-    setExpanded({});
-    setVisited({});
+    setEditing(undefined);
     setResetValues({});
     setAdding(undefined);
     setDeleting(undefined);
@@ -228,7 +224,7 @@ export default function GoalsPage() {
     dirty,
     pending,
     discard: clearDraft,
-    description: "Unsaved changes to Goals will be lost.",
+    description: "Unsaved changes to this goal will be lost.",
   });
   const save = () => {
     if (busy() || canRetryPersistence()) return;
@@ -239,7 +235,6 @@ export default function GoalsPage() {
       try {
         changes.push({ id, expected, ...editor.validate() });
       } catch {
-        setExpanded((old) => ({ ...old, [id]: true }));
         queueMicrotask(editor.focusError);
         return;
       }
@@ -255,48 +250,8 @@ export default function GoalsPage() {
     settings.registerDraft({
       pending,
       requestExit,
-      footer: (close) => (
-        <div
-          class="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background px-4 py-3"
-          data-testid="goals-settings-footer"
-        >
-          <div class="text-sm">
-            <p>Changes to Goals</p>
-            <output class="block text-muted-foreground">{message()}</output>
-          </div>
-          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button
-              class="min-h-11"
-              variant="outline"
-              disabled={pending()}
-              onClick={close}
-            >
-              Cancel
-            </Button>
-            <Button
-              class="min-h-11 min-w-36 gap-1"
-              data-testid="goal-save"
-              disabled={
-                !dirty() ||
-                pending() ||
-                Object.values(editors()).some((editor) => editor.pending())
-              }
-              onClick={save}
-            >
-              <Show
-                when={busy()}
-                fallback={<Save class="size-4" aria-hidden="true" />}
-              >
-                <LoaderCircle
-                  class="size-4 animate-spin motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
-              </Show>
-              {busy() ? "Saving…" : "Save changes"}
-            </Button>
-          </div>
-        </div>
-      ),
+      // Each goal is an independent modal task; the category has no draft footer.
+      footer: () => null,
     })
   );
   return (
@@ -305,7 +260,31 @@ export default function GoalsPage() {
       data-testid="goals-settings"
     >
       <div>
-        <h3 class="text-lg font-semibold">Goals</h3>
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="text-lg font-semibold">Goals</h3>
+          <Button
+            variant="accent"
+            class="min-h-11 gap-1"
+            data-testid="goal-add"
+            disabled={pending()}
+            onClick={(event) => {
+              editorTrigger = event.currentTarget;
+              setError("");
+              setAdding({
+                id: crypto.randomUUID(),
+                definition: {
+                  displayName: "",
+                  description: "",
+                  config: getCustomGoalConfig(
+                    getBuiltInGoals()[0].config.scheduler
+                  ),
+                },
+              });
+            }}
+          >
+            <Plus class="size-4" aria-hidden="true" /> Add goal
+          </Button>
+        </div>
         <p class="text-sm text-muted-foreground">
           Choose what you are working toward. Each goal has its own evaluations,
           scheduler and daily limits. Your settings apply across your
@@ -314,7 +293,7 @@ export default function GoalsPage() {
         </p>
       </div>
       <PracticeCalendarSummary />
-      <Confirmation />
+      <output class="block text-sm text-muted-foreground">{message()}</output>
       <Show when={deleting()} keyed>
         {(entry) => (
           <AlertDialog
@@ -407,7 +386,7 @@ export default function GoalsPage() {
           </Button>
         </div>
       </Show>
-      <Show when={error()}>
+      <Show when={error() && !editing() && !adding()}>
         <div role="alert" class="space-y-2 text-sm text-destructive">
           <p>{error()}</p>
           <Button
@@ -450,14 +429,11 @@ export default function GoalsPage() {
           </section>
         )}
       </For>
-      <fieldset
-        disabled={busy() || canRetryPersistence()}
-        class="min-w-0 space-y-3"
-      >
+      <fieldset disabled={pending()} class="min-w-0 space-y-3">
         <For each={goals()}>
           {(entry) => (
             <section
-              class="rounded border border-border bg-card text-card-foreground p-4 space-y-3"
+              class="rounded border border-border bg-card text-card-foreground p-4"
               data-testid={`goal-panel-${entry.row.id}`}
             >
               <div class="flex items-start justify-between gap-3">
@@ -482,34 +458,71 @@ export default function GoalsPage() {
                 </div>
                 <Button
                   variant="outline"
+                  class="min-h-11 shrink-0 gap-1"
                   data-testid={`goal-edit-${entry.row.id}`}
-                  class="min-h-11 shrink-0"
-                  aria-expanded={Boolean(expanded()[entry.row.id])}
-                  aria-controls={`goal-fields-${entry.row.id}`}
-                  onClick={() => toggleGoal(entry.row.id)}
+                  aria-haspopup="dialog"
+                  onClick={(event) => {
+                    editorTrigger = event.currentTarget;
+                    setError("");
+                    setEditing(entry);
+                  }}
                 >
-                  <ChevronDown class="size-4" aria-hidden="true" />
-                  {expanded()[entry.row.id] ? "Collapse" : "Edit"}
+                  <SquarePen class="size-4" aria-hidden="true" /> Edit
                 </Button>
               </div>
-              <Show when={editors()[entry.row.id]?.changed()}>
-                <p class="text-sm text-muted-foreground">Unsaved changes</p>
-              </Show>
-              <Show when={editors()[entry.row.id]?.error()}>
-                <p class="text-sm text-destructive">Needs attention</p>
-              </Show>
-              <Show when={visited()[entry.row.id]}>
-                <div
-                  id={`goal-fields-${entry.row.id}`}
-                  hidden={!expanded()[entry.row.id]}
-                  class="space-y-3"
-                >
+            </section>
+          )}
+        </For>
+      </fieldset>
+      <AlertDialog
+        open={Boolean(editing() || adding())}
+        onOpenChange={(open) => {
+          if (!open) requestExit(clearDraft);
+        }}
+      >
+        <AlertDialogContent
+          class="settings-task-dialog flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 text-foreground [color-scheme:light] dark:[color-scheme:dark]"
+          data-testid="goal-editor-dialog"
+          onInteractOutside={(event) => event.preventDefault()}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            document
+              .querySelector<HTMLElement>(
+                '[data-testid="goal-editor-dialog"] [data-testid="goal-name"]'
+              )
+              ?.focus();
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            editorTrigger?.focus();
+          }}
+        >
+          <header class="shrink-0 border-b border-border p-4 pr-16">
+            <AlertDialogTitle>
+              {editing()
+                ? `Edit ${editing()!.effective.displayName}`
+                : "Add goal"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Changes apply to this goal across your repertoires when saved.
+            </AlertDialogDescription>
+            <AlertDialogCloseButton
+              class="min-h-11 min-w-11"
+              disabled={pending()}
+              title="Close"
+            />
+          </header>
+          <div class="settings-task-body min-h-0 min-w-0 overflow-y-auto p-4 space-y-4">
+            <Show when={editing()} keyed>
+              {(entry) => (
+                <>
                   <Show
                     when={resetValues()[entry.row.id] ?? entry.effective}
                     keyed
                   >
                     {(initial) => (
                       <GoalEditor
+                        disabled={pending()}
                         initial={initial}
                         baseline={entry.effective}
                         plugins={plugins()}
@@ -526,6 +539,7 @@ export default function GoalsPage() {
                       <Button
                         variant="outline"
                         data-testid="goal-reset"
+                        disabled={pending()}
                         onClick={() =>
                           setResetValues((old) => ({
                             ...old,
@@ -540,60 +554,90 @@ export default function GoalsPage() {
                       <Button
                         variant="destructive-ghost"
                         data-testid="goal-delete"
-                        onClick={() => {
+                        disabled={pending()}
+                        onClick={() =>
                           requestExit(() => {
+                            clearDraft();
                             setDeleting(entry);
                             setReplacement("");
-                          });
-                        }}
+                          })
+                        }
                       >
                         <Trash2 class="size-4" aria-hidden="true" /> Delete
                         goal…
                       </Button>
                     </Show>
                   </div>
-                </div>
+                </>
+              )}
+            </Show>
+            <Show when={adding()} keyed>
+              {(draft) => (
+                <GoalEditor
+                  disabled={pending()}
+                  initial={draft.definition}
+                  plugins={plugins()}
+                  onInspectPlugin={inspectPlugin}
+                  onRegister={(editor) => registerEditor(draft.id, editor)}
+                  onSave={save}
+                />
+              )}
+            </Show>
+            <Show when={error()}>
+              <div role="alert" class="text-sm text-destructive space-y-2">
+                <p>{error()}</p>
+                <Show when={canRetryPersistence()}>
+                  <Button
+                    variant="outline"
+                    disabled={busy()}
+                    onClick={() =>
+                      report(
+                        perform(async () => {
+                          await persistGoalSettings();
+                        })
+                      )
+                    }
+                  >
+                    Retry saving to device
+                  </Button>
+                </Show>
+              </div>
+            </Show>
+          </div>
+          <footer class="shrink-0 flex flex-col gap-2 border-t border-border bg-background p-4 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              class="min-h-11"
+              disabled={pending()}
+              onClick={() => requestExit(clearDraft)}
+            >
+              Cancel
+            </Button>
+            <Button
+              class="min-h-11 min-w-36 gap-1"
+              data-testid="goal-save"
+              disabled={
+                !dirty() ||
+                pending() ||
+                Object.values(editors()).some((editor) => editor.pending())
+              }
+              onClick={save}
+            >
+              <Show
+                when={busy()}
+                fallback={<Save class="size-4" aria-hidden="true" />}
+              >
+                <LoaderCircle
+                  class="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
               </Show>
-            </section>
-          )}
-        </For>
-        <Show when={adding()} keyed>
-          {(draft) => (
-            <section class="rounded border border-border bg-card text-card-foreground p-4 space-y-3">
-              <h4 class="font-medium">New goal</h4>
-              <GoalEditor
-                initial={draft.definition}
-                plugins={plugins()}
-                onInspectPlugin={inspectPlugin}
-                onRegister={(editor) => registerEditor(draft.id, editor)}
-                onSave={save}
-              />
-            </section>
-          )}
-        </Show>
-        <Show when={!adding()}>
-          <Button
-            variant="accent"
-            class="min-h-11 gap-1"
-            data-testid="goal-add"
-            onClick={() => {
-              setDeleting(undefined);
-              const scheduler = getBuiltInGoals()[0].config.scheduler;
-              setAdding({
-                id: crypto.randomUUID(),
-                definition: {
-                  displayName: "",
-                  description: "",
-                  config: getCustomGoalConfig(scheduler),
-                },
-              });
-            }}
-          >
-            <Plus class="size-4" aria-hidden="true" />
-            Add goal
-          </Button>
-        </Show>
-      </fieldset>
+              {busy() ? "Saving…" : "Save changes"}
+            </Button>
+          </footer>
+          <Confirmation />
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

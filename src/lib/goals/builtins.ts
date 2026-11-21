@@ -29,7 +29,7 @@ const ladders = [
   {
     id: "00000000-0000-0000-0000-000000000002",
     name: "initial_learn",
-    displayName: "Initial learning",
+    displayName: "Learn",
     description:
       "Learn the tune well enough to play it through independently, without frequent prompts.",
     intervalsDays: [0.1, 0.5, 1, 2, 4],
@@ -82,7 +82,7 @@ const ladders = [
   {
     id: "00000000-0000-0000-0000-000000000004",
     name: "session_ready",
-    displayName: "Session ready",
+    displayName: "Session",
     description:
       "Prepare to join in confidently and keep the tune flowing when playing with others.",
     intervalsDays: [0.5, 1, 2, 3, 5],
@@ -106,7 +106,7 @@ const ladders = [
   {
     id: "00000000-0000-0000-0000-000000000005",
     name: "performance_polish",
-    displayName: "Performance polish",
+    displayName: "Polish",
     description:
       "Refine a familiar tune into a reliable, controlled and expressive performance.",
     intervalsDays: [2, 5, 10, 15, 21],

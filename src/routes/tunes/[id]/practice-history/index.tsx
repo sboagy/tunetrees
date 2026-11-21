@@ -14,7 +14,7 @@ import {
   useParams,
 } from "@solidjs/router";
 import { eq, isNull, or } from "drizzle-orm";
-import { ChevronLeft, LoaderCircle, Plus, Save } from "lucide-solid";
+import { LoaderCircle, Plus, Save, X } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -65,6 +65,10 @@ import {
 import { buildHistoryEvents } from "@/lib/goals/practice-history";
 import { readGoalPracticeContext } from "@/lib/goals/resolve";
 import { readGoalSettingsCatalog } from "@/lib/goals/settings";
+import {
+  tuneTaskReturn,
+  tuneTaskReturnState,
+} from "@/lib/tune-task-navigation";
 import { HistoryEventsTable } from "./HistoryEventsTable";
 
 interface DraftPracticeRecord {
@@ -121,7 +125,9 @@ const PracticeHistoryPage: Component = () => {
     scope: string;
     db: ReturnType<typeof localDb>;
   } | null>(null);
-  const [historyGoal, setHistoryGoal] = createSignal("");
+  // Undefined means the user has not selected a filter in this history scope.
+  // An explicit empty string keeps All goals selected, even with one goal.
+  const [selectedHistoryGoal, setHistoryGoal] = createSignal<string>();
   const forms = new WeakMap<
     NonNullable<ReturnType<typeof localDb>>,
     Map<string, ReturnType<typeof createEntryForm>>
@@ -154,7 +160,7 @@ const PracticeHistoryPage: Component = () => {
   createEffect(() => {
     const scope = `${userIdInt()}:${currentRepertoireId()}:${params.id}`;
     if (scope) {
-      setHistoryGoal("");
+      setHistoryGoal(undefined);
       setDeleteTarget(null);
     }
   });
@@ -169,8 +175,7 @@ const PracticeHistoryPage: Component = () => {
     catalogEntries().find((entry) => entry.row.id === draftRecord()?.goalId)
   );
   const returnPath = createMemo(() => {
-    const state = location.state as { from?: string } | undefined;
-    return state?.from || `/tunes/${params.id}`;
+    return tuneTaskReturn(location.state, params.id);
   });
 
   const [tune] = createResource(
@@ -224,6 +229,13 @@ const PracticeHistoryPage: Component = () => {
       userIdInt() ?? ""
     )
   );
+
+  const historyGoal = createMemo(() => {
+    const selected = selectedHistoryGoal();
+    if (selected !== undefined) return selected;
+    const keys = new Set(events().map((event) => event.goalKey));
+    return keys.size === 1 ? [...keys][0] : "";
+  });
 
   createEffect(() => {
     if (
@@ -294,8 +306,8 @@ const PracticeHistoryPage: Component = () => {
     return parsed.toISOString();
   };
 
-  const handleBack = () => {
-    navigate(returnPath());
+  const handleClose = () => {
+    navigate(returnPath(), { state: tuneTaskReturnState(location.state) });
   };
 
   const handleStartAdd = async () => {
@@ -468,17 +480,6 @@ const PracticeHistoryPage: Component = () => {
               <div class="order-first flex flex-wrap items-center gap-2 self-end lg:order-none lg:self-auto">
                 <Button
                   type="button"
-                  variant="ghost"
-                  class="min-h-11 gap-1"
-                  onClick={handleBack}
-                  disabled={isSavingDraft() || !!pendingSave()}
-                  data-testid="practice-history-cancel-button"
-                >
-                  <ChevronLeft class="size-4" aria-hidden="true" />
-                  <span>Back</span>
-                </Button>
-                <Button
-                  type="button"
                   variant="accent"
                   class="min-h-11 gap-1"
                   onClick={handleStartAdd}
@@ -487,6 +488,18 @@ const PracticeHistoryPage: Component = () => {
                 >
                   <Plus class="size-4" aria-hidden="true" />
                   <span>Add</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  class="min-h-11 min-w-11"
+                  aria-label="Close practice history"
+                  title="Close practice history"
+                  onClick={handleClose}
+                  disabled={isSavingDraft() || !!pendingSave()}
+                  data-testid="practice-history-cancel-button"
+                >
+                  <X class="size-4" aria-hidden="true" />
                 </Button>
               </div>
             </div>

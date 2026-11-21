@@ -138,23 +138,27 @@ test.describe("GOALS-001: Goals settings", () => {
     });
   });
 
-  test("saves collapsed goal drafts together and guards Settings dismissal", async ({
+  test("saves goals independently and guards modal dismissal", async ({
     page,
   }) => {
     await openSettingsTab(page, "goals");
     const recall = page.getByTestId(
-      "goal-panel-00000000-0000-0000-0000-000000000001"
+      "goal-edit-00000000-0000-0000-0000-000000000001"
     );
     const fluency = page.getByTestId(
-      "goal-panel-00000000-0000-0000-0000-000000000003"
+      "goal-edit-00000000-0000-0000-0000-000000000003"
     );
+    const editor = page.getByTestId("goal-editor-dialog");
+    await expect(page.getByTestId("goal-save")).toHaveCount(0);
+    await recall.click();
     await expect(page.getByTestId("goal-save")).toBeDisabled();
-    await recall.getByRole("button", { name: "Edit", exact: true }).click();
-    await recall.getByTestId("goal-minimum").fill("2");
-    await recall.getByRole("button", { name: "Collapse", exact: true }).click();
-    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
-    await fluency.getByTestId("goal-minimum").fill("1");
-    await page.getByTestId("settings-close-button").click();
+    await page.getByTestId("goal-minimum").fill("2");
+    await page.getByTestId("goal-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(editor).toHaveCount(0, { timeout: 10000 });
+    await fluency.click();
+    await page.getByTestId("goal-minimum").fill("1");
+    await editor.getByRole("button", { name: "Close", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Discard changes?" })
     ).toBeVisible({ timeout: 10000 });
@@ -162,52 +166,47 @@ test.describe("GOALS-001: Goals settings", () => {
       page.getByRole("button", { name: "Keep editing" })
     ).toBeFocused();
     await page.getByRole("button", { name: "Keep editing" }).click();
-    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("1");
+    await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
     await page.getByTestId("goal-save").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await expect(page.getByTestId("goal-save")).toBeDisabled({
-      timeout: 10000,
-    });
+    await expect(editor).toHaveCount(0, { timeout: 10000 });
     await page.reload();
     await openSettingsTab(page, "goals");
-    await recall.getByRole("button", { name: "Edit", exact: true }).click();
-    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
-    await expect(recall.getByTestId("goal-minimum")).toHaveValue("2");
-    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("1");
+    await recall.click();
+    await expect(page.getByTestId("goal-minimum")).toHaveValue("2");
+    await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+    await fluency.click();
+    await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
   });
 
-  test("reveals invalid collapsed goals before saving and preserves other edits", async ({
+  test("focuses invalid goal fields and discards only unsaved dialog edits", async ({
     page,
   }) => {
     await openSettingsTab(page, "goals");
     const recall = page.getByTestId(
-      "goal-panel-00000000-0000-0000-0000-000000000001"
+      "goal-edit-00000000-0000-0000-0000-000000000001"
     );
-    const fluency = page.getByTestId(
-      "goal-panel-00000000-0000-0000-0000-000000000003"
-    );
-    await recall.getByRole("button", { name: "Edit", exact: true }).click();
-    await recall.getByTestId("goal-name").fill("");
-    await recall.getByRole("button", { name: "Collapse", exact: true }).click();
-    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
-    await fluency.getByTestId("goal-minimum").fill("1");
+    await recall.click();
+    await page.getByTestId("goal-name").fill("");
     await page.getByTestId("goal-save").click();
-    await expect(recall.getByTestId("goal-name")).toBeFocused({
-      timeout: 10000,
-    });
-    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("1");
-    await page.getByTestId("settings-close-button").click();
+    await expect(page.getByTestId("goal-name")).toBeFocused({ timeout: 10000 });
+    await page
+      .getByTestId("goal-editor-dialog")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "Discard changes", exact: true })
       .click();
-    await expect(page.getByTestId("settings-modal")).toHaveCount(0, {
+    await expect(page.getByTestId("goal-editor-dialog")).toHaveCount(0, {
       timeout: 10000,
     });
-    await openSettingsTab(page, "goals");
-    await recall.getByRole("button", { name: "Edit", exact: true }).click();
-    await fluency.getByRole("button", { name: "Edit", exact: true }).click();
-    await expect(recall.getByTestId("goal-name")).toHaveValue("Recall");
-    await expect(fluency.getByTestId("goal-minimum")).toHaveValue("0");
+    await expect(page.getByTestId("settings-modal")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(recall).toBeFocused();
+    await recall.click();
+    await expect(page.getByTestId("goal-name")).toHaveValue("Recall");
+    await expect(page.getByTestId("goal-save")).toBeDisabled();
   });
 
   test("persists the per-goal same-day FSRS option", async ({ page }) => {
@@ -391,15 +390,15 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
 
     const goalTrigger = row.locator("button", { hasText: /recall/i }).first();
     await expect(goalTrigger).toBeVisible({ timeout: 10000 });
-    await clickGoalBadgeMenuItem(page, goalTrigger, /^Session ready/);
+    await clickGoalBadgeMenuItem(page, goalTrigger, /^Session/);
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    await expect(row.getByText("Session ready", { exact: true })).toBeVisible({
+    await expect(row.getByText("Session", { exact: true })).toBeVisible({
       timeout: 10000,
     });
 
     const updatedGoalTrigger = row
-      .locator("button", { hasText: /Session ready/i })
+      .locator("button", { hasText: /Session/i })
       .first();
     await clickGoalBadgeMenuItem(page, updatedGoalTrigger, /Edit Goals/i);
 

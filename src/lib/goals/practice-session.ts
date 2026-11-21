@@ -7,6 +7,7 @@ import {
 } from "../db/schema";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import type { EvaluationChoice } from "./config";
+import { recordedEvaluationColor } from "./evaluation-colors";
 import { readHistoryEvent } from "./practice-history";
 import { readGoalRepertoireSnapshot } from "./resolve";
 
@@ -67,14 +68,18 @@ export function readPracticeSession(
           throw new Error(
             "Practice tune is no longer active in this repertoire"
           );
+        const event = row.event
+          ? readHistoryEvent(row.event, snapshot.goals, userId)
+          : null;
         return [
           row.queue.tuneRef,
           {
             ...row,
-            submittedLabel: row.event
-              ? readHistoryEvent(row.event, snapshot.goals, userId)
-                  .evaluationLabel
-              : "Not available",
+            submittedLabel: event?.evaluationLabel ?? "Not available",
+            submittedColor: recordedEvaluationColor(
+              event?.action ?? null,
+              event?.rating ?? null
+            ),
             definition: snapshot.resolveAssignment(assignment),
           },
         ];
@@ -87,6 +92,7 @@ export interface PracticeEvaluationModel {
   loadDuePreviews?: () => Promise<Record<string, string>>;
   completed: boolean;
   submittedLabel?: string;
+  submittedColor?: string;
   error?: string;
   pending: boolean;
   unavailable?: boolean;

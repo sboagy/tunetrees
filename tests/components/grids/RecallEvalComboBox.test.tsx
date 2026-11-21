@@ -13,7 +13,7 @@ const choices: EvaluationChoice[] = [
   },
 ];
 
-it("preserves the selected evaluation's label and explanation", () => {
+it("shows only the selected evaluation label in the closed picker", () => {
   render(() => (
     <RecallEvalComboBox
       tuneId="tune"
@@ -22,9 +22,7 @@ it("preserves the selected evaluation's label and explanation", () => {
       onChange={vi.fn()}
     />
   ));
-  expect(screen.getByTestId("recall-eval-tune").textContent).toContain(
-    "Good: Recalled correctly"
-  );
+  expect(screen.getByTestId("recall-eval-tune").textContent).toBe("Good");
 });
 
 it("uses goal-provided labels rather than reconstructing them from the choice ID", () => {
@@ -38,9 +36,7 @@ it("uses goal-provided labels rather than reconstructing them from the choice ID
       onChange={vi.fn()}
     />
   ));
-  expect(screen.getByTestId("recall-eval-tune").textContent).toContain(
-    "Remembered: Without a prompt"
-  );
+  expect(screen.getByTestId("recall-eval-tune").textContent).toBe("Remembered");
 });
 
 it("does not add a separator to the unset choice", () => {
@@ -74,4 +70,29 @@ it("calculates estimates for an initially open controlled menu without selecting
   expect(await screen.findByText(/If practiced now: due/)).toBeDefined();
   expect(load).toHaveBeenCalledOnce();
   expect(change).not.toHaveBeenCalled();
+});
+
+it("keeps ladder explanations and scheduling effects in the open menu", () => {
+  render(() => (
+    <RecallEvalComboBox
+      tuneId="tune"
+      choices={[
+        {
+          id: "back",
+          label: "Loses the flow",
+          description: "Drops out or loses the tune",
+          action: { kind: "back" },
+        },
+      ]}
+      value="back"
+      onChange={vi.fn()}
+      open={true}
+    />
+  ));
+  expect(screen.getByTestId("recall-eval-tune").textContent).toBe(
+    "Loses the flow"
+  );
+  expect(screen.getByTestId("recall-eval-option-back").textContent).toContain(
+    "Drops out or loses the tune — Move back one interval"
+  );
 });

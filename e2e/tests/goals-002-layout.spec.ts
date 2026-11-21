@@ -41,7 +41,7 @@ for (const theme of ["light", "dark"] as const) {
         "goal-panel-00000000-0000-0000-0000-000000000001"
       );
       await recall.getByRole("button", { name: "Edit", exact: true }).click();
-      await recall
+      await page
         .getByTestId("goal-name")
         .fill(
           "Recall — maintaining my repertoire with confident independent playing"
@@ -49,7 +49,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.screenshot({
         path: testInfo.outputPath("goals-expanded.png"),
       });
-      const content = page.getByTestId("settings-content");
+      const content = page.getByTestId("goal-editor-dialog");
       expect
         .soft(
           await content.evaluate(
@@ -61,7 +61,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByTestId("goal-save")).toBeInViewport();
       await page.getByTestId("goal-save").click();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
-      await expect(page.getByTestId("goal-save")).toBeDisabled({
+      await expect(page.getByTestId("goal-editor-dialog")).toHaveCount(0, {
         timeout: 10000,
       });
       await page.screenshot({
@@ -300,3 +300,42 @@ for (const theme of ["light", "dark"] as const) {
     }
   });
 }
+
+test("ladder evaluations use available height and keep the final choice reachable", async ({
+  page,
+  testUser,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await setupForPracticeTestsParallel(page, testUser, {
+    repertoireTunes: [CATALOG_TUNE_KESH_ID],
+    scheduleDaysAgo: 1,
+    startTab: "practice",
+  });
+  const tt = new TuneTreesPage(page);
+  const row = tt.getRows("scheduled").first();
+  await row
+    .getByRole("button", { name: /recall/i })
+    .first()
+    .click();
+  await page.getByTestId("goal-option-session_ready").click();
+  const evaluation = page.getByTestId(`recall-eval-${CATALOG_TUNE_KESH_ID}`);
+  await evaluation.click();
+  const menu = page.getByTestId(`recall-eval-menu-${CATALOG_TUNE_KESH_ID}`);
+  const last = page.getByTestId("recall-eval-option-session_ready");
+  await expect(last).toContainText("If practiced now: due", { timeout: 10000 });
+  // Once preview lines arrive, all choices must fit without the old fixed-height cap.
+  await expect
+    .poll(() => menu.evaluate((el) => el.scrollHeight - el.clientHeight), {
+      timeout: 10000,
+    })
+    .toBeLessThanOrEqual(1);
+  await expect(last).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 667, height: 320 });
+  await evaluation.click();
+  await expect(last).toContainText("If practiced now: due", { timeout: 10000 });
+  await last.scrollIntoViewIfNeeded();
+  await expect(last).toBeInViewport({ ratio: 1 });
+  await last.click();
+  await expect(evaluation).toContainText("Session-ready", { timeout: 10000 });
+});

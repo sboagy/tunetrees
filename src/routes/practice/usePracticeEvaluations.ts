@@ -444,6 +444,7 @@ export function usePracticeEvaluations(
         completed:
           !!row?.queue.completedAt && !repeating().has(tuneId) && !hasDraft,
         submittedLabel,
+        submittedColor: row?.submittedColor,
         pending:
           requests().has(`evaluation:${tuneId}`) ||
           requests().has(`goal:${tuneId}`) ||

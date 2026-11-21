@@ -56,7 +56,7 @@ export function PracticeEvaluationCell(props: {
             <span
               class={
                 props.model?.submittedLabel
-                  ? "text-foreground"
+                  ? (props.model.submittedColor ?? "text-foreground")
                   : submitted().colorClass
               }
             >

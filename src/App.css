@@ -719,3 +719,14 @@
     overflow: visible;
   }
 }
+
+/* Goal task dialogs retain reachable actions when the keyboard/landscape is short. */
+@media (max-height: 480px) {
+  .settings-task-dialog {
+    overflow-y: auto;
+  }
+  .settings-task-body {
+    flex: none;
+    overflow: visible;
+  }
+}

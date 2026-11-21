@@ -35,6 +35,16 @@ export function HistoryEventsTable(props: {
   deletingIds: Set<string>;
   onDelete: (id: string) => void;
 }) {
+  const [expandedIds, setExpandedIds] = createSignal<ReadonlySet<string>>(
+    new Set()
+  );
+  const toggleDetails = (id: string) =>
+    setExpandedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const goalKey = () => props.goalKey;
   const setGoalKey = (key: string) => props.onGoalChange(key);
   const options = createMemo(() => {
@@ -122,7 +132,17 @@ export function HistoryEventsTable(props: {
     {
       id: "details",
       header: "Scheduler details",
-      cell: (context) => <EventDetails event={context.row.original} />,
+      cell: (context) => (
+        <Button
+          variant="ghost"
+          class="min-h-11 gap-1"
+          aria-expanded={expandedIds().has(context.row.id)}
+          aria-controls={`history-details-${context.row.id}`}
+          onClick={() => toggleDetails(context.row.id)}
+        >
+          <ChevronDown class="size-4" aria-hidden="true" /> Details
+        </Button>
+      ),
     },
     {
       id: "actions",
@@ -256,23 +276,35 @@ export function HistoryEventsTable(props: {
           <tbody>
             <For each={table.getRowModel().rows}>
               {(row) => (
-                <tr
-                  class="border-t border-border hover:bg-accent"
-                  data-testid={`practice-history-event-${row.id}`}
-                >
-                  <For each={row.getVisibleCells()}>
-                    {(cell) => (
-                      <td
-                        class={`px-2 py-1.5 align-top ${numericColumns.has(cell.column.id) ? "text-right tabular-nums" : "text-left"}`}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
+                <>
+                  <tr
+                    class="border-t border-border hover:bg-accent"
+                    data-testid={`practice-history-event-${row.id}`}
+                  >
+                    <For each={row.getVisibleCells()}>
+                      {(cell) => (
+                        <td
+                          class={`px-2 py-1.5 align-top ${numericColumns.has(cell.column.id) ? "text-right tabular-nums" : "text-left"}`}
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </td>
+                      )}
+                    </For>
+                  </tr>
+                  <Show when={expandedIds().has(row.id)}>
+                    <tr
+                      id={`history-details-${row.id}`}
+                      class="border-t border-border bg-muted/30"
+                    >
+                      <td colSpan={row.getVisibleCells().length} class="p-4">
+                        <EventDetails event={row.original} />
                       </td>
-                    )}
-                  </For>
-                </tr>
+                    </tr>
+                  </Show>
+                </>
               )}
             </For>
           </tbody>
@@ -368,7 +400,6 @@ export function HistoryEventsTable(props: {
 }
 
 function EventDetails(props: { event: HistoryEvent }) {
-  const [open, setOpen] = createSignal(false);
   const details = createMemo(() => {
     const state = props.event.state;
     if (state.kind === "fsrs6")
@@ -394,43 +425,32 @@ function EventDetails(props: { event: HistoryEvent }) {
       ];
     return [["Scheduler details", "Not available"]];
   });
-  const id = () => `history-details-${props.event.record.id}`;
   return (
-    <div>
-      <Button
-        variant="ghost"
-        class="min-h-11"
-        aria-expanded={open()}
-        aria-controls={id()}
-        onClick={() => setOpen(!open())}
-      >
-        <ChevronDown class="size-4" aria-hidden="true" /> Details
-      </Button>
-      <Show when={open()}>
-        <div id={id()} class="space-y-2 py-2">
-          <dl class="text-sm">
-            <For each={details()}>
-              {([label, value]) => (
-                <div>
-                  <dt class="text-muted-foreground">{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              )}
-            </For>
-            <dt class="text-muted-foreground">State sequence</dt>
-            <dd>{props.event.episode}</dd>
-          </dl>
-          <Show when={props.event.description}>
-            <p>{props.event.description}</p>
-          </Show>
-          <Show when={props.event.legacy}>
-            <p>Legacy event</p>
-          </Show>
-          <For each={props.event.notices}>
-            {(notice) => <p class="text-muted-foreground">{notice}</p>}
-          </For>
-        </div>
+    <section
+      class="space-y-3"
+      aria-label={`Details for ${formatPracticeHistoryDate(props.event.record.practiced)}`}
+    >
+      <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
+        <For
+          each={[...details(), ["State sequence", String(props.event.episode)]]}
+        >
+          {([label, value]) => (
+            <div>
+              <dt class="text-muted-foreground">{label}</dt>
+              <dd class="break-words tabular-nums">{value}</dd>
+            </div>
+          )}
+        </For>
+      </dl>
+      <Show when={props.event.description}>
+        <p>{props.event.description}</p>
       </Show>
-    </div>
+      <Show when={props.event.legacy}>
+        <p>Legacy event</p>
+      </Show>
+      <For each={props.event.notices}>
+        {(notice) => <p class="text-muted-foreground">{notice}</p>}
+      </For>
+    </section>
   );
 }
