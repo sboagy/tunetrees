@@ -55,10 +55,42 @@ jobs:
         id: tunetrees_ref
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      # Older refs predate .nvmrc and used Node.js 24.
+      - name: Select Node.js version
+        id: node-version
+        shell: bash
+        run: |
+          if [[ -e .nvmrc || -L .nvmrc ]]; then
+            if LC_ALL=C tr -d '\t\r\n' < .nvmrc | LC_ALL=C grep -a '[[:cntrl:]]' > /dev/null; then
+              echo "::error::.nvmrc contains invalid characters" >&2
+              exit 1
+            fi
+            # Ignore comments and metadata without treating leading >= or <= as keys.
+            version="$(LC_ALL=C awk '
+              { sub(/#.*/, ""); gsub(/^[[:space:]]+|[[:space:]]+$/, "") }
+              /^$/ { next }
+              /^[^<>=][^=]*=/ {
+                key = $0
+                sub(/=.*/, "", key)
+                sub(/[[:space:]]+$/, "", key)
+                if (key == "node" || keys[key]++) invalid = 1
+                next
+              }
+              { if (count++) invalid = 1; version = $0 }
+              END { if (invalid || !count) exit 1; print version }
+            ' .nvmrc)" || {
+              echo "::error::.nvmrc must contain a single valid Node.js version" >&2
+              exit 1
+            }
+          else
+            version=24
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ steps.node-version.outputs.version }}
           cache: "npm"
           cache-dependency-path: |
             package-lock.json
