@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": "=24"
+    "node": "^26"
   },
   "scripts": {
     "postinstall": "node scripts/patch-supabase-sourcemaps.js",
@@ -142,7 +142,7 @@
     "jodit": "^4.19.7",
     "loglevel": "^1.9.2",
     "lucide-solid": "^1.73.0",
-    "oosync": "https://codeload.github.com/sboagy/oosync/tar.gz/86618d964426b024d48b7251aeee51264b611655",
+    "oosync": "https://codeload.github.com/sboagy/oosync/tar.gz/8d23ed29e2f53729771a369b69727ec3bffd0f02",
     "papaparse": "^5.7.1",
     "quickjs-emscripten": "^0.32.0",
     "solid-js": "^1.9.18",

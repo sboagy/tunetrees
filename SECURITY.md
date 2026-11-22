@@ -117,7 +117,7 @@ dependency changes. Development dependencies can execute in builds and CI with
 access to source code, credentials, and release artifacts; a clean production
 audit does not establish that those workflows are safe.
 
-Run all four commands independently from the repository root using Node 24:
+Run all four commands independently from the repository root using Node 26:
 
 ```bash
 npm run audit:summary
