@@ -12,8 +12,8 @@ import { shouldClearConsumedScheduledOverride } from "../services/scheduled-over
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import { nonFsrsCompatibility } from "./calculate";
 import {
-  normalizePracticeInterval,
   practiceEventContent as eventContent,
+  normalizePracticeInterval,
 } from "./practice-event-content";
 import {
   pluginPreviewReceiptHash,
