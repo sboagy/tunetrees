@@ -409,6 +409,27 @@ test("ladder evaluations use available height and keep the final choice reachabl
   await expect(evaluation).toBeFocused({ timeout: 10000 });
 });
 
+test("320px: skipped dates retain touch targets without widening the dialog", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto("/user-settings/goals");
+  await page.getByTestId("shared-practice-calendar").click();
+  const dialog = page.getByTestId("practice-calendar-dialog");
+  const dates = dialog.locator("[data-date]");
+  await expect(dates.first()).toBeVisible({ timeout: 10000 });
+  expect(
+    await dates.evaluateAll((buttons) =>
+      buttons.every(
+        (button) => button.clientWidth >= 44 && button.clientHeight >= 44
+      )
+    )
+  ).toBe(true);
+  expect(await dialog.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(
+    0
+  );
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`${theme}: shared calendar saves and guards unfinished edits`, async ({
     page,
@@ -430,9 +451,16 @@ for (const theme of ["light", "dark"] as const) {
       "not yet applied to practice scheduling",
       { timeout: 10000 }
     );
-    await page.getByTestId("calendar-days").fill("4");
-    await page.getByTestId("calendar-weekly").fill('{"monday":true}');
-    await page.getByTestId("calendar-exceptions").fill("[]");
+    const monday = dialog.getByRole("button", { name: "Monday", exact: true });
+    const day = dialog.locator("[data-date]").first();
+    const savedMonday = String(
+      (await monday.getAttribute("aria-pressed")) !== "true"
+    );
+    const savedDate = String(
+      (await day.getAttribute("aria-pressed")) !== "true"
+    );
+    await monday.click();
+    await day.click();
     await page.getByTestId("calendar-save").scrollIntoViewIfNeeded();
     await expect(page.getByTestId("calendar-save")).toBeInViewport();
     await page.screenshot({ path: testInfo.outputPath("calendar-editor.png") });
@@ -441,25 +469,23 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).toHaveCount(0, { timeout: 10000 });
     await page.reload();
     await page.getByTestId("shared-practice-calendar").click();
-    await expect(page.getByTestId("calendar-days")).toHaveValue("4", {
+    await expect(monday).toHaveAttribute("aria-pressed", savedMonday, {
       timeout: 10000,
     });
-    await expect(page.getByTestId("calendar-weekly")).toHaveValue(
-      '{"monday":true}'
-    );
-    await page.getByTestId("calendar-days").fill("2");
+    await expect(day).toHaveAttribute("aria-pressed", savedDate);
+    await monday.click();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await page
       .getByRole("button", { name: "Keep Editing", exact: true })
       .click();
-    await expect(page.getByTestId("calendar-days")).toHaveValue("2");
+    await expect(monday).not.toHaveAttribute("aria-pressed", savedMonday);
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await page
       .getByRole("button", { name: "Discard Changes", exact: true })
       .click();
     await expect(dialog).toHaveCount(0, { timeout: 10000 });
     await page.getByTestId("shared-practice-calendar").click();
-    await expect(page.getByTestId("calendar-days")).toHaveValue("4", {
+    await expect(monday).toHaveAttribute("aria-pressed", savedMonday, {
       timeout: 10000,
     });
   });

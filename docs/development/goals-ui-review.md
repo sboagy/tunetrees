@@ -315,3 +315,16 @@ Post-review validation: all 1,511 unit tests across 117 files pass, as do
 typecheck, lint, formatting, and diff checks. The full browser suite was not
 rerun after these final review fixes. More user-requested manual UI tweaks
 come next; the second design-system audit has not begun.
+
+### Manual review: Shared Practice Calendar pickers (2026-11-25)
+
+Settings → Goals → Shared Practice Calendar (F/E/R): weekday toggles replace the
+numeric target and weekly JSON editor. Selecting weekdays derives the count;
+date exceptions use an inline, multi-select month calendar. Month navigation
+does not change the draft. Both selections save together, and neither changes
+queue scheduling (#959). An older count without named days is preserved until
+the user chooses weekdays; unsupported stored rules are not overwritten.
+
+Focused component tests (6) and typecheck passed. Desktop/mobile browser tests
+were updated but not run for this change. Visual, keyboard-only, and assistive
+technology checks remain open for manual review.

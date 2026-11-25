@@ -58,15 +58,14 @@ test.describe("USERSETTINGS-001: Goal daily settings", () => {
       )
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByLabel("Min Reviews Per Day")).toHaveCount(0);
-    await expect(page.getByTestId("calendar-days")).toBeEditable({
-      timeout: 10000,
-    });
-    await expect(page.getByTestId("calendar-weekly")).toBeEditable({
-      timeout: 10000,
-    });
-    await expect(page.getByTestId("calendar-exceptions")).toBeEditable({
-      timeout: 10000,
-    });
+    await expect(
+      page.getByRole("button", { name: "Monday", exact: true })
+    ).toBeEnabled({ timeout: 10000 });
+    await expect(
+      page
+        .getByTestId("calendar-exceptions")
+        .getByRole("button", { name: "Next month" })
+    ).toBeEnabled({ timeout: 10000 });
     await expect(page.getByTestId("calendar-save")).toBeDisabled({
       timeout: 10000,
     });

@@ -1,5 +1,12 @@
 import { CalendarDays, Save } from "lucide-solid";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+} from "solid-js";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -18,6 +25,13 @@ import {
   updateSchedulingOptions,
 } from "@/lib/db/queries/user-settings";
 
+import {
+  readDates,
+  readWeekdays,
+  SkippedDatesPicker,
+  weekdays,
+} from "./PracticeCalendarPicker";
+
 export interface CalendarEditorGuard {
   open: () => boolean;
   pending: () => boolean;
@@ -28,28 +42,14 @@ const fields = (saved: SchedulingOptions | null) => ({
   weekly: saved?.weeklyRules ?? "",
   exceptions: saved?.exceptions ?? "",
 });
-function calendarJson(
-  text: string,
-  array: boolean,
-  label: string
-): string | null {
-  if (!text.trim()) return null;
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw new Error(`${label} must contain valid JSON.`);
-  }
-  if (
-    array
-      ? !Array.isArray(value)
-      : value === null || typeof value !== "object" || Array.isArray(value)
-  )
-    throw new Error(`${label} must be a JSON ${array ? "array" : "object"}.`);
-  return JSON.stringify(value);
+
+function weeklyPracticeSummary(selectedCount: number, savedDays: string) {
+  if (selectedCount === 1) return "1 day per week";
+  if (selectedCount > 1) return `${selectedCount} days per week`;
+  if (savedDays)
+    return `Previously saved: ${savedDays} days per week. Select weekdays to replace this target.`;
+  return "No weekly practice days selected.";
 }
-const inputClass =
-  "min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-foreground";
 
 /** Calendar editing preserves the existing fields; scheduler integration is #959. */
 export function PracticeCalendarSummary(props: {
@@ -67,12 +67,40 @@ export function PracticeCalendarSummary(props: {
   let session:
     | { db: NonNullable<ReturnType<typeof localDb>>; userId: string }
     | undefined;
-  let form: HTMLFormElement | undefined;
-  let weeklyInput: HTMLTextAreaElement | undefined;
-  let exceptionsInput: HTMLTextAreaElement | undefined;
-  const [invalidField, setInvalidField] = createSignal<
-    "weekly" | "exceptions"
-  >();
+  const selectedDays = createMemo(() =>
+    readWeekdays(draft().weekly, draft().days)
+  );
+  const selectedDates = createMemo(() => readDates(draft().exceptions));
+  const toggleDay = (day: string) => {
+    const selected = selectedDays();
+    if (!selected) return;
+    const next = weekdays.filter((value) =>
+      value === day ? !selected.includes(day) : selected.includes(value)
+    );
+    const original = baseline();
+    const reverted =
+      JSON.stringify(next) ===
+      JSON.stringify(readWeekdays(original.weekly, original.days));
+    const selectedCount = next.length ? String(next.length) : "";
+    setDraft({
+      ...draft(),
+      days: reverted ? original.days : selectedCount,
+      weekly: reverted
+        ? original.weekly
+        : JSON.stringify(
+            Object.fromEntries(next.map((value) => [value.toLowerCase(), true]))
+          ),
+    });
+  };
+  const changeDates = (next: string[]) =>
+    setDraft({
+      ...draft(),
+      exceptions:
+        JSON.stringify(next) ===
+        JSON.stringify(readDates(baseline().exceptions))
+          ? baseline().exceptions
+          : JSON.stringify(next),
+    });
   createEffect(() => {
     const db = localDb();
     const userId = user()?.id;
@@ -133,26 +161,13 @@ export function PracticeCalendarSummary(props: {
     if (busy() || !ready() || !session || !isCurrent()) return;
     const savingSession = session;
     setError("");
-    setInvalidField(undefined);
-    if (!form?.reportValidity()) return;
     setBusy(true);
     try {
       if (!retryPersistence()) {
         const value = draft();
         const daysPerWeek = value.days === "" ? null : Number(value.days);
-        const validateJson = (
-          field: "weekly" | "exceptions",
-          label: string
-        ) => {
-          try {
-            return calendarJson(value[field], field === "exceptions", label);
-          } catch (cause) {
-            setInvalidField(field);
-            throw cause;
-          }
-        };
-        const weeklyRules = validateJson("weekly", "Weekly Rules");
-        const exceptions = validateJson("exceptions", "Date Exceptions");
+        const weeklyRules = value.weekly || null;
+        const exceptions = value.exceptions || null;
         const current = await getSchedulingOptions(session.db, session.userId);
         if (session !== savingSession || !isCurrent())
           throw new Error("The settings session changed. Reopen the calendar.");
@@ -190,11 +205,7 @@ export function PracticeCalendarSummary(props: {
             : "Could not save the calendar. Try again."
         );
     } finally {
-      if (session === savingSession) {
-        setBusy(false);
-        if (invalidField() === "weekly") weeklyInput?.focus();
-        if (invalidField() === "exceptions") exceptionsInput?.focus();
-      }
+      if (session === savingSession) setBusy(false);
     }
   };
   return (
@@ -210,6 +221,7 @@ export function PracticeCalendarSummary(props: {
       <AlertDialogTrigger
         as={Button}
         variant="outline"
+        disabled={!user()?.id || !localDb()}
         class="min-h-11 gap-1"
         data-testid="shared-practice-calendar"
       >
@@ -238,68 +250,69 @@ export function PracticeCalendarSummary(props: {
         </Show>
         <Show when={ready()}>
           <form
-            ref={form}
-            class="space-y-4"
+            class="min-w-0 space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
               save();
             }}
           >
-            <fieldset disabled={pending()} class="space-y-4">
-              <label class="block space-y-1 text-sm">
-                <span>Days per Week (Optional)</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="7"
-                  step="1"
-                  class={inputClass}
-                  data-testid="calendar-days"
-                  value={draft().days}
-                  onInput={(event) =>
-                    setDraft({ ...draft(), days: event.currentTarget.value })
+            <fieldset disabled={pending()} class="min-w-0 space-y-4">
+              <fieldset class="space-y-2" data-testid="calendar-weekly">
+                <legend class="text-sm font-medium">
+                  Weekly Practice Days
+                </legend>
+                <Show
+                  when={selectedDays()}
+                  fallback={
+                    <p class="text-sm text-muted-foreground">
+                      Your existing weekly rule is preserved but cannot be
+                      edited with this picker.
+                    </p>
                   }
-                />
-              </label>
-              <label class="block space-y-1 text-sm">
-                <span>Weekly Rules (Optional JSON Object)</span>
-                <textarea
-                  rows={4}
-                  class={inputClass}
-                  data-testid="calendar-weekly"
-                  ref={weeklyInput}
-                  aria-invalid={invalidField() === "weekly"}
-                  aria-describedby={
-                    invalidField() === "weekly" ? "calendar-error" : undefined
-                  }
-                  value={draft().weekly}
-                  onInput={(event) =>
-                    setDraft({ ...draft(), weekly: event.currentTarget.value })
-                  }
-                />
-              </label>
-              <label class="block space-y-1 text-sm">
-                <span>Date Exceptions (Optional JSON Array)</span>
-                <textarea
-                  rows={4}
-                  class={inputClass}
-                  data-testid="calendar-exceptions"
-                  ref={exceptionsInput}
-                  aria-invalid={invalidField() === "exceptions"}
-                  aria-describedby={
-                    invalidField() === "exceptions"
-                      ? "calendar-error"
-                      : undefined
-                  }
-                  value={draft().exceptions}
-                  onInput={(event) =>
-                    setDraft({
-                      ...draft(),
-                      exceptions: event.currentTarget.value,
-                    })
-                  }
-                />
-              </label>
+                >
+                  {(days) => (
+                    <>
+                      <div class="flex flex-wrap gap-1">
+                        <For each={weekdays}>
+                          {(day) => (
+                            <Button
+                              type="button"
+                              class="h-11 min-w-11 px-2"
+                              variant={
+                                days().includes(day) ? "default" : "outline"
+                              }
+                              aria-label={day}
+                              aria-pressed={days().includes(day)}
+                              onClick={() => toggleDay(day)}
+                            >
+                              {day.slice(0, 3)}
+                            </Button>
+                          )}
+                        </For>
+                      </div>
+                      <p
+                        class="text-sm text-muted-foreground"
+                        data-testid="calendar-days"
+                      >
+                        {weeklyPracticeSummary(days().length, draft().days)}
+                      </p>
+                    </>
+                  )}
+                </Show>
+              </fieldset>
+              <Show
+                when={selectedDates()}
+                fallback={
+                  <p class="text-sm text-muted-foreground">
+                    Your existing date exceptions are preserved but cannot be
+                    edited with this picker.
+                  </p>
+                }
+              >
+                {(dates) => (
+                  <SkippedDatesPicker dates={dates()} onChange={changeDates} />
+                )}
+              </Show>
             </fieldset>
             <div class="flex flex-wrap justify-end gap-2">
               <Button
