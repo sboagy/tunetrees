@@ -11,7 +11,10 @@ import { parseGoalPluginState } from "../plugins/goal-scheduler";
 import { shouldClearConsumedScheduledOverride } from "../services/scheduled-override";
 import { normalizePracticeTimestamp } from "../utils/practice-history";
 import { nonFsrsCompatibility } from "./calculate";
-import { practiceEventContent as eventContent } from "./practice-event-content";
+import {
+  normalizePracticeInterval,
+  practiceEventContent as eventContent,
+} from "./practice-event-content";
 import {
   pluginPreviewReceiptHash,
   practiceContextFingerprints,
@@ -279,7 +282,8 @@ function checkedPluginPreview(draft: Draft): CommitPreview {
   if (
     !Number.isFinite(intervalDays) ||
     intervalDays < 0 ||
-    intervalDays !== draft.intervalDays
+    normalizePracticeInterval(intervalDays) !==
+      normalizePracticeInterval(draft.intervalDays)
   )
     throw new Error("Invalid plugin result interval");
   return {

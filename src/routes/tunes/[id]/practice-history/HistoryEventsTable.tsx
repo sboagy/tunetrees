@@ -1,12 +1,17 @@
 import { createTable, flexRender } from "@tanstack/solid-table";
 import { ChevronDown, Trash2 } from "lucide-solid";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, type JSX, Show } from "solid-js";
 import {
   type ColumnDef,
   gridTableFeatures,
 } from "@/components/grids/tanstack-table";
 import { Button } from "@/components/ui/button";
 import { BarChart, LineChart } from "@/components/ui/charts";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { HistoryEvent } from "@/lib/goals/practice-history";
 import {
   historyStabilitySeries,
@@ -16,6 +21,31 @@ import {
   formatPracticeHistoryDate,
   getPracticeHistoryStateLabel,
 } from "./practice-history-utils";
+
+// Describe recorded event values, not the tune's current scheduling state.
+const columnDescriptions: Record<string, string> = {
+  practiced:
+    "When this practice took place, displayed in your local time zone.",
+  goal: "The goal recorded for this practice. Changing the tune's current goal does not relabel its history.",
+  evaluation: "The evaluation recorded when this practice was submitted.",
+  due: "The next due date recorded by this event. Later practice or schedule changes may have changed the tune's current due date.",
+  interval:
+    "The scheduling interval recorded for this event, in days. Fractional values include partial days.",
+  details:
+    "Inspect this event's scheduler, recorded state and available historical context.",
+  actions:
+    "Actions on this recorded practice entry. Deleting an entry is different from removing a tune from a queue.",
+  stability:
+    "FSRS memory stability in days, recorded after this practice. Higher values indicate more durable recall.",
+  difficulty:
+    "FSRS's estimate of how difficult this tune is to recall, recorded after this practice.",
+  reps: "The number of reviews in the recorded FSRS state. This is not a lifetime count across every goal.",
+  lapses: "The number of lapses in the recorded FSRS state.",
+  status:
+    "The FSRS learning state recorded after this practice: new, learning, review or relearning.",
+  ladder:
+    "The interval ladder position recorded after this practice, counted from one.",
+};
 
 const numericColumns = new Set([
   "interval",
@@ -29,6 +59,7 @@ const numericColumns = new Set([
 /** The same chronological event table is available at every viewport width.
  * Filtering affects presentation only; episode identities were computed upstream. */
 export function HistoryEventsTable(props: {
+  actions?: JSX.Element;
   events: HistoryEvent[];
   goalKey: string;
   onGoalChange: (key: string) => void;
@@ -97,7 +128,7 @@ export function HistoryEventsTable(props: {
   const columns: ColumnDef<HistoryEvent>[] = [
     {
       id: "practiced",
-      header: "Date practiced",
+      header: "Date Practiced",
       cell: (context) =>
         formatPracticeHistoryDate(context.row.original.record.practiced),
     },
@@ -117,7 +148,7 @@ export function HistoryEventsTable(props: {
     },
     {
       id: "due",
-      header: "Recorded due date",
+      header: "Recorded Due Date",
       cell: (context) =>
         formatPracticeHistoryDate(context.row.original.record.due),
     },
@@ -131,7 +162,7 @@ export function HistoryEventsTable(props: {
     },
     {
       id: "details",
-      header: "Scheduler details",
+      header: "Scheduler Details",
       cell: (context) => (
         <Button
           variant="ghost"
@@ -155,7 +186,7 @@ export function HistoryEventsTable(props: {
           disabled={props.deletingIds.has(context.row.original.record.id)}
           onClick={() => props.onDelete(context.row.original.record.id)}
         >
-          <Trash2 class="size-4" aria-hidden="true" /> Delete entry
+          <Trash2 class="size-4" aria-hidden="true" /> Delete Entry
         </Button>
       ),
     },
@@ -189,7 +220,7 @@ export function HistoryEventsTable(props: {
     if (events().some((event) => event.state.kind === "ladder")) {
       extra.push({
         id: "ladder",
-        header: "Ladder position",
+        header: "Ladder Position",
         cell: (context) => {
           const state = context.row.original.state;
           return state.kind === "ladder"
@@ -221,24 +252,19 @@ export function HistoryEventsTable(props: {
             onChange={(event) => setGoalKey(event.currentTarget.value)}
             data-testid="practice-history-goal-filter"
           >
-            <option value="">All goals</option>
+            <option value="">All Goals</option>
             <For each={options()}>
               {(option) => <option value={option.key}>{option.label}</option>}
             </For>
           </select>
         </label>
-        <Show when={goalKey()}>
-          <Button
-            class="min-h-11"
-            variant="ghost"
-            onClick={() => setGoalKey("")}
-          >
-            Clear filters
-          </Button>
-        </Show>
-        <output class="text-sm text-muted-foreground">
+        <output
+          class="flex min-h-11 items-center text-sm text-muted-foreground"
+          data-testid="practice-history-session-count"
+        >
           {events().length} of {props.events.length} sessions
         </output>
+        <div class="ml-auto flex min-h-11 items-center">{props.actions}</div>
       </div>
       <p class="text-sm text-muted-foreground">
         Recorded labels and due dates describe each submitted event. Filtering
@@ -262,10 +288,26 @@ export function HistoryEventsTable(props: {
                         scope="col"
                         class={`px-2 py-1.5 font-medium ${numericColumns.has(header.id) ? "text-right" : "text-left"}`}
                       >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
+                        <Popover>
+                          <PopoverTrigger
+                            as="button"
+                            type="button"
+                            class="min-h-11 w-full rounded-sm [text-align:inherit] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label={`About ${typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : header.id}`}
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                          </PopoverTrigger>
+                          <PopoverContent
+                            aria-label={`About ${typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : header.id}`}
+                            class="text-sm"
+                            data-testid={`history-column-info-${header.id}`}
+                          >
+                            {columnDescriptions[header.id]}
+                          </PopoverContent>
+                        </Popover>
                       </th>
                     )}
                   </For>
@@ -319,10 +361,6 @@ export function HistoryEventsTable(props: {
         class="flex flex-wrap gap-6 text-sm"
         data-testid="practice-history-summary"
       >
-        <div>
-          <dt>Sessions in view</dt>
-          <dd class="tabular-nums">{summary().totalSessions}</dd>
-        </div>
         <Show when={goalKey()}>
           <div>
             <dt>Average known interval (days)</dt>
@@ -413,8 +451,8 @@ function EventDetails(props: { event: HistoryEvent }) {
       ];
     if (state.kind === "ladder")
       return [
-        ["Scheduler", "Interval ladder"],
-        ["Ladder position", String(state.state.ladderIndex + 1)],
+        ["Scheduler", "Interval Ladder"],
+        ["Ladder Position", String(state.state.ladderIndex + 1)],
         ["Recorded action", props.event.action ?? "Not available"],
       ];
     if (state.kind === "plugin")
@@ -423,7 +461,7 @@ function EventDetails(props: { event: HistoryEvent }) {
         ["Plugin version", String(state.state.pluginVersion)],
         ["State version", String(state.state.stateVersion)],
       ];
-    return [["Scheduler details", "Not available"]];
+    return [["Scheduler Details", "Not available"]];
   });
   return (
     <section

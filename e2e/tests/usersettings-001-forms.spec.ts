@@ -45,7 +45,7 @@ test.describe("USERSETTINGS-001: Goal daily settings", () => {
     await page.waitForTimeout(500);
   });
 
-  test("shows shared calendar preferences without inactive editing controls", async ({
+  test("offers editable shared calendar preferences with scheduling limitations disclosed", async ({
     page,
   }) => {
     await expect(
@@ -54,11 +54,22 @@ test.describe("USERSETTINGS-001: Goal daily settings", () => {
     await page.getByTestId("shared-practice-calendar").click();
     await expect(
       page.getByText(
-        /Weekly rules and date exceptions are not currently applied/
+        /These values are saved, but are not yet applied to practice scheduling/
       )
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByLabel("Min Reviews Per Day")).toHaveCount(0);
-    await expect(page.getByLabel("Weekly Rules (JSON)")).toHaveCount(0);
+    await expect(page.getByTestId("calendar-days")).toBeEditable({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("calendar-weekly")).toBeEditable({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("calendar-exceptions")).toBeEditable({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("calendar-save")).toBeDisabled({
+      timeout: 10000,
+    });
   });
 
   test("validates a goal minimum against its finite maximum", async ({
@@ -98,7 +109,7 @@ test.describe("USERSETTINGS-001: Goal daily settings", () => {
     await recall.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
     await expect(page.getByTestId("goal-maximum")).toHaveValue("4");
-    // Reset stages defaults in the goal dialog; only Save changes persists them.
+    // Reset stages defaults in the goal dialog; only Save Changes persists them.
     await page.getByTestId("goal-reset").click();
     await expect(page.getByTestId("goal-minimum")).toHaveValue("3");
     await expect(page.getByTestId("goal-maximum")).toHaveValue("10");
@@ -136,7 +147,7 @@ test.describe("USERSETTINGS-001: Legacy FSRS settings link", () => {
       .click();
     await new TuneTreesPage(page).goalFsrsAdvanced.click();
     await expect(
-      page.getByLabel("Desired retention (0–1)", { exact: true })
+      page.getByLabel("Desired Retention (0–1)", { exact: true })
     ).toBeVisible({ timeout: 10000 });
     await expect(
       page.getByLabel("Algorithm Type", { exact: true })

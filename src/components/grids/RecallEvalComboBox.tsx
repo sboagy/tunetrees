@@ -173,7 +173,8 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
           onClick={(event) => event.stopPropagation()}
         >
           <span
-            class={`min-w-0 break-words whitespace-normal ${selectedOption().color}`}
+            // Match the submitted control's checkmark (size-4) and gap-1.
+            class={`min-w-0 pl-5 break-words whitespace-normal ${selectedOption().color}`}
           >
             {selectedOption().label}
           </span>
@@ -193,7 +194,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
           >
             <Show when={props.loadDuePreviews && !previewStatus()}>
               <p class="px-3 pt-2 pb-1 text-xs text-muted-foreground">
-                Scheduling estimates
+                Scheduling Estimates
               </p>
             </Show>
             <Show when={previewStatus()}>
@@ -267,7 +268,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
               data-testid="recall-eval-explain"
               class="flex min-h-11 items-center justify-between gap-2 px-3 py-2 text-sm text-muted-foreground data-[highlighted]:bg-accent cursor-pointer"
             >
-              Explain choices
+              Explain Choices
               <ChevronDown
                 class="size-4 shrink-0"
                 classList={{ "rotate-180": explainChoices() }}
@@ -282,7 +283,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
                 props.onChange("");
               }}
             >
-              Clear evaluation
+              Clear Evaluation
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

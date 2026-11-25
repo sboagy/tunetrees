@@ -1,5 +1,5 @@
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { ChevronDown } from "lucide-solid";
+import { Check, ChevronDown } from "lucide-solid";
 import { createSignal, Show } from "solid-js";
 import type { PracticeEvaluationModel } from "../../lib/goals/practice-session";
 import { Button } from "../ui/button";
@@ -71,20 +71,31 @@ export function PracticeEvaluationCell(props: {
           <DropdownMenu.Trigger
             data-testid={`practice-again-${props.tuneId}`}
             disabled={props.model?.pending || !props.onPracticeAgain}
-            class="inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-left text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+            class="w-full flex min-h-11 items-center justify-between rounded-md border border-transparent px-3 py-1.5 text-left text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
             onPointerDown={menuPosition.onTriggerPointerDown}
             onClick={(event) => event.stopPropagation()}
           >
-            <span
-              class={
-                props.model?.submittedLabel
-                  ? (props.model.submittedColor ?? "text-foreground")
-                  : submitted().colorClass
-              }
-            >
-              {props.model?.submittedLabel ?? submitted().label}
+            <span class="flex min-w-0 items-center gap-1">
+              <Check
+                class="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <span class="sr-only">Submitted: </span>
+              <span
+                class={
+                  "min-w-0 break-words " +
+                  (props.model?.submittedLabel
+                    ? (props.model.submittedColor ?? "text-foreground")
+                    : submitted().colorClass)
+                }
+              >
+                {props.model?.submittedLabel ?? submitted().label}
+              </span>
             </span>
-            <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
+            <ChevronDown
+              class="size-4 shrink-0 ml-2 text-muted-foreground"
+              aria-hidden="true"
+            />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
@@ -100,7 +111,7 @@ export function PracticeEvaluationCell(props: {
                 data-testid="practice-again-action"
                 onSelect={props.onPracticeAgain}
               >
-                Practice again
+                Practice Again
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

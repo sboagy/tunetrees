@@ -117,6 +117,9 @@ test.describe("Practice Evaluation Interaction", () => {
     await expect(submitButton).toBeEnabled();
   });
 
+  // Skipped: legacy count assertions read asynchronous staging updates without
+  // waiting and allow a nonzero baseline. Re-enable after deterministic fixture
+  // setup and awaited count/disabled-state assertions replace those assumptions.
   test.skip("should disable Submit button when evaluation changed to (Not Set)", async ({
     page,
   }) => {
@@ -188,6 +191,9 @@ test.describe("Practice Evaluation Interaction", () => {
     expect(total).toBeGreaterThanOrEqual(baseline);
   });
 
+  // Skipped: this legacy test conditionally selects however many rows it finds
+  // and reads counts before staging settles. Re-enable with exactly two seeded
+  // targets and awaited count assertions for each clear operation.
   test.skip("should correctly decrement count when clearing evaluations", async ({
     page,
   }) => {
@@ -214,7 +220,7 @@ test.describe("Practice Evaluation Interaction", () => {
     const afterAdd = await parseCount();
     expect(afterAdd).toBe(baseline + numToAdd);
 
-    // Clear evaluations for the same two rows
+    // Clear Evaluations for the same two rows
     if (ids.length >= 1) {
       await selectEvalFor(ids[0], "not-set");
     }

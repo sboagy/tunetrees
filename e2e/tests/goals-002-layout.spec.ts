@@ -91,13 +91,13 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeInViewport();
       await page.getByTestId("practice-history-discard-button").click();
       await expect(
-        page.getByRole("button", { name: "Keep editing" })
+        page.getByRole("button", { name: "Keep Editing" })
       ).toBeFocused({ timeout: 10000 });
       await page.screenshot({
         path: testInfo.outputPath("history-discard.png"),
       });
       await page
-        .getByRole("button", { name: "Discard changes", exact: true })
+        .getByRole("button", { name: "Discard Changes", exact: true })
         .click();
       await expect(form).toHaveCount(0);
     });
@@ -165,12 +165,32 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByTestId("practice-history-save-button").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(page.getByTestId("practice-history-add-form")).toHaveCount(0);
+    await expect(
+      page.getByTestId("practice-history-session-count")
+    ).toContainText("1", { timeout: 10000 });
+    await expect(
+      page.getByRole("button", { name: "Clear Filters" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Sessions in view", { exact: true })
+    ).toHaveCount(0);
     await page
       .getByTestId("practice-history-goal-filter")
       .selectOption({ label: "Recall" });
     await expect(
       page.getByTestId("practice-history-stability-chart")
     ).toBeVisible({ timeout: 10000 });
+    const dueHeader = page.getByRole("button", {
+      name: "About Recorded Due Date",
+      exact: true,
+    });
+    await dueHeader.click();
+    await expect(page.getByTestId("history-column-info-due")).toContainText(
+      "Later practice or schedule changes may have changed the tune's current due date.",
+      { timeout: 10000 }
+    );
+    await page.keyboard.press("Escape");
+    await expect(dueHeader).toBeFocused({ timeout: 10000 });
     for (const viewport of layouts) {
       await page.setViewportSize(viewport);
       const table = page.getByTestId("practice-history-events-table");
@@ -388,3 +408,59 @@ test("ladder evaluations use available height and keep the final choice reachabl
   await page.keyboard.press("Escape");
   await expect(evaluation).toBeFocused({ timeout: 10000 });
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`${theme}: shared calendar saves and guards unfinished edits`, async ({
+    page,
+    testUser,
+  }, testInfo) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    await page.addInitScript(
+      (mode) => localStorage.setItem("themeMode", mode),
+      theme
+    );
+    await setupDeterministicTestParallel(page, testUser, {
+      clearRepertoire: true,
+      seedRepertoire: [],
+    });
+    await page.goto("/user-settings/goals");
+    await page.getByTestId("shared-practice-calendar").click();
+    const dialog = page.getByTestId("practice-calendar-dialog");
+    await expect(dialog).toContainText(
+      "not yet applied to practice scheduling",
+      { timeout: 10000 }
+    );
+    await page.getByTestId("calendar-days").fill("4");
+    await page.getByTestId("calendar-weekly").fill('{"monday":true}');
+    await page.getByTestId("calendar-exceptions").fill("[]");
+    await page.getByTestId("calendar-save").scrollIntoViewIfNeeded();
+    await expect(page.getByTestId("calendar-save")).toBeInViewport();
+    await page.screenshot({ path: testInfo.outputPath("calendar-editor.png") });
+    await page.getByTestId("calendar-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(dialog).toHaveCount(0, { timeout: 10000 });
+    await page.reload();
+    await page.getByTestId("shared-practice-calendar").click();
+    await expect(page.getByTestId("calendar-days")).toHaveValue("4", {
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("calendar-weekly")).toHaveValue(
+      '{"monday":true}'
+    );
+    await page.getByTestId("calendar-days").fill("2");
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Keep Editing", exact: true })
+      .click();
+    await expect(page.getByTestId("calendar-days")).toHaveValue("2");
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Discard Changes", exact: true })
+      .click();
+    await expect(dialog).toHaveCount(0, { timeout: 10000 });
+    await page.getByTestId("shared-practice-calendar").click();
+    await expect(page.getByTestId("calendar-days")).toHaveValue("4", {
+      timeout: 10000,
+    });
+  });
+}

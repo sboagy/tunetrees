@@ -26,7 +26,7 @@ export function createDraftExitGuard(options: {
   globalThis.addEventListener("beforeunload", beforeUnload);
   onCleanup(() => globalThis.removeEventListener("beforeunload", beforeUnload));
 
-  // Keep editing is first so the primitive focuses it after nested focus scopes settle.
+  // Keep Editing is first so the primitive focuses it after nested focus scopes settle.
   const Confirmation = () => {
     return (
       <AlertDialog
@@ -39,7 +39,7 @@ export function createDraftExitGuard(options: {
           class="max-w-md w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto"
           onInteractOutside={(event) => event.preventDefault()}
         >
-          <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+          <AlertDialogTitle>Discard Changes?</AlertDialogTitle>
           <AlertDialogDescription>{options.description}</AlertDialogDescription>
           <div class="flex flex-wrap justify-end gap-2">
             <Button
@@ -47,7 +47,7 @@ export function createDraftExitGuard(options: {
               variant="outline"
               onClick={() => setExitAction(undefined)}
             >
-              Keep editing
+              Keep Editing
             </Button>
             <Button
               class="min-h-11"
@@ -61,7 +61,7 @@ export function createDraftExitGuard(options: {
                 action?.();
               }}
             >
-              Discard changes
+              Discard Changes
             </Button>
           </div>
         </AlertDialogContent>

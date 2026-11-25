@@ -467,7 +467,11 @@ the active goal calculator.
 and validation as practice. Built-in and private-goal edits write personal overrides;
 unchanged fields inherit defaults. Goals Settings opens an independent dialog draft
 for each goal; its Cancel / Save changes footer commits that goal after plugin
-preparation. Reset to defaults changes the draft until saved. There is no outer
+preparation. Evaluation choices have a separate dialog/save boundary that reuses
+`saveGoalSettingsBatch`: for existing goals it persists the scheduler and choices,
+retaining unrelated parent drafts; for new goals it creates the validated goal too.
+The editor updates its baseline after that save, so parent Cancel cannot undo it.
+Reset to defaults changes the draft until saved. There is no outer
 Goals category save footer; dirty/pending exit handling is registered with
 `UserSettingsDialogContext`. The overlay remains outside
 Router to preserve the underlying page, while `SettingsNavigationBoundary` inside Router
@@ -594,8 +598,9 @@ Supabase seed configuration and Rhizome’s seed-directory discovery. The goal
 seed check keeps these restore inputs aligned with the typed defaults. SQLite v28
 uses the guarded rebuild/full-pull path. Active evaluation and daily allocation
 read per-goal settings. Goals owns Advanced FSRS options, daily settings and a
-shared read-only calendar summary. Old Scheduling Options and Spaced Repetition
-links resolve to Goals; inactive weekly rules/exceptions remain stored unchanged. See
+shared calendar editor using the existing scheduling-preferences fields. Old Scheduling
+Options and Spaced Repetition links resolve to Goals. Calendar values persist locally
+and sync, but scheduler consumption remains #959; the editor discloses this limitation. See
 [`goals-implementation.md`](docs/development/goals-implementation.md) for the
 checkpoint boundary and remaining integration work.
 

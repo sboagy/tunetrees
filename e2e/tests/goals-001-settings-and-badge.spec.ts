@@ -160,12 +160,12 @@ test.describe("GOALS-001: Goals settings", () => {
     await page.getByTestId("goal-minimum").fill("1");
     await editor.getByRole("button", { name: "Close", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Discard changes?" })
+      page.getByRole("heading", { name: "Discard Changes?" })
     ).toBeVisible({ timeout: 10000 });
     await expect(
-      page.getByRole("button", { name: "Keep editing" })
+      page.getByRole("button", { name: "Keep Editing" })
     ).toBeFocused();
-    await page.getByRole("button", { name: "Keep editing" }).click();
+    await page.getByRole("button", { name: "Keep Editing" }).click();
     await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
     await page.getByTestId("goal-save").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -195,7 +195,7 @@ test.describe("GOALS-001: Goals settings", () => {
       .getByRole("button", { name: "Cancel", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Discard changes", exact: true })
+      .getByRole("button", { name: "Discard Changes", exact: true })
       .click();
     await expect(page.getByTestId("goal-editor-dialog")).toHaveCount(0, {
       timeout: 10000,
@@ -259,6 +259,7 @@ test.describe("GOALS-001: Goals settings", () => {
     await page
       .getByTestId("goal-scheduler")
       .selectOption({ label: "Named action scheduler (custom scheduler)" });
+    await page.getByTestId("goal-choice-edit-0").click();
     await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
       "Advance",
       { timeout: 10000 }
@@ -268,7 +269,16 @@ test.describe("GOALS-001: Goals settings", () => {
     // Inspection loads the sandbox before going offline; saving must still use
     // the locally stored script and declarations, not contact a remote service.
     await setOfflineForTest(context, true);
-    await page.getByTestId("goal-save").click();
+    await page.getByTestId("goal-choice-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("goal-choice-dialog")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    // The choice saved the new goal too. Cancel must not undo that write.
+    await page
+      .getByTestId("goal-editor-dialog")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
     await expect(page.getByTestId("goal-editor")).toHaveCount(0, {
       timeout: 10000,
     });
@@ -288,6 +298,7 @@ test.describe("GOALS-001: Goals settings", () => {
     await expect(page.getByTestId("goal-plugin-reload")).toBeVisible({
       timeout: 10000,
     });
+    await page.getByTestId("goal-choice-edit-0").click();
     await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
       "At tempo",
       { timeout: 10000 }
@@ -321,8 +332,17 @@ test.describe("GOALS-001: Goals settings", () => {
     await page.getByTestId("goal-intervals").fill("0.5, 1, 2, 3");
     await page.getByTestId("goal-minimum").fill("0");
     await page.getByTestId("goal-unlimited").check();
+    await page.getByTestId("goal-choice-edit-0").click();
     await page.getByTestId("goal-choice-label-0").fill("Start again slowly");
-    await page.getByTestId("goal-save").click();
+    await page.getByTestId("goal-choice-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("goal-choice-dialog")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await page
+      .getByTestId("goal-editor-dialog")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     const createdRow = page
@@ -334,7 +354,7 @@ test.describe("GOALS-001: Goals settings", () => {
     await expect(createdRow).toContainText("Build confidence at session tempo");
     await expect(createdRow).toContainText("Unlimited");
     await createdRow.getByRole("button", { name: "Edit", exact: true }).click();
-    await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
+    await expect(page.getByTestId("goal-choice-summary-0")).toHaveText(
       "Start again slowly"
     );
     await expect(page.getByTestId("goal-intervals")).toHaveValue(

@@ -1083,6 +1083,45 @@ describe("atomic goal practice submission", () => {
     }
   );
 
+  it.each(["again", "hard", "good", "easy"])(
+    "submits a repeat %s after an older review at a non-rounded time",
+    async (evaluationId) => {
+      event("older", "2026-11-01T17:43:12.123Z");
+      await submit([await item()]);
+      await stageGoalPracticeEvaluation(
+        db,
+        {
+          userId: "owner",
+          repertoireId: "rep",
+          tuneId: "tune",
+          evaluationId,
+          practiced: new Date("2026-11-24T23:17:43.987Z"),
+        },
+        () => true
+      );
+      // Reproduce the 15-significant-digit value observed in synced drafts:
+      // a 25-hour interval returned as 1.04166666666667 instead of 25 / 24.
+      const interval = capture()[0].draft.intervalDays;
+      if (interval === null) throw new Error("Missing interval");
+      raw.run("UPDATE table_transient_data SET interval_days = ?", [
+        Number(interval.toPrecision(15)),
+      ]);
+      expect((await submit(capture())).status).toBe("committed");
+      expect(events()).toHaveLength(3);
+    }
+  );
+
+  it("still rejects a stored interval changed by one second", async () => {
+    await item("tune", "again");
+    raw.run(
+      "UPDATE table_transient_data SET interval_days = interval_days + ?",
+      [1 / 86400]
+    );
+    await expect(submit(capture())).rejects.toThrow("Stored preview differs");
+    expect(events()).toHaveLength(0);
+    expect(drafts()).toHaveLength(1);
+  });
+
   it("canceling a repeat preserves completion, history and the next due date", async () => {
     await submit([await item()]);
     const previousEvents = events();
@@ -1180,6 +1219,19 @@ describe("atomic goal practice submission", () => {
       );
       expect(drafts()).toHaveLength(0);
     });
+    it("submits a synced plugin interval rounded by Postgres transport", async () => {
+      raw.run("UPDATE plugin SET script=? WHERE id='selected'", [
+        script.replace("21600000", "90000000"),
+      ]);
+      await item("tune", "smooth");
+      raw.run("UPDATE table_transient_data SET interval_days=?", [
+        Number((25 / 24).toPrecision(15)),
+      ]);
+      expect((await submit(capture())).status).toBe("committed");
+      expect(events()[0].intervalDays).toBe(25 / 24);
+      expect(drafts()).toHaveLength(0);
+    });
+
     it("continues the latest matching plugin state after submission", async () => {
       await submit([await item("tune", "smooth")]);
       const preview = await prepareGoalPracticePreview(db, {

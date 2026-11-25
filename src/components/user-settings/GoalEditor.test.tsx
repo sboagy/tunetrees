@@ -6,7 +6,7 @@ import {
   waitFor,
 } from "@solidjs/testing-library";
 import { createSignal, Show } from "solid-js";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { getBuiltInGoals } from "@/lib/goals/builtins";
 import type { GoalPluginSelection } from "@/lib/goals/plugin-settings";
 import type { EditableGoalDefinition } from "@/lib/goals/settings";
@@ -17,6 +17,7 @@ function EditorHarness(props: {
   initial: EditableGoalDefinition;
   plugins?: { id: string; name: string }[];
   onInspectPlugin?: (id: string) => Promise<GoalPluginSelection>;
+  isNew?: boolean;
   onSave: (
     definition: EditableGoalDefinition,
     selection?: GoalPluginSelection
@@ -39,6 +40,10 @@ function EditorHarness(props: {
         onRegister={(value) => {
           draft = value;
         }}
+        onSaveChoices={async (definition, selection) => {
+          await props.onSave(definition, selection);
+          return definition;
+        }}
         onSave={save}
       />
       <button
@@ -47,7 +52,7 @@ function EditorHarness(props: {
         disabled={draft.pending()}
         onClick={save}
       >
-        Save changes
+        Save Changes
       </button>
       <Show when={failure()}>
         <p role="alert">{failure()}</p>
@@ -55,7 +60,13 @@ function EditorHarness(props: {
     </>
   );
 }
-afterEach(cleanup);
+beforeEach(() => {
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+});
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 function setup(name = "recall") {
   const definition = getBuiltInGoals().find((item) => item.name === name)!;
   const save = vi.fn().mockResolvedValue(undefined);
@@ -83,6 +94,7 @@ it("saves Unlimited and zero minimum without changing evaluation identities", as
 });
 it("preserves focus across consecutive evaluation-label edits", () => {
   setup("fluency");
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
   const input = screen.getByTestId("goal-choice-label-0");
   input.focus();
   fireEvent.input(input, { target: { value: "Needs " } });
@@ -200,10 +212,11 @@ it("offers named plugin effects with editable evaluation labels and descriptions
     target: { value: "plugin:selected" },
   });
   await waitFor(() =>
-    expect(
-      (screen.getByTestId("goal-choice-label-0") as HTMLInputElement).value
-    ).toBe("Advance")
+    expect(screen.getByTestId("goal-choice-summary-0").textContent).toBe(
+      "Advance"
+    )
   );
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
   fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
     target: { value: "Played smoothly" },
   });
@@ -211,7 +224,7 @@ it("offers named plugin effects with editable evaluation labels and descriptions
     target: { value: "repeat" },
   });
   expect(screen.getAllByText("Review in six hours").length).toBeGreaterThan(0);
-  fireEvent.submit(screen.getByTestId("goal-editor"));
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
   expect(save.mock.calls[0][0].config.evaluations[0]).toMatchObject({
     label: "Played smoothly",
@@ -230,16 +243,14 @@ it("retains the previous draft on plugin load failure and retries explicitly", a
       "Plugin unavailable"
     )
   );
-  expect(
-    (screen.getByTestId("goal-choice-label-0") as HTMLInputElement).value
-  ).toBe("Again");
+  expect(screen.getByTestId("goal-choice-summary-0").textContent).toBe("Again");
   fireEvent.submit(screen.getByTestId("goal-editor"));
   expect(save).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: /^Retry$/ }));
   await waitFor(() =>
-    expect(
-      (screen.getByTestId("goal-choice-label-0") as HTMLInputElement).value
-    ).toBe("Advance")
+    expect(screen.getByTestId("goal-choice-summary-0").textContent).toBe(
+      "Advance"
+    )
   );
 });
 it("ignores plugin results after a different scheduler is selected", async () => {
@@ -293,9 +304,11 @@ it("preserves existing plugin options, labels and evaluation identities when rel
       (screen.getByTestId("goal-save") as HTMLButtonElement).disabled
     ).toBe(false)
   );
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
   expect(
     (screen.getByTestId("goal-choice-action-0") as HTMLSelectElement).value
   ).toBe("repeat");
+  fireEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
   fireEvent.submit(screen.getByTestId("goal-editor"));
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
   expect(save.mock.calls[0][0].config).toEqual(initial.config);
@@ -320,9 +333,16 @@ it("shows missing effects and rejects them without inventing a replacement actio
   await waitFor(() =>
     expect(screen.getByTestId("goal-plugin-reload")).toBeTruthy()
   );
+  await waitFor(() =>
+    expect(
+      (screen.getByTestId("goal-choice-edit-0") as HTMLButtonElement).disabled
+    ).toBe(false)
+  );
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
   expect(
     screen.getByRole("option", { name: "Unavailable effect — choose another" })
   ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
   fireEvent.submit(screen.getByTestId("goal-editor"));
   await waitFor(() =>
     expect(screen.getByRole("alert").textContent).toContain(
@@ -330,4 +350,73 @@ it("shows missing effects and rejects them without inventing a replacement actio
     )
   );
   expect(save).not.toHaveBeenCalled();
+});
+
+it("saves a choice immediately without saving an unrelated name draft", async () => {
+  const { save, definition } = setup();
+  fireEvent.input(screen.getByTestId("goal-name"), {
+    target: { value: "Unfinished name" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Try again" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  expect(save.mock.calls[0][0].displayName).toBe(definition.displayName);
+  expect(save.mock.calls[0][0].config.evaluations[0].label).toBe("Try again");
+  expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
+    "Unfinished name"
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("goal-choice-summary-0").textContent).toBe(
+      "Try again"
+    )
+  );
+  fireEvent.submit(screen.getByTestId("goal-editor"));
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+  expect(save.mock.calls[1][0].config.evaluations[0].label).toBe("Try again");
+});
+it("retains a choice while returning to complete a new goal's missing name", async () => {
+  const initial = { ...getBuiltInGoals()[0], displayName: "" };
+  const save = vi.fn().mockResolvedValue(undefined);
+  render(() => <EditorHarness initial={initial} isNew onSave={save} />);
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Try again" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Complete Goal Details" })
+    ).toBeTruthy()
+  );
+  expect(save).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Complete Goal Details" })
+  );
+  expect(screen.getByTestId("goal-choice-summary-0").textContent).toBe(
+    "Try again"
+  );
+  fireEvent.input(screen.getByTestId("goal-name"), {
+    target: { value: "My goal" },
+  });
+  fireEvent.submit(screen.getByTestId("goal-editor"));
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  expect(save.mock.calls[0][0].config.evaluations[0].label).toBe("Try again");
+});
+it("retains choice edits when their immediate save fails", async () => {
+  const { save } = setup();
+  save.mockRejectedValueOnce(new Error("Settings changed"));
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Try again" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(screen.getByRole("alert").textContent).toContain("Settings changed")
+  );
+  expect(
+    (screen.getByTestId("goal-choice-label-0") as HTMLInputElement).value
+  ).toBe("Try again");
 });

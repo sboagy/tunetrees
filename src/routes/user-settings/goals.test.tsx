@@ -13,12 +13,16 @@ import {
   useUserSettingsDialog,
 } from "@/contexts/UserSettingsDialogContext";
 import { getBuiltInGoals } from "@/lib/goals/builtins";
-import type { GoalSettingsEntry } from "@/lib/goals/settings";
+import {
+  type GoalSettingsEntry,
+  GoalSettingsPersistenceError,
+} from "@/lib/goals/settings";
 import GoalsPage from "./goals";
 
 const mocks = vi.hoisted(() => ({
   db: {},
   save: vi.fn(),
+  persist: vi.fn(),
   catalog: vi.fn(),
 }));
 vi.mock("@/lib/auth/AuthContext", () => ({
@@ -39,6 +43,7 @@ vi.mock("@/lib/goals/settings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/goals/settings")>()),
   readGoalSettingsCatalog: mocks.catalog,
   saveGoalSettingsBatch: mocks.save,
+  persistGoalSettings: mocks.persist,
 }));
 
 // No database is used by this UI test; persistence/revision atomicity has separate
@@ -108,6 +113,7 @@ beforeEach(() => {
   vi.spyOn(globalThis, "scrollTo").mockImplementation(() => {});
   mocks.catalog.mockReturnValue({ entries: entries(), unavailable: [] });
   mocks.save.mockResolvedValue(undefined);
+  mocks.persist.mockResolvedValue(undefined);
 });
 afterEach(() => {
   cleanup();
@@ -147,7 +153,7 @@ it("keeps the category and draft when declining navigation, then discards on exp
   fireEvent.click(
     screen.getByRole("button", { name: "Appearance", hidden: true })
   );
-  fireEvent.click(await screen.findByRole("button", { name: "Keep editing" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Keep Editing" }));
   expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
     "My recall"
   );
@@ -155,7 +161,7 @@ it("keeps the category and draft when declining navigation, then discards on exp
     screen.getByRole("button", { name: "Appearance", hidden: true })
   );
   fireEvent.click(
-    await screen.findByRole("button", { name: "Discard changes" })
+    await screen.findByRole("button", { name: "Discard Changes" })
   );
   expect(screen.getByText("Appearance content")).toBeTruthy();
   expect(mocks.save).not.toHaveBeenCalled();
@@ -193,5 +199,204 @@ it("blocks close and category changes during a local save and keeps failed draft
   );
   expect((screen.getByTestId("goal-save") as HTMLButtonElement).disabled).toBe(
     false
+  );
+});
+
+it("keeps an immediately saved choice when canceling unrelated goal edits", async () => {
+  const catalog = entries();
+  mocks.catalog.mockImplementation(() => ({
+    entries: catalog,
+    unavailable: [],
+  }));
+  mocks.save.mockImplementationOnce(async (_db, _user, changes) => {
+    catalog[0].effective = structuredClone(changes[0].definition);
+    catalog[0].overridden = true;
+    catalog[0].revision = "two";
+  });
+  const { first } = setup();
+  fireEvent.click(first.getByRole("button", { name: "Edit" }));
+  fireEvent.input(screen.getByTestId("goal-name"), {
+    target: { value: "Unsaved name" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Try again" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(screen.queryByTestId("goal-choice-dialog")).toBeNull()
+  );
+  expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
+    "Unsaved name"
+  );
+  fireEvent.click(
+    within(screen.getByTestId("goal-editor-dialog")).getByRole("button", {
+      name: /^Cancel$/,
+    })
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Discard Changes" })
+  );
+  await waitFor(() =>
+    expect(screen.queryByTestId("goal-editor-dialog")).toBeNull()
+  );
+  fireEvent.click(screen.getByTestId(`goal-edit-${catalog[0].row.id}`));
+  expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
+    catalog[0].defaults.displayName
+  );
+  expect(screen.getByTestId("goal-choice-summary-0").textContent).toBe(
+    "Try again"
+  );
+  expect(mocks.save).toHaveBeenCalledOnce();
+});
+
+it("guards Settings navigation while a choice has unsaved edits", async () => {
+  const { first } = setup();
+  fireEvent.click(first.getByRole("button", { name: "Edit" }));
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Unfinished choice" },
+  });
+  // Exercise the Settings navigation boundary (also used for routed navigation),
+  // even though the modal makes the background button inert to pointer input.
+  fireEvent.click(
+    screen.getByRole("button", { name: "Appearance", hidden: true })
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Keep Editing" }));
+  expect(
+    (screen.getByTestId("goal-choice-label-0") as HTMLInputElement).value
+  ).toBe("Unfinished choice");
+  expect(screen.queryByText("Appearance content")).toBeNull();
+  expect(mocks.save).not.toHaveBeenCalled();
+});
+
+it("retries only disk persistence and freezes the failed choice operation", async () => {
+  const catalog = entries();
+  catalog[0].overridden = true;
+  mocks.catalog.mockImplementation(() => ({
+    entries: catalog,
+    unavailable: [],
+  }));
+  mocks.save.mockImplementationOnce(async (_db, _user, changes) => {
+    catalog[0].effective = structuredClone(changes[0].definition);
+    throw new GoalSettingsPersistenceError(new Error("Disk unavailable"));
+  });
+  const { first } = setup();
+  fireEvent.click(first.getByRole("button", { name: "Edit" }));
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Try again" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await screen.findByRole("button", { name: "Retry Saving to Device" });
+  expect((screen.getByTestId("goal-reset") as HTMLButtonElement).disabled).toBe(
+    true
+  );
+  expect(
+    screen.getByTestId("goal-choice-label-0").closest("fieldset")?.disabled
+  ).toBe(true);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Appearance", hidden: true })
+  );
+  expect(screen.queryByText("Appearance content")).toBeNull();
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(screen.queryByTestId("goal-choice-dialog")).toBeNull()
+  );
+  expect(mocks.save).toHaveBeenCalledOnce();
+  expect(mocks.persist).toHaveBeenCalledOnce();
+  expect(screen.getByTestId("goal-choice-summary-0").textContent).toBe(
+    "Try again"
+  );
+});
+
+it("requires reopening after an incoming goal update during choice persistence", async () => {
+  const catalog = entries();
+  mocks.catalog.mockImplementation(() => ({
+    entries: catalog,
+    unavailable: [],
+  }));
+  mocks.save.mockImplementationOnce(async (_db, _user, changes) => {
+    catalog[0].effective = {
+      ...structuredClone(changes[0].definition),
+      displayName: "Updated elsewhere",
+    };
+    catalog[0].revision = "incoming";
+  });
+  const { first } = setup();
+  fireEvent.click(first.getByRole("button", { name: "Edit" }));
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Try again" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(
+      within(screen.getByTestId("goal-choice-dialog")).getByRole("alert")
+        .textContent
+    ).toContain("Close and reopen")
+  );
+  expect((screen.getByTestId("goal-save") as HTMLButtonElement).disabled).toBe(
+    true
+  );
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(
+      within(screen.getByTestId("goal-choice-dialog")).getByRole("alert")
+        .textContent
+    ).toContain("changed elsewhere")
+  );
+  expect(mocks.save).toHaveBeenCalledOnce();
+});
+
+it("retains a newly created goal identity and isolates later choice saves from parent drafts", async () => {
+  const catalog = entries();
+  mocks.catalog.mockImplementation(() => ({
+    entries: catalog,
+    unavailable: [],
+  }));
+  mocks.save.mockImplementationOnce(async (_db, _user, changes) => {
+    const change = changes[0];
+    catalog.push({
+      ...entries()[0],
+      row: { ...entries()[0].row, id: change.id, privateFor: "owner" },
+      defaults: structuredClone(change.definition),
+      effective: structuredClone(change.definition),
+    });
+  });
+  mocks.save.mockImplementationOnce(async (_db, _user, changes) => {
+    catalog[2].effective = structuredClone(changes[0].definition);
+  });
+  setup();
+  fireEvent.click(screen.getByTestId("goal-add"));
+  fireEvent.input(screen.getByTestId("goal-name"), {
+    target: { value: "Created goal" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "First save" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(screen.queryByTestId("goal-choice-dialog")).toBeNull()
+  );
+  fireEvent.input(screen.getByTestId("goal-name"), {
+    target: { value: "Unfinished name" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Second save" },
+  });
+  fireEvent.click(screen.getByTestId("goal-choice-save"));
+  await waitFor(() =>
+    expect(screen.queryByTestId("goal-choice-dialog")).toBeNull()
+  );
+  expect(mocks.save.mock.calls[1][2][0].id).toBe(
+    mocks.save.mock.calls[0][2][0].id
+  );
+  expect(catalog[2].effective.displayName).toBe("Created goal");
+  expect(catalog[2].effective.config.evaluations[0].label).toBe("Second save");
+  expect((screen.getByTestId("goal-name") as HTMLInputElement).value).toBe(
+    "Unfinished name"
   );
 });

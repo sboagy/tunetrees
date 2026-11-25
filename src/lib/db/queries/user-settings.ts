@@ -106,9 +106,10 @@ function buildSchedulingOptionsUpdateSet(
       data.maxReviewsPerDay,
       existing.maxReviewsPerDay
     ),
-    daysPerWeek: resolveOptionalUpdate(data.daysPerWeek, existing.daysPerWeek),
-    weeklyRules: resolveOptionalUpdate(data.weeklyRules, existing.weeklyRules),
-    exceptions: resolveOptionalUpdate(data.exceptions, existing.exceptions),
+    // Undefined omits a field; explicit null clears an optional calendar value.
+    daysPerWeek: data.daysPerWeek,
+    weeklyRules: data.weeklyRules,
+    exceptions: data.exceptions,
     autoScheduleNew: toDbBool(data.autoScheduleNew),
     lastModifiedAt: now,
   };

@@ -74,17 +74,17 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     const date = page.getByTestId("practice-history-practiced-input");
     await date.fill("2026-04-19T14:30");
     await page.getByTestId("practice-history-discard-button").click();
-    const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
+    const confirmation = page.getByRole("dialog", { name: "Discard Changes?" });
     await expect(confirmation).toBeVisible({ timeout: 10_000 });
     await expect(
-      confirmation.getByRole("button", { name: "Keep editing" })
+      confirmation.getByRole("button", { name: "Keep Editing" })
     ).toBeFocused();
-    await confirmation.getByRole("button", { name: "Keep editing" }).click();
+    await confirmation.getByRole("button", { name: "Keep Editing" }).click();
     await expect(date).toHaveValue("2026-04-19T14:30");
     await page.getByTestId("practice-history-cancel-button").click();
     await expect(confirmation).toBeVisible({ timeout: 10_000 });
     await expect(page).toHaveURL(/practice-history/);
-    await confirmation.getByRole("button", { name: "Discard changes" }).click();
+    await confirmation.getByRole("button", { name: "Discard Changes" }).click();
     await expect(page).not.toHaveURL(/practice-history/, { timeout: 10_000 });
     await gotoPracticeHistory(page, CATALOG_TUNE_KESH_ID);
     await expect(page.getByTestId("practice-history-add-form")).toHaveCount(0);
@@ -115,7 +115,7 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     const grid = page.locator("table").first();
     await expect(grid).toBeVisible({ timeout: 10_000 });
     await expect(grid.getByText("Easy")).toBeVisible({ timeout: 10_000 });
-    // A sole recorded goal opens with its analytics, but All goals remains
+    // A sole recorded goal opens with its analytics, but All Goals remains
     // an explicit user choice and must not be immediately overridden.
     const filter = page.getByTestId("practice-history-goal-filter");
     await expect(filter.locator("option:checked")).toHaveText("Recall");
@@ -193,7 +193,7 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     });
     await expect(table.getByText("Fluent", { exact: true })).toHaveCount(0);
     await expect(
-      table.getByRole("columnheader", { name: "Stability", exact: true })
+      table.getByRole("columnheader", { name: "About Stability", exact: true })
     ).toBeVisible({ timeout: 10_000 });
     await expect(
       page.getByTestId("practice-history-quality-chart")
@@ -207,7 +207,10 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     });
     await expect(table.getByText("Good", { exact: true })).toHaveCount(0);
     await expect(
-      table.getByRole("columnheader", { name: "Ladder position" })
+      table.getByRole("columnheader", {
+        name: "About Ladder Position",
+        exact: true,
+      })
     ).toBeVisible({ timeout: 10_000 });
     await expect(
       page.getByTestId("practice-history-quality-chart")
@@ -218,14 +221,14 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     ).toHaveText("Fluency");
     await page.getByTestId("practice-history-discard-button").click();
     await page
-      .getByRole("button", { name: "Discard changes", exact: true })
+      .getByRole("button", { name: "Discard Changes", exact: true })
       .click();
     await table
-      .getByRole("button", { name: "Delete entry", exact: true })
+      .getByRole("button", { name: "Delete Entry", exact: true })
       .click();
     await page
       .getByRole("dialog", { name: "Delete practice entry?" })
-      .getByRole("button", { name: "Delete entry", exact: true })
+      .getByRole("button", { name: "Delete Entry", exact: true })
       .click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
     await expect(page.getByTestId("practice-history-goal-filter")).toHaveValue(
@@ -304,14 +307,14 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
     const rows = page.locator("tbody tr");
     await expect(rows).toHaveCount(1);
 
-    await rows.first().getByRole("button", { name: "Delete entry" }).click();
+    await rows.first().getByRole("button", { name: "Delete Entry" }).click();
     const confirmation = page.getByRole("dialog", {
       name: "Delete practice entry?",
     });
     await expect(confirmation).toBeVisible({ timeout: 10_000 });
     await expect(rows).toHaveCount(1);
     await confirmation
-      .getByRole("button", { name: "Delete entry", exact: true })
+      .getByRole("button", { name: "Delete Entry", exact: true })
       .click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
 

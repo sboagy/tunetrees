@@ -243,7 +243,7 @@ test.describe("Fluency scheduling", () => {
     ).toBe(1);
   });
 
-  test("Practice again appends an event and cancellation preserves the prior completion", async ({
+  test("Practice Again appends an event and cancellation preserves the prior completion", async ({
     page,
     context,
     testUser,
@@ -258,6 +258,9 @@ test.describe("Fluency scheduling", () => {
     );
     await tt.setShowSubmitted(true);
     const completed = page.getByTestId(`practice-again-${TEST_TUNE_BANISH_ID}`);
+    await expect(completed).toHaveAccessibleName("Submitted: Effortless", {
+      timeout: 10000,
+    });
     await expect(completed).toContainText("Effortless", { timeout: 10000 });
     await completed.click();
     const submittedMenu = page.getByTestId(

@@ -126,7 +126,7 @@ const PracticeHistoryPage: Component = () => {
     db: ReturnType<typeof localDb>;
   } | null>(null);
   // Undefined means the user has not selected a filter in this history scope.
-  // An explicit empty string keeps All goals selected, even with one goal.
+  // An explicit empty string keeps All Goals selected, even with one goal.
   const [selectedHistoryGoal, setHistoryGoal] = createSignal<string>();
   const forms = new WeakMap<
     NonNullable<ReturnType<typeof localDb>>,
@@ -451,6 +451,19 @@ const PracticeHistoryPage: Component = () => {
     }
   };
 
+  const AddPracticeButton = () => (
+    <Button
+      type="button"
+      variant="accent"
+      class="min-h-11 gap-1"
+      onClick={handleStartAdd}
+      disabled={!canAddRecord()}
+      data-testid="practice-history-add-button"
+    >
+      <Plus class="size-4" aria-hidden="true" />
+      <span>Add</span>
+    </Button>
+  );
   return (
     <div
       class="h-full overflow-y-auto bg-background text-foreground [color-scheme:light] dark:[color-scheme:dark]"
@@ -478,17 +491,6 @@ const PracticeHistoryPage: Component = () => {
               </div>
 
               <div class="order-first flex flex-wrap items-center gap-2 self-end lg:order-none lg:self-auto">
-                <Button
-                  type="button"
-                  variant="accent"
-                  class="min-h-11 gap-1"
-                  onClick={handleStartAdd}
-                  disabled={!canAddRecord()}
-                  data-testid="practice-history-add-button"
-                >
-                  <Plus class="size-4" aria-hidden="true" />
-                  <span>Add</span>
-                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -556,7 +558,7 @@ const PracticeHistoryPage: Component = () => {
                   }}
                 >
                   <header class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background py-3">
-                    <h3 class="text-base font-semibold">Add practice entry</h3>
+                    <h3 class="text-base font-semibold">Add Practice Entry</h3>
                     <div class="flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -619,7 +621,7 @@ const PracticeHistoryPage: Component = () => {
                           }}
                         >
                           <option value="" disabled>
-                            Choose a goal
+                            Choose a Goal
                           </option>
                           <Show when={draft().goalId && !selectedDefinition()}>
                             <option value={draft().goalId} disabled>
@@ -722,6 +724,7 @@ const PracticeHistoryPage: Component = () => {
                 >
                   <div class="py-8 text-center text-muted-foreground">
                     <p>No practice records found for this tune.</p>
+                    <AddPracticeButton />
                     <p class="mt-2 text-sm">
                       Use &quot;Add&quot; to backfill a prior session if needed.
                     </p>
@@ -730,6 +733,7 @@ const PracticeHistoryPage: Component = () => {
 
                 <Match when={(practiceRecords()?.length ?? 0) > 0}>
                   <HistoryEventsTable
+                    actions={<AddPracticeButton />}
                     goalKey={historyGoal()}
                     onGoalChange={setHistoryGoal}
                     events={events()}
@@ -779,7 +783,7 @@ const PracticeHistoryPage: Component = () => {
                     await handleDelete(target.id);
                 }}
               >
-                Delete entry
+                Delete Entry
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

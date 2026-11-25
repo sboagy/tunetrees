@@ -198,3 +198,120 @@ next user-run verification.
 Checkpoint acceptance: the developer reports the full local CI run passing after
 these fixes. Committing this evaluation-chooser and shutdown/re-entry batch for
 hosted CI; manual UI review and the final design-system review remain open.
+
+### Manual feedback round two — header help (2026-11-24)
+
+Source: https://github.com/sboagy/tunetrees/pull/940#issuecomment-7137338740
+Base: `9206ea43`; working-tree changes, existing local dev server.
+
+- Practice History header help (T1/R2/C2): previously static headings did not
+  explain recorded state. Headers now open the shared popover, including an
+  explicit distinction between recorded due dates and the current schedule.
+  Sorting/resizing/column visibility are unchanged.
+- Verification: typecheck, focused Biome and diff whitespace checks pass.
+  Five focused Playwright checks pass (setup plus populated history/retention
+  layouts in light/dark on Chromium/Mobile Chrome). Added assertions for due-date
+  help and Escape restoring header focus. Existing layout checks remain intact.
+- Pending discussion: submitted-state checkmark/alignment, sentence-case label
+  consistency, History toolbar/count/filter simplification, calendar save scope
+  versus currently unsupported calendar scheduling, and choice-dialog draft scope.
+  No changes to those behaviors in this checkpoint. No server restart or commit.
+- Screen-reader and physical-device verification remain untested.
+
+### Round two — immediate evaluation-choice saves (in progress)
+
+Approved behavior: choices appear in a compact table and open a separate editing
+dialog. Save Changes persists through the existing goal settings service. A new
+goal is created with the choice; an existing goal retains unrelated unsaved parent
+fields. Missing new-goal details preserve the choice and offer Complete Goal Details.
+Parent cancellation does not undo saved choices. Deletion confirms and preserves
+recorded practice. The design-system E6 exception records this save boundary.
+
+All 1,499 unit tests pass (including 52 focused editor/route/persistence tests),
+along with typecheck, lint, and formatting. Cases include missing-name recovery,
+unrelated parent drafts, saved choices surviving parent Cancel, and save failure.
+The authorized browser retry passed all five checks: setup plus desktop/mobile
+custom-goal CRUD and named plugin actions saved offline and retained after reload.
+These flows also verify that parent Cancel keeps the newly saved goal/choice.
+The remaining round-two UI requests are not claimed complete by this checkpoint.
+
+CodeRabbit reviewed this working tree. Fixed its accessible-name and E2E-wait
+findings, and prevented a sync update during choice persistence from giving a stale
+parent draft permission to overwrite newer data: the user must close/reopen the goal.
+Its other save-lifetime questions were checked with regressions: new goals retain
+their identity and change to existing-goal save scope; failed disk persistence
+freezes the choice and retries persistence only; Settings navigation respects the
+child draft/pending state. Final typecheck/lint/format and all 1,499 unit tests pass.
+No commit/push. Focused browser verification passed; the full local E2E suite has
+not been rerun for this batch.
+
+### Round two — remaining feedback implementation
+
+- Submitted evaluations have a compact checkmark and accessible “Submitted” label;
+  their chevrons use the same right inset as unsubmitted controls.
+- Practice History places Add in the Goal/filter toolbar, aligns its one session
+  count and removes the redundant Clear Filters and Sessions in View controls.
+- Shared Practice Calendar edits the existing days/weekly-rules/exceptions fields,
+  saves through the existing preferences/sync path, guards unsaved exits and retries
+  disk persistence without repeating the database update. It explicitly discloses
+  that calendar rules do not yet affect scheduling; that work is tracked in #959.
+- Affected menus, actions, labels and discard guards use title-style capitalization.
+  This is a goal-related pass, not certification of every application string.
+
+All 1,503 unit tests, typecheck, lint and formatting pass. New calendar tests cover
+save scope, malformed JSON, guarded navigation and persistence-only retry.
+The first browser launch timed out at 1Password; the authorized retry and
+completed CodeRabbit results are recorded below. Existing choice-dialog browser
+validation above remains valid for that earlier checkpoint.
+No servers restarted and no commit/push performed.
+
+CodeRabbit completed this follow-up review. Fixed optional calendar fields failing
+to clear (explicit null now reaches SQLite), blocked Reset to Defaults while a
+choice save needs persistence recovery, and invalidated old-session choice receipts
+on auth/database changes. Both editor call sites already supply choice persistence;
+existing retry tests verify the mutation is not repeated. A new real-SQLite test
+verifies clearing/reloading all three optional calendar fields and preserving omitted
+preferences. Final validation: all 1,504 unit tests across 117 files, typecheck,
+lint and formatting pass. The authorized browser retry passed all 35 checks
+(setup plus Chromium/Mobile Chrome): light/dark form layouts at narrow, desktop
+and short-landscape sizes; populated History and retention layouts; goal menus
+and recovery; calendar save/reload and guarded cancellation; and Practice Again
+with its submitted accessible label and preserved history. Inspected generated
+light/dark calendar and desktop History screenshots. Log:
+`/tmp/426-round2-layout-retry.log`. Full local E2E has not been rerun for this batch.
+
+### Re-practice preview comparison fix — 2026-11-24
+
+Manual review exposed Submit rejecting Again drafts after sync/reload. Read-only
+local Postgres inspection and the PostgreSQL JS client confirmed 25/24 days is
+returned as 1.04166666666667, versus JS 1.0416666666666667. Exact event-content
+comparison rejected that transport rounding. A SQLite-WASM staging/commit test
+reproduced the same error before the fix. Event comparison now normalizes only
+intervalDays to millisecond resolution; timestamps, labels and scheduler state
+remain exact. Four rating regressions cover a rounded re-practice draft; an
+additional regression confirms a genuine one-second interval change is rejected
+without writing an event or losing the draft. No schema or database data changed.
+All 1,509 unit tests, typecheck and targeted Biome checks pass. Existing drafts
+can be retried after loading the updated app. Browser tests were not rerun for
+this fix. Changes remain uncommitted.
+
+### Round-two reviewed checkpoint — 2026-11-24
+
+The user confirmed the full local E2E suite passes. A final CodeRabbit review
+reported eight findings. Four referenced the old committed implementation:
+both GoalEditor callers already provide independent choice saving, shared
+discard labels match the tests, calendar updates preserve explicit nulls, and
+the approved History toolbar explicitly uses All Goals to clear its sole filter.
+
+Fixed the four remaining findings: calendar JSON errors now identify and focus
+the invalid field; an account/database change releases obsolete calendar save
+recovery and ignores late results; interval help correctly describes partial
+days; checked plugin previews use the same millisecond interval normalization
+as event receipts, accepting transport rounding without accepting changed dates
+or state. Added regression coverage for account changes and synced plugin
+intervals, and strengthened invalid-field accessibility assertions.
+
+Post-review validation: all 1,511 unit tests across 117 files pass, as do
+typecheck, lint, formatting, and diff checks. The full browser suite was not
+rerun after these final review fixes. More user-requested manual UI tweaks
+come next; the second design-system audit has not begun.

@@ -13,11 +13,15 @@ import {
   GoalEditor,
   type GoalEditorDraft,
 } from "@/components/user-settings/GoalEditor";
-import { PracticeCalendarSummary } from "@/components/user-settings/PracticeCalendarSummary";
+import {
+  type CalendarEditorGuard,
+  PracticeCalendarSummary,
+} from "@/components/user-settings/PracticeCalendarSummary";
 import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getPluginsByCapability } from "@/lib/db/queries/plugins";
 import { getBuiltInGoals, getCustomGoalConfig } from "@/lib/goals/builtins";
+import { canonicalJson } from "@/lib/goals/config";
 import { inspectGoalPlugin } from "@/lib/goals/plugin-settings";
 import {
   deleteConfiguredGoal,
@@ -33,7 +37,7 @@ import {
 
 const schedulerLabels = {
   "builtin:fsrs6": "FSRS-6",
-  "builtin:interval-ladder": "Interval ladder",
+  "builtin:interval-ladder": "Interval Ladder",
   plugin: "Custom scheduler",
 };
 
@@ -54,6 +58,7 @@ export default function GoalsPage() {
     []
   );
   const settings = useUserSettingsDialog();
+  const [choiceConflict, setChoiceConflict] = createSignal(false);
   const [editing, setEditing] = createSignal<GoalSettingsEntry>();
   let editorTrigger: HTMLElement | undefined;
   const [editors, setEditors] = createSignal<Record<string, GoalEditorDraft>>(
@@ -75,6 +80,7 @@ export default function GoalsPage() {
     );
   };
   const clearDraft = () => {
+    setChoiceConflict(false);
     setEditing(undefined);
     setResetValues({});
     setAdding(undefined);
@@ -149,6 +155,7 @@ export default function GoalsPage() {
   };
   createEffect(() => {
     // refresh() reads the auth user and database synchronously, tracking both.
+    choiceSaveReceipt = undefined;
     clearDraft();
     setAdding(undefined);
     setDeleting(undefined);
@@ -193,7 +200,7 @@ export default function GoalsPage() {
     } catch (cause) {
       if (!current()) return;
       // The SQLite transaction may have committed before disk persistence failed.
-      // Reload before editing again; Retry saving to device never repeats a mutation.
+      // Reload before editing again; Retry Saving to Device never repeats a mutation.
       setCanRetryPersistence(cause instanceof GoalSettingsPersistenceError);
       setError(cause instanceof Error ? cause.message : String(cause));
       throw cause;
@@ -217,17 +224,103 @@ export default function GoalsPage() {
     }
   };
   const dirty = () =>
-    Boolean(adding()) ||
-    Object.values(editors()).some((editor) => editor.changed());
+    Boolean(
+      adding() && !goals().some((entry) => entry.row.id === adding()?.id)
+    ) || Object.values(editors()).some((editor) => editor.changed());
   const pending = () => busy() || canRetryPersistence();
+  const exitPending = () =>
+    pending() || Object.values(editors()).some((editor) => editor.pending());
   const { requestExit, Confirmation } = createDraftExitGuard({
     dirty,
-    pending,
+    pending: exitPending,
     discard: clearDraft,
     description: "Unsaved changes to this goal will be lost.",
   });
+  let choiceSaveReceipt:
+    | {
+        id: string;
+        db: NonNullable<ReturnType<typeof localDb>>;
+        userId: string;
+        definition: EditableGoalDefinition;
+      }
+    | undefined;
+  // Persist a choice without remounting the parent editor or losing unrelated drafts.
+  const saveChoices = async (
+    id: string,
+    definition: EditableGoalDefinition,
+    reviewedPlugin?: Parameters<
+      typeof saveGoalSettingsBatch
+    >[2][number]["reviewedPlugin"]
+  ) => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId || pending())
+      throw new Error("Settings are not ready to save.");
+    const isCurrent = () =>
+      !disposed && localDb() === db && user()?.id === userId;
+    if (choiceConflict())
+      throw new Error(
+        "This goal changed elsewhere. Close and reopen it before saving more changes."
+      );
+    setBusy(true);
+    try {
+      if (choiceSaveReceipt) {
+        if (
+          choiceSaveReceipt.id !== id ||
+          choiceSaveReceipt.db !== db ||
+          choiceSaveReceipt.userId !== userId
+        )
+          throw new Error("The settings session changed. Reopen Goals.");
+        await persistGoalSettings();
+      } else {
+        try {
+          await saveGoalSettingsBatch(
+            db,
+            userId,
+            [
+              {
+                id,
+                definition,
+                reviewedPlugin,
+                expected: goals().find((entry) => entry.row.id === id),
+              },
+            ],
+            { isCurrent }
+          );
+        } catch (cause) {
+          if (cause instanceof GoalSettingsPersistenceError && isCurrent())
+            choiceSaveReceipt = { id, db, userId, definition };
+          throw cause;
+        }
+      }
+      if (!isCurrent())
+        throw new Error("The settings session changed. Reopen Goals.");
+      const catalog = readGoalSettingsCatalog(db, userId);
+      setGoals(catalog.entries);
+      incrementRepertoireListChanged();
+      incrementPracticeListStagedChanged();
+      const saved = choiceSaveReceipt?.definition ?? definition;
+      choiceSaveReceipt = undefined;
+      // A pull can arrive during disk persistence. Do not give a stale draft
+      // the incoming revision and then allow it to overwrite that update.
+      if (
+        canonicalJson(
+          catalog.entries.find((entry) => entry.row.id === id)?.effective
+        ) !== canonicalJson(saved)
+      ) {
+        setChoiceConflict(true);
+        const message =
+          "The choice was saved, but this goal changed again. Close and reopen it before saving more changes.";
+        setError(message);
+        throw new Error(message);
+      }
+      return saved;
+    } finally {
+      if (!disposed) setBusy(false);
+    }
+  };
   const save = () => {
-    if (busy() || canRetryPersistence()) return;
+    if (busy() || canRetryPersistence() || choiceConflict()) return;
     const changes: GoalSettingsChange[] = [];
     for (const [id, editor] of Object.entries(editors())) {
       const expected = goals().find((entry) => entry.row.id === id);
@@ -246,10 +339,14 @@ export default function GoalsPage() {
       )
     );
   };
+  let calendarGuard: CalendarEditorGuard | undefined;
   onCleanup(
     settings.registerDraft({
-      pending,
-      requestExit,
+      pending: () => exitPending() || Boolean(calendarGuard?.pending()),
+      requestExit: (action) =>
+        calendarGuard?.open()
+          ? calendarGuard.requestExit(action)
+          : requestExit(action),
       // Each goal is an independent modal task; the category has no draft footer.
       footer: () => null,
     })
@@ -282,7 +379,7 @@ export default function GoalsPage() {
               });
             }}
           >
-            <Plus class="size-4" aria-hidden="true" /> Add goal
+            <Plus class="size-4" aria-hidden="true" /> Add Goal
           </Button>
         </div>
         <p class="text-sm text-muted-foreground">
@@ -292,7 +389,11 @@ export default function GoalsPage() {
           editing them does not replace today’s existing queue.
         </p>
       </div>
-      <PracticeCalendarSummary />
+      <PracticeCalendarSummary
+        onRegister={(guard) => {
+          calendarGuard = guard;
+        }}
+      />
       <output class="block text-sm text-muted-foreground">{message()}</output>
       <Show when={deleting()} keyed>
         {(entry) => (
@@ -321,14 +422,14 @@ export default function GoalsPage() {
                 handled first.
               </AlertDialogDescription>
               <label class="block text-sm">
-                <span>Replacement goal</span>
+                <span>Replacement Goal</span>
                 <select
                   class="min-h-11 w-full border border-input rounded bg-background text-foreground p-2"
                   data-testid="goal-replacement"
                   value={replacement()}
                   onChange={(e) => setReplacement(e.currentTarget.value)}
                 >
-                  <option value="">Choose a goal</option>
+                  <option value="">Choose a Goal</option>
                   <For
                     each={goals().filter(
                       (item) => item.row.id !== entry.row.id
@@ -363,7 +464,7 @@ export default function GoalsPage() {
                   )
                 }
               >
-                <Trash2 class="size-4" aria-hidden="true" /> Replace and delete
+                <Trash2 class="size-4" aria-hidden="true" /> Replace and Delete
               </Button>
               <Show when={error()}>
                 <p role="alert" class="text-sm text-destructive">
@@ -408,7 +509,7 @@ export default function GoalsPage() {
                 )
               }
             >
-              Retry saving to device
+              Retry Saving to Device
             </Button>
           </Show>
         </div>
@@ -501,7 +602,7 @@ export default function GoalsPage() {
             <AlertDialogTitle>
               {editing()
                 ? `Edit ${editing()!.effective.displayName}`
-                : "Add goal"}
+                : "Add Goal"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Changes apply to this goal across your repertoires when saved.
@@ -524,11 +625,17 @@ export default function GoalsPage() {
                       <GoalEditor
                         disabled={pending()}
                         initial={initial}
-                        baseline={entry.effective}
+                        baseline={
+                          goals().find((goal) => goal.row.id === entry.row.id)
+                            ?.effective ?? entry.effective
+                        }
                         plugins={plugins()}
                         onInspectPlugin={inspectPlugin}
                         onRegister={(editor) =>
                           registerEditor(entry.row.id, editor)
+                        }
+                        onSaveChoices={(definition, selection) =>
+                          saveChoices(entry.row.id, definition, selection)
                         }
                         onSave={save}
                       />
@@ -539,7 +646,7 @@ export default function GoalsPage() {
                       <Button
                         variant="outline"
                         data-testid="goal-reset"
-                        disabled={pending()}
+                        disabled={exitPending()}
                         onClick={() =>
                           setResetValues((old) => ({
                             ...old,
@@ -547,7 +654,7 @@ export default function GoalsPage() {
                           }))
                         }
                       >
-                        Reset to defaults
+                        Reset to Defaults
                       </Button>
                     </Show>
                     <Show when={entry.row.privateFor !== null}>
@@ -564,7 +671,7 @@ export default function GoalsPage() {
                         }
                       >
                         <Trash2 class="size-4" aria-hidden="true" /> Delete
-                        goal…
+                        Goal…
                       </Button>
                     </Show>
                   </div>
@@ -579,6 +686,10 @@ export default function GoalsPage() {
                   plugins={plugins()}
                   onInspectPlugin={inspectPlugin}
                   onRegister={(editor) => registerEditor(draft.id, editor)}
+                  isNew={!goals().some((entry) => entry.row.id === draft.id)}
+                  onSaveChoices={(definition, selection) =>
+                    saveChoices(draft.id, definition, selection)
+                  }
                   onSave={save}
                 />
               )}
@@ -598,7 +709,7 @@ export default function GoalsPage() {
                       )
                     }
                   >
-                    Retry saving to device
+                    Retry Saving to Device
                   </Button>
                 </Show>
               </div>
@@ -618,6 +729,7 @@ export default function GoalsPage() {
               data-testid="goal-save"
               disabled={
                 !dirty() ||
+                choiceConflict() ||
                 pending() ||
                 Object.values(editors()).some((editor) => editor.pending())
               }
@@ -632,7 +744,7 @@ export default function GoalsPage() {
                   aria-hidden="true"
                 />
               </Show>
-              {busy() ? "Saving…" : "Save changes"}
+              {busy() ? "Saving…" : "Save Changes"}
             </Button>
           </footer>
           <Confirmation />
