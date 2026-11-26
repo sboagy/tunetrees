@@ -64,7 +64,7 @@ test.describe("USERSETTINGS-001: Goal daily settings", () => {
     await expect(
       page
         .getByTestId("calendar-exceptions")
-        .getByRole("button", { name: "Next month" })
+        .getByRole("button", { name: "Next Month" })
     ).toBeEnabled({ timeout: 10000 });
     await expect(page.getByTestId("calendar-save")).toBeDisabled({
       timeout: 10000,

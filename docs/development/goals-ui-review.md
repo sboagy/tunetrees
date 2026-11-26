@@ -1,4 +1,96 @@
-# Goals UI review — first pass
+# Goals UI review
+
+## Second design-system pass — started 2026-11-25
+
+Baseline: `f4402cbe`, after the user completed manual review and reported local
+E2E passing. Remote CI is still running; its outcome is not assumed. This pass
+uses the current design contract, including independent goal/choice saves,
+Close/X plus guarded Cancel, compact overlapping evaluation menus, and the
+approved categorical goal colors. Earlier checkpoints below are historical.
+
+Tracking destination: this report. Scope: Goals summary and editor, evaluation
+choice editor/deletion, shared calendar, goal assignment, active/submitted
+practice evaluation menus, repeat/recovery, Practice History/filter/details/Add,
+and the FSRS retention chart. Shared primitives are checked through these
+consumers; unrelated whole-app issues remain outside this feature audit.
+
+Coverage starts **not tested** for this pass. Planned evidence: current source
+inspection, focused Chromium/Mobile Chrome workflows, light/dark screenshots at
+320/390/768/1280px and short landscape, keyboard/focus checks, and targeted
+regressions for confirmed gaps. Real screen-reader output and physical on-screen
+keyboard behavior require separate manual verification; do not infer them from
+DOM assertions. Record findings and exact completed coverage here before handoff.
+
+### Second-pass findings and fixes
+
+| Surface / entry | Rules | Expected vs observed | Severity / root cause | Fix | Retest |
+| --- | --- | --- | --- | --- | --- |
+| Goals → Shared Practice Calendar → month arrows | A2, C1, R2 | Named icon controls also need hover/focus tooltips and ghost styling; these arrows had names only and outline styling | P2; calendar used bare icon buttons | Shared Tooltip primitives; Previous Month / Next Month labels; retain 44px targets and navigation | Six calendar unit tests pass; desktop/mobile calendar persistence, touch targets, focused tooltip and cross-month keyboard navigation pass |
+| Grid → goal menu → current goal | V2, R2 | The visual checkmark must also expose selection to assistive technology; ordinary menu items had no checked state | P2; selection was rendered only as a decorative checkmark | Kobalte RadioGroup/RadioItem, retaining the existing labels, colors, checkmark and Edit Goals action | Desktop/mobile checked-state, assignment, Edit Goals entry and Escape/focus-return checks pass |
+
+### Second-pass evidence and remaining coverage
+
+- Baseline focused browser run: **69 passed**, Chromium and Mobile Chrome,
+  `goals-001-settings-and-badge`, `goals-002-layout`, and `practice-history`.
+  Log: `/tmp/426-ui-second-pass-baseline.log`. These results precede the two
+  accessibility fixes above; they do not substitute for their retest.
+- Calendar unit tests: **6 passed**; log `/tmp/426-ui-calendar-unit.log`.
+- Post-change focused browser run: **16 passed, 1 failed**. The failed new
+  desktop tooltip test used programmatic focus immediately after pointer-driven
+  dialog opening. Revised it to move the pointer away, Tab from Previous Month,
+  and assert focus before testing the tooltip. Its final desktop/mobile rerun
+  passed (**3 including auth setup**). No assertions were removed. Logs:
+  `/tmp/426-ui-access-review.log`, `/tmp/426-ui-calendar-keyboard.log`.
+- Typecheck, repository lint, targeted Biome checks and `git diff --check` pass.
+  Test setup also printed the existing local PostgreSQL collation-version and
+  Node color-environment warnings; these are not UI failures, and no database
+  maintenance or environment-wide changes were made in response.
+- Source inspection covers the goal badge, calendar keyboard navigation,
+  evaluation-choice dialog/save/delete controls, and goal editor field anatomy.
+- Representative screenshots inspected: dark 390px goal editor; dark 320px
+  populated History; light 390px goal menu; light mobile calendar; dark short
+  landscape evaluation menu. The transient queue toast overlaps part of the
+  last screenshot, so that capture alone is not evidence of all menu choices
+  being unobstructed. Existing interaction checks exercise reachability.
+
+| Coverage | Current result |
+| --- | --- |
+| Goal editing, validation, immediate choice persistence, custom scheduler offline behavior, badge assignment | Pass in baseline focused workflows; post-change badge checks also pass |
+| History Add, mixed-goal filtering, readonly view, deletion, future date, guarded cancellation, return navigation | Pass in baseline focused workflows |
+| Light/dark layout geometry at 320/390/768/1280px and 667×320; long labels; reduced-motion setting | Pass in baseline layout suite; representative screenshots inspected, not a pixel-baseline comparison |
+| Calendar dirty guard, persistence/reload, 44px date targets | Pass in baseline suite and focused units; new tooltip/cross-month keyboard checks also pass |
+| Goal/evaluation menu Escape and focus return; history information popup focus | Pass in baseline layout suite; goal checked-state retest also passes |
+| Notes recovery control reachability | Pass in baseline layout suite; not every conflict/failure variant was rerun in this audit |
+| Retention chart theme switching and populated layout at 1280px | Pass in baseline suite; narrow Analysis review remains outstanding |
+| 200% browser zoom; physical mobile keyboard; actual screen-reader announcements | **Not tested**; viewport resizing and DOM semantics do not prove these cases |
+| Full matrix of incoming edits, failed writes, denied/loading states and concurrent changes | **Not rerun in this pass**; retain existing regression coverage without claiming new audit evidence |
+
+### Review checkpoint — 2026-11-25
+
+The user confirmed manual inspection of these changes and a passing full local
+E2E run. CodeRabbit then reviewed all seven changed files and found one valid
+regression: Kobalte radio menu items default to remaining open after selection.
+Explicit `closeOnSelect` restores the previous goal-assignment interaction while
+retaining checked semantics. A component regression test keeps the badge mounted
+and verifies assignment, menu dismissal and focus return. The focused component
+run passes **7 tests** across the badge and calendar suites. Full unit validation
+passes **119 files / 1,521 tests**; typecheck, lint, formatting and diff whitespace
+checks pass. The full unit log also contains nine jsdom `Window.scrollTo()`
+not-implemented diagnostics without test attribution; the focused badge/calendar
+run is quiet. Their source is not established by this run, so this is not a claim
+of diagnostic-free full-suite output. Log: `/tmp/426-second-pass-fix-all-unit.log`.
+The full local E2E
+result predates this final one-property correction; it has not been rerun after
+that correction. Review log: `/tmp/426-second-pass-coderabbit.log`.
+
+The user reviewed the finding/fix checkpoint and authorized committing and
+pushing it before continuing the remaining audit.
+
+This pass remains **in progress**, not a complete Q2 compliance certification.
+No server was restarted and no personal browser profile was accessed.
+
+## First-pass historical record
+
 
 Scope: #426 Goals settings, shared Settings entry points, goal assignment menus,
 practice evaluation/recovery controls, mixed-goal Practice History, and the

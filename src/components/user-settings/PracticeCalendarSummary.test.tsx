@@ -61,7 +61,7 @@ it("saves only calendar fields and persists before closing", async () => {
   const first = document.querySelector<HTMLButtonElement>("[data-date]")!;
   const firstKey = first.dataset.date;
   fireEvent.click(first);
-  fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next Month" }));
   const second = document.querySelector<HTMLButtonElement>("[data-date]")!;
   const secondKey = second.dataset.date;
   fireEvent.click(second);

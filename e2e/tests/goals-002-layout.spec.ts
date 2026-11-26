@@ -264,6 +264,14 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByTestId("goal-option-fluency")).toBeVisible({
         timeout: 10000,
       });
+      await expect(page.getByTestId("goal-option-recall")).toHaveAttribute(
+        "aria-checked",
+        "true"
+      );
+      await expect(page.getByTestId("goal-option-fluency")).toHaveAttribute(
+        "aria-checked",
+        "false"
+      );
       await page.screenshot({
         path: testInfo.outputPath(`goal-menu-${viewport.width}.png`),
       });
@@ -428,6 +436,37 @@ test("320px: skipped dates retain touch targets without widening the dialog", as
   expect(await dialog.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(
     0
   );
+});
+
+test("calendar keyboard navigation crosses months without editing dates", async ({
+  page,
+}) => {
+  await page.goto("/user-settings/goals");
+  await page.getByTestId("shared-practice-calendar").click();
+  const calendar = page.getByTestId("calendar-exceptions");
+  const nextMonth = calendar.getByRole("button", { name: "Next Month" });
+  // Move the pointer away before keyboard traversal so layout changes do not
+  // synthesize a pointer-leave while testing the focused tooltip.
+  await page.mouse.move(0, 0);
+  await calendar.getByRole("button", { name: "Previous Month" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(nextMonth).toBeFocused({ timeout: 10000 });
+  await expect(page.getByRole("tooltip")).toHaveText("Next Month", {
+    timeout: 10000,
+  });
+  await nextMonth.press("Enter");
+  const first = calendar.locator("[data-date]").first();
+  const firstKey = await first.getAttribute("data-date");
+  await first.focus();
+  await first.press("ArrowLeft");
+  await expect(calendar.locator("[data-date]").last()).toBeFocused({
+    timeout: 10000,
+  });
+  await page.keyboard.press("ArrowRight");
+  await expect(calendar.locator(`[data-date="${firstKey}"]`)).toBeFocused({
+    timeout: 10000,
+  });
+  await expect(page.getByTestId("calendar-save")).toBeDisabled();
 });
 
 for (const theme of ["light", "dark"] as const) {

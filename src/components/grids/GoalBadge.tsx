@@ -60,34 +60,41 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
         <DropdownMenu.Portal>
           <DropdownMenu.Content class="z-50 min-w-40 max-w-[calc(100vw-1rem)] max-h-[min(32rem,80dvh)] overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground p-1 shadow-md">
             {/* Goal items */}
-            <For each={props.goals?.() ?? []}>
-              {(goal) => (
-                <DropdownMenu.Item
-                  data-testid={`goal-option-${goal.name}`}
-                  class="relative flex min-h-11 cursor-pointer select-none items-center rounded-sm py-2 pl-7 pr-3 text-sm hover:bg-accent data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground outline-none"
-                  onSelect={() => props.onGoalChange!(goal.name)}
-                >
-                  {/* Checkmark for current goal */}
-                  <Show when={goal.name === goalKey()}>
-                    <span class="absolute left-2 top-1/2 -translate-y-1/2">
-                      <Check class="size-4" aria-hidden="true" />
-                    </span>
-                  </Show>
-                  <span
-                    aria-hidden="true"
-                    class={`mr-2 inline-block size-2 shrink-0 rounded-full ${goalIdentityColors(goal.name)}`}
-                  />
-                  <span class="min-w-0 break-words">
-                    {goal.displayName ?? goal.name}
-                    <Show when={goal.description}>
-                      <span class="block max-w-xs text-sm text-muted-foreground break-words">
-                        {goal.description}
+            <DropdownMenu.RadioGroup
+              value={goalKey()}
+              onChange={(value) => props.onGoalChange?.(value)}
+              aria-label="Practice Goal"
+            >
+              <For each={props.goals?.() ?? []}>
+                {(goal) => (
+                  <DropdownMenu.RadioItem
+                    closeOnSelect
+                    value={goal.name}
+                    data-testid={`goal-option-${goal.name}`}
+                    class="relative flex min-h-11 cursor-pointer select-none items-center rounded-sm py-2 pl-7 pr-3 text-sm hover:bg-accent data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground outline-none"
+                  >
+                    {/* Checkmark for current goal */}
+                    <Show when={goal.name === goalKey()}>
+                      <span class="absolute left-2 top-1/2 -translate-y-1/2">
+                        <Check class="size-4" aria-hidden="true" />
                       </span>
                     </Show>
-                  </span>
-                </DropdownMenu.Item>
-              )}
-            </For>
+                    <span
+                      aria-hidden="true"
+                      class={`mr-2 inline-block size-2 shrink-0 rounded-full ${goalIdentityColors(goal.name)}`}
+                    />
+                    <span class="min-w-0 break-words">
+                      {goal.displayName ?? goal.name}
+                      <Show when={goal.description}>
+                        <span class="block max-w-xs text-sm text-muted-foreground break-words">
+                          {goal.description}
+                        </span>
+                      </Show>
+                    </span>
+                  </DropdownMenu.RadioItem>
+                )}
+              </For>
+            </DropdownMenu.RadioGroup>
 
             {/* Separator + Edit Goals action */}
             <DropdownMenu.Separator class="my-1 -mx-1 h-px bg-border" />

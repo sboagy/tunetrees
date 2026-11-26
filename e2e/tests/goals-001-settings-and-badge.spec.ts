@@ -88,13 +88,14 @@ async function openSettingsTab(
 async function clickGoalBadgeMenuItem(
   page: Page,
   trigger: Locator,
-  itemName: string | RegExp
+  itemName: string | RegExp,
+  role: "menuitem" | "menuitemradio" = "menuitem"
 ) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await trigger.scrollIntoViewIfNeeded().catch(() => undefined);
     await expect(trigger).toBeVisible({ timeout: 10000 });
 
-    const menuItem = page.getByRole("menuitem", { name: itemName }).last();
+    const menuItem = page.getByRole(role, { name: itemName }).last();
     const menuItemVisible = await menuItem
       .isVisible({ timeout: 250 })
       .catch(() => false);
@@ -125,7 +126,7 @@ async function clickGoalBadgeMenuItem(
     await page.waitForTimeout(100);
   }
 
-  await page.getByRole("menuitem", { name: itemName }).last().click();
+  await page.getByRole(role, { name: itemName }).last().click();
 }
 
 test.describe("GOALS-001: Goals settings", () => {
@@ -410,7 +411,12 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
 
     const goalTrigger = row.locator("button", { hasText: /recall/i }).first();
     await expect(goalTrigger).toBeVisible({ timeout: 10000 });
-    await clickGoalBadgeMenuItem(page, goalTrigger, /^Session/);
+    await clickGoalBadgeMenuItem(
+      page,
+      goalTrigger,
+      /^Session/,
+      "menuitemradio"
+    );
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect(row.getByText("Session", { exact: true })).toBeVisible({

@@ -1,6 +1,11 @@
 import { ChevronLeft, ChevronRight } from "lucide-solid";
 import { createMemo, createSignal, For } from "solid-js";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const weekdays = [
   "Sunday",
@@ -114,32 +119,40 @@ export function SkippedDatesPicker(props: {
         Select dates to skip practice. Select a date again to remove it.
       </p>
       <div class="flex items-center justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          class="size-11"
-          aria-label="Previous month"
-          onClick={() => navigate(-1)}
-        >
-          <ChevronLeft aria-hidden="true" class="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            as={Button}
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="size-11"
+            aria-label="Previous Month"
+            onClick={() => navigate(-1)}
+          >
+            <ChevronLeft aria-hidden="true" class="size-4" />
+          </TooltipTrigger>
+          <TooltipContent>Previous Month</TooltipContent>
+        </Tooltip>
         <span aria-live="polite" class="text-sm font-medium">
           {cursor().toLocaleDateString(undefined, {
             month: "long",
             year: "numeric",
           })}
         </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          class="size-11"
-          aria-label="Next month"
-          onClick={() => navigate(1)}
-        >
-          <ChevronRight aria-hidden="true" class="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            as={Button}
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="size-11"
+            aria-label="Next Month"
+            onClick={() => navigate(1)}
+          >
+            <ChevronRight aria-hidden="true" class="size-4" />
+          </TooltipTrigger>
+          <TooltipContent>Next Month</TooltipContent>
+        </Tooltip>
       </div>
       <div
         ref={calendar}
