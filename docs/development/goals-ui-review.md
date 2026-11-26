@@ -328,3 +328,25 @@ the user chooses weekdays; unsupported stored rules are not overwritten.
 Focused component tests (6) and typecheck passed. Desktop/mobile browser tests
 were updated but not run for this change. Visual, keyboard-only, and assistive
 technology checks remain open for manual review.
+
+### Short evaluation defaults — 2026-11-25
+
+Practice → Evaluation chooser (C1/R): approved single-word ladder labels now
+use Incomplete/Prompted/Effortful/Independent for Learn,
+Unready/Faltering/Following/Confident for Session, and
+Rebuild/Inconsistent/Reliable/Expressive for Polish. Recall and Fluency are
+unchanged. Descriptions, IDs, action mappings, intervals, overrides and
+historical snapshots are preserved.
+
+Generated a new data-only seed migration from the canonical built-in source,
+plus the two restore seeds and current-seed reference. This introduces no schema,
+Worker contract, adapter or scheduling changes; old bundles can read the same
+IDs/configuration shape. Existing applied migrations were not edited. As with
+the earlier goal-name seed, timestamp-preserving updates require the coordinated
+full download; a browser refresh alone will not pick up older local defaults.
+
+Validation: 80 calculation/configuration tests, typecheck, focused Biome checks
+and generated-seed check pass. Executed the migration in local PostgreSQL with
+ROLLBACK and verified all five goals' labels. No database update was committed,
+no local reset performed, and no browser/E2E run performed for this label-only
+change. Uncommitted; second design-system audit has not begun.

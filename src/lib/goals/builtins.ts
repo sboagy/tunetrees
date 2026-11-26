@@ -34,27 +34,17 @@ const ladders = [
       "Learn the tune well enough to play it through independently, without frequent prompts.",
     intervalsDays: [0.1, 0.5, 1, 2, 4],
     choices: [
-      [
-        "cannot_play",
-        "Cannot play through",
-        "Unable to complete the tune",
-        "reset",
-      ],
-      [
-        "prompted",
-        "Needs frequent prompts",
-        "Needs repeated help to continue",
-        "back",
-      ],
+      ["cannot_play", "Incomplete", "Unable to complete the tune", "reset"],
+      ["prompted", "Prompted", "Needs repeated help to continue", "back"],
       [
         "effortful",
-        "Plays through with effort",
+        "Effortful",
         "Completes the tune with concentration",
         "stay",
       ],
       [
         "independent",
-        "Plays independently",
+        "Independent",
         "Completes the tune without prompts",
         "advance",
       ],
@@ -89,15 +79,20 @@ const ladders = [
     choices: [
       [
         "cannot_join",
-        "Cannot join in",
+        "Unready",
         "Cannot maintain the tune with others",
         "reset",
       ],
-      ["loses_flow", "Loses the flow", "Drops out or loses the tune", "back"],
-      ["keeps_up", "Keeps up", "Stays with the group through the tune", "stay"],
+      ["loses_flow", "Faltering", "Drops out or loses the tune", "back"],
+      [
+        "keeps_up",
+        "Following",
+        "Stays with the group through the tune",
+        "stay",
+      ],
       [
         "session_ready",
-        "Session-ready",
+        "Confident",
         "Plays confidently with others",
         "advance",
       ],
@@ -113,20 +108,20 @@ const ladders = [
     choices: [
       [
         "rebuild",
-        "Needs rebuilding",
+        "Rebuild",
         "Fundamental problems interrupt the performance",
         "reset",
       ],
       ["inconsistent", "Inconsistent", "Control or expression varies", "back"],
       [
         "performance_ready",
-        "Performance-ready",
+        "Reliable",
         "Reliable and controlled performance",
         "stay",
       ],
       [
         "expressive",
-        "Confident and expressive",
+        "Expressive",
         "Reliable performance with clear musical intent",
         "advance",
       ],

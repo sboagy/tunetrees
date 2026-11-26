@@ -381,7 +381,7 @@ test("ladder evaluations use available height and keep the final choice reachabl
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport({ ratio: 1 });
   await last.click();
-  await expect(evaluation).toContainText("Session-ready", { timeout: 10000 });
+  await expect(evaluation).toContainText("Confident", { timeout: 10000 });
   await page.setViewportSize({ width: 1280, height: 1000 });
   await evaluation.click();
   await expect(last).toContainText("Current selection", { timeout: 10000 });

@@ -184,7 +184,7 @@ describe("goal-selected calculations with JSON state", () => {
     expect(result.due).toBe("2026-11-16T14:24:00.000Z");
     input.config.evaluations[0].label = "Renamed";
     expect(JSON.parse(result.evaluationSnapshot).choiceLabel).toBe(
-      "Cannot play through"
+      "Incomplete"
     );
   });
   it("rejects an unknown choice instead of mapping it to Good", async () => {
