@@ -1,5 +1,31 @@
 # Goals UI review
 
+## CI follow-up — 2026-11-26
+
+Run `45760287916`, shard 1, exposed an actual accessibility defect in the
+calendar tooltip: Next Month was focused and expanded, but the body-level
+tooltip portal acquired an `aria-hidden` ancestor outside the dialog. The shared
+tooltip wrapper now accepts a portal mount, and calendar tooltips mount inside
+their owning fieldset/dialog. The existing keyboard/month-traversal test retains
+its assertions and additionally requires a visible tooltip inside the dialog.
+
+The same run's light 768×800 flake occurred before layout assertions. Trace
+evidence showed two optimized Solid module versions and an AuthProvider-context
+exception after Vite discovered `papaparse` and `quickjs-emscripten` mid-run.
+Both lazy dependencies are now explicitly pre-bundled. This is not a sync timeout
+increase or an allowance for initialization errors.
+
+Focused Chromium/Mobile Chrome rerun: **5 passed**, including auth setup;
+calendar component tests: **7 passed**. Typecheck, targeted Biome and whitespace
+checks pass. Logs: `/tmp/426-calendar-e2e.log`, `/tmp/426-calendar-unit.log`,
+`/tmp/426-calendar-typecheck.log`. Existing PostgreSQL collation-version and Node
+color-environment warnings appeared during browser setup. Fresh CI confirmation
+of the optimizer fix remains pending; no full local E2E rerun is claimed.
+
+Fresh CodeRabbit review of all five changed files completed with **zero findings**
+(`/tmp/426-calendar-coderabbit.log`). No post-review code fixes were required;
+the focused validation above applies to the reviewed code.
+
 ## Second design-system pass — started 2026-11-25
 
 Baseline: `f4402cbe`, after the user completed manual review and reported local

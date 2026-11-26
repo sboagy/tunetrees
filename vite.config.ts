@@ -439,6 +439,9 @@ export default defineConfig(() => {
       },
     },
     optimizeDeps: {
+      // Lazy import/plugin entry points otherwise trigger a mid-session optimizer
+      // reload, which can mix Solid module versions during E2E navigation.
+      include: ["papaparse", "quickjs-emscripten"],
       exclude: ["@sqlite.org/sqlite-wasm", "oosync/runtime/browser-sqlite"],
     },
     // Define global constants

@@ -19,16 +19,19 @@ export { Tooltip };
 export const TooltipTrigger = Tooltip.Trigger;
 
 type TooltipContentProps<T extends ValidComponent = "div"> = ParentProps<
-  TooltipPrimitiveContentProps<T> & { class?: string }
+  TooltipPrimitiveContentProps<T> & { class?: string; mount?: HTMLElement }
 >;
 
 export const TooltipContent = <T extends ValidComponent = "div">(
   props: PolymorphicProps<T, TooltipContentProps<T>>
 ) => {
-  const [local, rest] = splitProps(props as TooltipContentProps, ["class"]);
+  const [local, rest] = splitProps(props as TooltipContentProps, [
+    "class",
+    "mount",
+  ]);
 
   return (
-    <Tooltip.Portal>
+    <Tooltip.Portal mount={local.mount}>
       <Tooltip.Content
         class={cn(
           "z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md",

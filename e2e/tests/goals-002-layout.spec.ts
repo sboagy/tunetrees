@@ -475,9 +475,15 @@ test("calendar keyboard navigation crosses months without editing dates", async 
   await calendar.getByRole("button", { name: "Previous Month" }).focus();
   await page.keyboard.press("Tab");
   await expect(nextMonth).toBeFocused({ timeout: 10000 });
-  await expect(page.getByRole("tooltip")).toHaveText("Next Month", {
+  // A body-level portal can be hidden by the dialog's aria-hide-outside logic.
+  // Require an accessible, visible tooltip within its owning dialog.
+  const tooltip = page
+    .getByTestId("practice-calendar-dialog")
+    .getByRole("tooltip");
+  await expect(tooltip).toHaveText("Next Month", {
     timeout: 10000,
   });
+  await expect(tooltip).toBeVisible({ timeout: 10000 });
   await nextMonth.press("Enter");
   const first = calendar.locator("[data-date]").first();
   const firstKey = await first.getAttribute("data-date");

@@ -77,6 +77,7 @@ export function SkippedDatesPicker(props: {
 }) {
   const today = new Date();
   const [cursor, setCursor] = createSignal(today);
+  const [tooltipMount, setTooltipMount] = createSignal<HTMLFieldSetElement>();
   let calendar: HTMLDivElement | undefined;
   const monthDays = createMemo(() => {
     const year = cursor().getFullYear();
@@ -113,7 +114,11 @@ export function SkippedDatesPicker(props: {
       ?.focus();
   };
   return (
-    <fieldset class="min-w-0 space-y-2" data-testid="calendar-exceptions">
+    <fieldset
+      ref={setTooltipMount}
+      class="min-w-0 space-y-2"
+      data-testid="calendar-exceptions"
+    >
       <legend class="text-sm font-medium">Dates to Skip</legend>
       <p class="text-sm text-muted-foreground">
         Select dates to skip practice. Select a date again to remove it.
@@ -131,7 +136,8 @@ export function SkippedDatesPicker(props: {
           >
             <ChevronLeft aria-hidden="true" class="size-4" />
           </TooltipTrigger>
-          <TooltipContent>Previous Month</TooltipContent>
+          {/* Keep portalled tooltips inside the dialog's accessible subtree. */}
+          <TooltipContent mount={tooltipMount()}>Previous Month</TooltipContent>
         </Tooltip>
         <span aria-live="polite" class="text-sm font-medium">
           {cursor().toLocaleDateString(undefined, {
@@ -151,7 +157,7 @@ export function SkippedDatesPicker(props: {
           >
             <ChevronRight aria-hidden="true" class="size-4" />
           </TooltipTrigger>
-          <TooltipContent>Next Month</TooltipContent>
+          <TooltipContent mount={tooltipMount()}>Next Month</TooltipContent>
         </Tooltip>
       </div>
       <div
