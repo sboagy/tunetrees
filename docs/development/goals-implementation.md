@@ -3,6 +3,18 @@
 PR #940 is the implementation PR for the full goals plan, not a separate
 upgrade-only feature. The approved detailed plan remains in `_notes/426_goals_plan.md`.
 
+## Current Reading Guide — 2026-11-25
+
+Functional implementation, developer manual UI review and the practical second
+UI pass are complete through `6cbe90f1`. Final-SHA acceptance, outstanding audit
+coverage and staging/production/device rollout remain open. The dated checkpoints
+below preserve what was true at each step; references there to active legacy
+services or pending integration are historical, not instructions for current code.
+
+Current contracts: [scheduling reference](../reference/scheduling.md),
+[practice flow](../practice_flow.md), [architecture](../../ARCHITECTURE.md),
+[UI evidence](goals-ui-review.md), and [cutover runbook](goals-cutover.md).
+
 ## Completed baseline
 
 - oosync rebuild protection, TuneTrees preservation policy, blocked-upgrade UI,

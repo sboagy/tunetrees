@@ -389,18 +389,15 @@ weights and immutable history remain compatible with older clients. See
 [`ts-fsrs6-migration.md`](docs/development/ts-fsrs6-migration.md) for reviewed
 scheduling differences and the separate scope of a future FSRS-7 migration.
 
-```text
-User rates tune -> FSRS calculates -> Next review date stored
-       |
-  Again (1) -> Short interval (1 day)
-  Hard  (2) -> Medium interval
-  Good  (3) -> Scheduled interval
-  Easy  (4) -> Long interval (2x normal)
-```
+A goal chooses FSRS-6, an interval ladder, or an explicit scheduler plugin.
+Evaluation choices map to that scheduler's actions; their effects are not fixed
+multipliers. See [Goals and Scheduling](docs/reference/scheduling.md) for the
+current allocation, continuation and evaluation contracts.
 
 Key tables:
 
-- `practice_record`: immutable historical practice events.
+- `practice_record`: submitted historical events; normal Submit appends. History
+  correction/deletion scheduling and sync repair is separately tracked in #958.
 - `repertoire_tune`: current scheduling state per tune within a repertoire.
 - `daily_practice_queue`: frozen daily queue snapshot used to present the day's work.
 

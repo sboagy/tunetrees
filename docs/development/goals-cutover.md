@@ -1,8 +1,9 @@
 # One-time goals cutover
 
 This is the #426 procedure for the one real user's devices and existing test users.
-Historical imported-completion validation is still in progress; **run the production cutover only when the complete
-#426 runtime/UI release is ready to deploy**. Development of the tooling does not
+Local imported-completion rehearsal is complete; staging and production acceptance
+remain pending. **Run production cutover only after staging rehearsal and approval
+of the complete #426 runtime/UI release.** Development of the tooling does not
 require migrating production now.
 
 Implementation details and script contracts are in the
