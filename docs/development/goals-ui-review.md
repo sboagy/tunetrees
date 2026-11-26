@@ -146,6 +146,28 @@ CodeRabbit reviewed all three changed files and reported **zero findings**
 all 20 focused unit tests pass again, with quiet unit output. The user authorized
 committing and pushing this clean review checkpoint.
 
+### Recovery coverage closeout after `c506da58`
+
+The save-feedback fixes were committed and pushed as `c506da58`. The user
+requested continued review. Controlled pending-save component tests now hold
+calendar persistence and evaluation-choice saving open, verify Saving…,
+`aria-busy`, disabled commit controls and duplicate-submit protection, then
+release the operation and verify the editor closes. This checks the transient
+state that was too quick to inspect manually without slowing real persistence.
+
+All **34 tests across four suites** pass: goal editing, calendar, Goals route
+save/conflict/recovery boundaries, and History recovery across repertoires.
+Typecheck, targeted Biome and diff whitespace checks pass; no unexpected console
+diagnostics in `/tmp/426-final-audit-recovery.log`. No new production defect was
+found in this continuation. The user authorized committing and pushing these
+test-only changes and this report update.
+
+This closes the controlled pending-save coverage gap, not the entire Q2 matrix.
+Real browser zoom, physical on-screen keyboard, actual screen-reader output and
+the full browser failure/denied/stale matrix remain unverified as listed above.
+The shared-header overlap remains a separate whole-app finding. No additional
+goal UI redesign is proposed from this review checkpoint.
+
 ## First-pass historical record
 
 

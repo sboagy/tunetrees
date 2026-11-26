@@ -77,6 +77,30 @@ it("saves only calendar fields and persists before closing", async () => {
   });
   expect(mocks.persist).toHaveBeenCalledOnce();
 });
+it("keeps the calendar busy and prevents duplicate submission until persistence completes", async () => {
+  let finish!: () => void;
+  mocks.persist.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  await open();
+  fireEvent.click(screen.getByRole("button", { name: "Monday" }));
+  const button = screen.getByTestId("calendar-save") as HTMLButtonElement;
+  fireEvent.click(button);
+  await waitFor(() => expect(mocks.persist).toHaveBeenCalledOnce());
+  expect(button.disabled).toBe(true);
+  expect(button.getAttribute("aria-busy")).toBe("true");
+  expect(button.textContent).toContain("Saving…");
+  fireEvent.submit(button.closest("form")!);
+  expect(mocks.update).toHaveBeenCalledOnce();
+  finish();
+  await waitFor(() =>
+    expect(screen.queryByTestId("practice-calendar-dialog")).toBeNull()
+  );
+  expect(mocks.persist).toHaveBeenCalledOnce();
+});
+
 it("preserves an unsupported weekly rule on an exception-only save", async () => {
   mocks.load.mockResolvedValue({
     weeklyRules: '{"legacy":true}',

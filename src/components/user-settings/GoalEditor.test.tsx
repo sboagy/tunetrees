@@ -405,6 +405,32 @@ it("retains a choice while returning to complete a new goal's missing name", asy
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
   expect(save.mock.calls[0][0].config.evaluations[0].label).toBe("Try again");
 });
+it("keeps a choice busy and prevents duplicate submission until its save completes", async () => {
+  const { save } = setup();
+  let finish!: () => void;
+  save.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  fireEvent.click(screen.getByTestId("goal-choice-edit-0"));
+  fireEvent.input(screen.getByTestId("goal-choice-label-0"), {
+    target: { value: "Try again" },
+  });
+  const button = screen.getByTestId("goal-choice-save") as HTMLButtonElement;
+  fireEvent.click(button);
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  expect(button.disabled).toBe(true);
+  expect(button.getAttribute("aria-busy")).toBe("true");
+  expect(button.textContent).toContain("Saving…");
+  fireEvent.submit(button.closest("form")!);
+  expect(save).toHaveBeenCalledOnce();
+  finish();
+  await waitFor(() =>
+    expect(screen.queryByTestId("goal-choice-save")).toBeNull()
+  );
+});
+
 it("retains choice edits when their immediate save fails", async () => {
   const { save } = setup();
   save.mockRejectedValueOnce(new Error("Settings changed"));
