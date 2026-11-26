@@ -1,4 +1,4 @@
-import { CalendarDays, Save } from "lucide-solid";
+import { CalendarDays, LoaderCircle, Save } from "lucide-solid";
 import {
   createEffect,
   createMemo,
@@ -327,8 +327,18 @@ export function PracticeCalendarSummary(props: {
                 type="submit"
                 disabled={busy() || (!dirty() && !retryPersistence())}
                 data-testid="calendar-save"
+                class="min-w-36"
+                aria-busy={busy()}
               >
-                <Save class="size-4" aria-hidden="true" />
+                <Show
+                  when={busy()}
+                  fallback={<Save class="size-4" aria-hidden="true" />}
+                >
+                  <LoaderCircle
+                    class="size-4 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                </Show>
                 {busy() ? "Saving…" : "Save Changes"}
               </Button>
             </div>

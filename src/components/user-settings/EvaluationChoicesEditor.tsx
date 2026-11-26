@@ -1,4 +1,4 @@
-import { Plus, Save, SquarePen, Trash2 } from "lucide-solid";
+import { LoaderCircle, Plus, Save, SquarePen, Trash2 } from "lucide-solid";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import {
   AlertDialog,
@@ -371,6 +371,8 @@ export function EvaluationChoicesEditor(props: {
                   <Button
                     type="submit"
                     data-testid="goal-choice-save"
+                    class="min-w-36"
+                    aria-busy={busy()}
                     disabled={
                       busy() ||
                       props.disabled ||
@@ -380,7 +382,15 @@ export function EvaluationChoicesEditor(props: {
                         !props.schedulerChanged)
                     }
                   >
-                    <Save class="size-4" aria-hidden="true" />
+                    <Show
+                      when={busy()}
+                      fallback={<Save class="size-4" aria-hidden="true" />}
+                    >
+                      <LoaderCircle
+                        class="size-4 animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    </Show>
                     {saveLabel()}
                   </Button>
                 </div>

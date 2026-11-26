@@ -124,6 +124,28 @@ below, and authorized committing and pushing it on 2026-11-25.
 - Real 200% browser zoom, physical on-screen keyboard and screen-reader output
   remain untested. Do not interpret responsive viewport tests as those checks.
 
+### Save-feedback continuation after `924c06cf`
+
+The preceding continuation was committed and pushed as `924c06cf` after the
+user's manual inspection and full local E2E pass. Further source review found
+an E3 pending-state inconsistency: evaluation-choice and calendar Save buttons
+showed Saving… but retained the Save icon. Both now use the existing
+reduced-motion-aware spinner pattern, expose `aria-busy`, and reserve the usual
+minimum Save Changes button width. Persistence and validation are unchanged.
+
+Typecheck, targeted Biome and diff
+whitespace checks pass; all **20** goal-editor/calendar component tests pass
+with no unexpected console output. Logs: `/tmp/426-ui-save-feedback-unit.log`
+and `/tmp/426-ui-save-feedback-typecheck.log`. The new pending presentation has
+not yet been visually verified in a browser; the user's earlier E2E result
+predates this small follow-up. Remaining manual accessibility coverage above
+is still outstanding. The user subsequently confirmed normal save/close behavior
+by manual inspection; local saves completed too quickly to inspect the spinner.
+CodeRabbit reviewed all three changed files and reported **zero findings**
+(`/tmp/426-save-feedback-coderabbit.log`). Final typecheck, targeted Biome and
+all 20 focused unit tests pass again, with quiet unit output. The user authorized
+committing and pushing this clean review checkpoint.
+
 ## First-pass historical record
 
 
