@@ -162,7 +162,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.6",
     "@types/papaparse": "^5.5.2",
-    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/coverage-v8": "^5.1.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "concurrently": "^10.0.4",
