@@ -1,3 +1,4 @@
+import { expectConsole } from "../../helpers/expected-console";
 /**
  * Tests for starter repertoire service functions
  *
@@ -263,6 +264,10 @@ describe("createStarterRepertoire", () => {
 
 describe("populateStarterRepertoireFromCatalog", () => {
   it("returns (0 added, 0 skipped) when no matching catalog tunes exist", async () => {
+    expectConsole(
+      "warn",
+      '⚠️ No catalog tunes found for starter template "itrad-starter" (filter: genre="ITRAD"). The catalog may not have synced yet.'
+    );
     seedGenre("ITRAD");
     const rep = await createStarterRepertoire(
       db,

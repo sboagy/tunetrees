@@ -1,3 +1,4 @@
+import { expectConsole } from "../../helpers/expected-console";
 // @vitest-environment jsdom
 
 import type { SQL } from "drizzle-orm";
@@ -210,6 +211,11 @@ describe("staging request ownership with synchronous writes", () => {
     expect(state.evaluations()).toEqual({ tune: "easy" });
   });
   it("refreshes the stored goal after persistence fails", async () => {
+    expectConsole(
+      "error",
+      "[PracticePage] Failed to update goal for tune:",
+      expect.objectContaining({ message: "persist failed" })
+    );
     mocks.persist.mockRejectedValueOnce(new Error("persist failed"));
     await state.handleGoalChange("tune", "recall");
     expect(goals.get("tune")).toBe("recall");
@@ -248,6 +254,11 @@ describe("staging request ownership with synchronous writes", () => {
     expect(mocks.error).not.toHaveBeenCalled();
   });
   it("restores the staged rating when a newer rating fails while an older one is pending", async () => {
+    expectConsole(
+      "error",
+      "❌ [PracticePage] Failed to stage evaluation for tune:",
+      expect.objectContaining({ message: "scheduling failed" })
+    );
     mocks.evaluate.mockResolvedValueOnce(schedule(2));
     await state.handleRecallEvalChange("tune", "hard");
     const older = await begin("good");
@@ -262,6 +273,11 @@ describe("staging request ownership with synchronous writes", () => {
     expect(row()).toEqual({ recall_eval: "hard", interval: 2 });
   });
   it("refreshes the view after a newer failure restores an older persisted rating", async () => {
+    expectConsole(
+      "error",
+      "❌ [PracticePage] Failed to stage evaluation for tune:",
+      expect.objectContaining({ message: "scheduling failed" })
+    );
     const saving = deferred<void>();
     mocks.persist.mockReturnValueOnce(saving.promise);
     mocks.evaluate.mockResolvedValueOnce(schedule(2));
@@ -277,6 +293,11 @@ describe("staging request ownership with synchronous writes", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
   it("does not restore a cancelled optimistic rating when the goal change fails", async () => {
+    expectConsole(
+      "error",
+      "[PracticePage] Failed to update goal for tune:",
+      expect.objectContaining({ message: "persist failed" })
+    );
     const pending = await begin("good");
     mocks.persist.mockRejectedValueOnce(new Error("persist failed"));
     await state.handleGoalChange("tune", "recall");
@@ -289,6 +310,16 @@ describe("staging request ownership with synchronous writes", () => {
     expect(state.evaluationsCount()).toBe(0);
   });
   it("reconciles a failed goal clear even when user lookup finishes after the goal task", async () => {
+    expectConsole(
+      "error",
+      "[PracticePage] Failed to update goal for tune:",
+      expect.objectContaining({ message: "persist failed" })
+    );
+    expectConsole(
+      "error",
+      "❌ [PracticePage] Failed to stage evaluation for tune:",
+      expect.objectContaining({ message: "persist failed" })
+    );
     mocks.evaluate.mockResolvedValueOnce(schedule(2));
     await state.handleRecallEvalChange("tune", "hard");
     // Only these overview fields are consumed by the hook. Keep the view stale
@@ -326,6 +357,11 @@ describe("staging request ownership with synchronous writes", () => {
     expect(state.evaluationsCount()).toBe(0);
   });
   it("clears the old evaluation error after a successful goal change", async () => {
+    expectConsole(
+      "error",
+      "❌ [PracticePage] Failed to stage evaluation for tune:",
+      expect.objectContaining({ message: "Plugin failed" })
+    );
     mocks.evaluate.mockRejectedValueOnce(new Error("Plugin failed"));
     await state.handleRecallEvalChange("tune", "good");
     expect(state.hasEvaluationErrors()).toBe(true);

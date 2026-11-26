@@ -13,6 +13,7 @@ import {
 } from "../../../src/components/notes/media-auth";
 import { NotesEditor } from "../../../src/components/notes/NotesEditor";
 import * as offlineNoteMedia from "../../../src/lib/media/offline-note-media";
+import { expectConsole } from "../../helpers/expected-console";
 
 vi.mock("jodit/es2021/jodit.min.css", () => ({}));
 
@@ -657,9 +658,11 @@ describe("NotesEditor", () => {
   });
 
   it("falls back to the raw editor content when offline draft resolution fails", async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    expectConsole(
+      "error",
+      "Failed to resolve offline note media drafts:",
+      expect.objectContaining({ message: "IndexedDB blocked" })
+    );
     vi.spyOn(
       offlineNoteMedia,
       "resolveOfflineNoteMediaDraftUrlsInHtml"
@@ -675,10 +678,6 @@ describe("NotesEditor", () => {
     await waitFor(() => {
       expect(createdEditors[0]?.value).toBe(
         '<p><img src="tunetrees-note-media-draft://draft-1"></p>'
-      );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Failed to resolve offline note media drafts:",
-        expect.any(Error)
       );
     });
   });

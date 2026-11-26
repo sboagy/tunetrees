@@ -6,6 +6,7 @@ import {
 import { drizzle } from "drizzle-orm/sql-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codegenConfig from "../../../oosync.codegen.config.json";
+import { expectSqliteTriggerFailure } from "../../../tests/helpers/expected-console";
 import { persistDb } from "../db/client-sqlite";
 import {
   dailyPracticeQueue,
@@ -394,6 +395,7 @@ describe("goal-aware daily queue", () => {
     expect(db.select().from(dailyPracticeQueue).all()).toEqual(before);
   });
   it("a later insert failure rolls back legacy attribution and all earlier inserts", async () => {
+    expectSqliteTriggerFailure('insert into "daily_practice_queue"');
     add("existing");
     add("a");
     add("z");

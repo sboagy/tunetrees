@@ -10,6 +10,7 @@ import {
 } from "quickjs-emscripten";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codegenConfig from "../../../oosync.codegen.config.json";
+import { expectSqliteTriggerFailure } from "../../../tests/helpers/expected-console";
 import { persistDb } from "../db/client-sqlite";
 import {
   getFsrsRetentionCurve,
@@ -435,6 +436,7 @@ describe("goal assignment changes", () => {
     expect(context().goalKey).toBe("recall");
   });
   it("rolls back draft clearing if the assignment update fails", async () => {
+    expectSqliteTriggerFailure('update "repertoire_tune"');
     await stageGoalPracticeEvaluation(
       db,
       {
@@ -627,6 +629,7 @@ describe("goal preview staging", () => {
   });
 
   it("rolls back a failed staged write without losing the existing preview", async () => {
+    expectSqliteTriggerFailure('insert into "table_transient_data"');
     await stageGoalPracticeEvaluation(db, input(), () => true);
     const before = draft();
     raw.run(
@@ -1647,6 +1650,7 @@ describe("atomic goal practice submission", () => {
   });
 
   it("rolls back the whole batch when the second queue update fails", async () => {
+    expectSqliteTriggerFailure('update "daily_practice_queue"');
     db.insert(repertoireTune)
       .values({
         repertoireRef: "rep",

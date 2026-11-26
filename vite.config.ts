@@ -257,6 +257,7 @@ export default defineConfig(() => {
       format: "es",
     },
     test: {
+      setupFiles: ["./tests/setup-console.ts"],
       exclude: [
         "**/node_modules/**",
         "**/.yalc/**",
@@ -404,11 +405,23 @@ export default defineConfig(() => {
     ],
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
-        "@oosync": path.resolve(__dirname, "./node_modules/oosync/src"),
-        "@sync-schema": path.resolve(__dirname, "./shared/sync-schema"),
-        "@shared-generated": path.resolve(__dirname, "./shared/generated"),
-        "solid-sonner": path.resolve(__dirname, "./node_modules/solid-sonner"),
+        "@": path.resolve(import.meta.dirname, "./src"),
+        "@oosync": path.resolve(
+          import.meta.dirname,
+          "./node_modules/oosync/src"
+        ),
+        "@sync-schema": path.resolve(
+          import.meta.dirname,
+          "./shared/sync-schema"
+        ),
+        "@shared-generated": path.resolve(
+          import.meta.dirname,
+          "./shared/generated"
+        ),
+        "solid-sonner": path.resolve(
+          import.meta.dirname,
+          "./node_modules/solid-sonner"
+        ),
       },
     },
     // Build optimizations

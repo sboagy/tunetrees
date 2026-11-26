@@ -6,6 +6,7 @@ import {
   TTAuthContext,
   TTAuthProvider,
 } from "../../../src/lib/auth/TTAuthProvider";
+import { expectConsole } from "../../helpers/expected-console";
 
 type TestUser = {
   id: string;
@@ -254,6 +255,11 @@ describe("provider sync completion lifetime", () => {
   });
 
   it("propagates a genre lookup failure and retries the initial filter on the next operation", async () => {
+    expectConsole(
+      "error",
+      "[TTAuthProvider] Failed to build sync overrides:",
+      expect.objectContaining({ message: "Genre lookup: HTTP 502" })
+    );
     setUser({ ...user, email: "owner-a@example.test" });
     mocks.selectRows.mockResolvedValue([{ id: user.id }]);
     mount();
@@ -386,6 +392,13 @@ describe("provider sync completion lifetime", () => {
   });
 
   it("does not clear a replacement user's database after reset teardown", async () => {
+    expectConsole(
+      "error",
+      "❌ [ForceCleanLocalReset] Local reset failed:",
+      expect.objectContaining({
+        message: "Local reset did not run because the active session changed",
+      })
+    );
     mount();
     await started();
     const gate = deferred<void>();
@@ -602,6 +615,11 @@ describe("manual sync uploads", () => {
   });
 
   it("rejects returned upload failures without publishing successful completion", async () => {
+    expectConsole(
+      "error",
+      "❌ [ForceSyncUp] Sync up failed:",
+      expect.objectContaining({ message: "Upload rejected" })
+    );
     mocks.up.mockResolvedValueOnce({
       ...result,
       success: false,
@@ -615,6 +633,11 @@ describe("manual sync uploads", () => {
   });
 
   it("rejects a failed result after retrying an in-progress upload", async () => {
+    expectConsole(
+      "error",
+      "❌ [ForceSyncUp] Sync up failed:",
+      expect.objectContaining({ message: "Retry rejected" })
+    );
     mocks.up.mockRejectedValueOnce(
       Object.assign(new Error("Busy"), { name: "SyncInProgressError" })
     );
@@ -643,6 +666,20 @@ it("skips uploads for restored anonymous metadata", async () => {
 });
 
 it("retries catalog download after a failed upload even when selection is already saved", async () => {
+  // No profile at startup; sync makes it available to subsequent lookups.
+  mocks.selectRows
+    .mockResolvedValueOnce([])
+    .mockResolvedValue([{ id: user.id }]);
+  expectConsole(
+    "error",
+    "❌ [ForceSyncUp] Sync up failed:",
+    expect.objectContaining({ message: "Upload rejected" })
+  );
+  expectConsole(
+    "warn",
+    "[TTAuthProvider] Failed to reconcile catalog genre selection:",
+    expect.objectContaining({ message: "Upload rejected" })
+  );
   setUser({ ...user, email: "owner-a@example.test" });
   mocks.selected.mockResolvedValue(["irish"]);
   mocks.required.mockResolvedValue(["irish"]);
@@ -684,6 +721,11 @@ it("publishes transport results before asynchronous completion work resumes", as
 });
 
 it("rejects a returned download failure without publishing a UI refresh", async () => {
+  expectConsole(
+    "error",
+    "❌ [ForceSyncDown] Sync down failed:",
+    expect.objectContaining({ message: "Download rejected" })
+  );
   mocks.down.mockResolvedValueOnce({
     ...result,
     success: false,
@@ -699,6 +741,10 @@ it("rejects a returned download failure without publishing a UI refresh", async 
 });
 
 it("does not turn startup skipSync reconciliation into a delayed full pull", async () => {
+  // No profile at startup; sync makes it available to subsequent lookups.
+  mocks.selectRows
+    .mockResolvedValueOnce([])
+    .mockResolvedValue([{ id: user.id }]);
   setUser({ ...user, email: "owner-a@example.test" });
   mocks.selected.mockResolvedValue(["irish"]);
   mocks.required.mockResolvedValue(["irish", "scottish"]);

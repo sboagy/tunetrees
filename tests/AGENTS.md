@@ -49,6 +49,8 @@ it('renders title', () => {
 
 - Run with `npm run test` in CI. All unit tests must pass with zero warnings.
 - Coverage optional; add where critical logic warrants it.
+- `tests/setup-console.ts` fails tests on unexpected `console.warn` / `console.error` calls. For an intentional failure, register its exact diagnostic with `expectConsole` from `tests/helpers/expected-console.ts` before the operation; keep the rejection/recovery assertions. Missing, extra, or changed calls also fail. SQLite trigger-injection tests use `expectSqliteTriggerFailure` with the rejected SQL statement prefix.
+- Do not blanket-suppress warning/error output or add suite-wide allowlists. Await asynchronous work and clean up effects before the test finishes. The shared console guard assumes sequential tests within each file (the current default); do not use `test.concurrent` with global console expectations.
 
 ## References
 

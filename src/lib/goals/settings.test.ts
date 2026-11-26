@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/sql-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codegenConfig from "../../../oosync.codegen.config.json";
+import { expectSqliteTriggerFailure } from "../../../tests/helpers/expected-console";
 import { persistDb } from "../db/client-sqlite";
 import {
   dailyPracticeQueue,
@@ -296,6 +297,7 @@ describe("goal settings persistence", () => {
     ).rejects.toThrow("Built-in");
   });
   it("rolls replacement back when deletion fails late", async () => {
+    expectSqliteTriggerFailure('update "goal"');
     const source = await assignedCustom();
     raw.exec(
       "CREATE TRIGGER reject_goal_delete BEFORE UPDATE ON goal BEGIN SELECT RAISE(ABORT, 'late failure'); END;"
