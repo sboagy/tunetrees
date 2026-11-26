@@ -127,7 +127,7 @@ export const FsrsRetentionChart: Component<Props> = (props) => {
                 </div>
                 <details class="mt-3 text-sm">
                   <summary class="min-h-11 cursor-pointer py-3">
-                    View retention estimate data
+                    View Retention Estimate Data
                   </summary>
                   <table class="w-full" data-testid="retention-estimate-data">
                     <caption class="text-left text-muted-foreground py-2">

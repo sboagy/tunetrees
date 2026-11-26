@@ -28,7 +28,7 @@ it("provides the chart's rounded estimates as a readable data table", async () =
   const table = await screen.findByTestId("retention-estimate-data");
   expect(table.textContent).toContain("100%");
   expect(table.textContent).toContain("85%");
-  expect(screen.getByText("View retention estimate data")).toBeTruthy();
+  expect(screen.getByText("View Retention Estimate Data")).toBeTruthy();
 });
 
 it("retries failed local data loading and replaces the error with the estimate", async () => {

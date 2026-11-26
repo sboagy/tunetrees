@@ -61,7 +61,7 @@ DOM assertions. Record findings and exact completed coverage here before handoff
 | Calendar dirty guard, persistence/reload, 44px date targets | Pass in baseline suite and focused units; new tooltip/cross-month keyboard checks also pass |
 | Goal/evaluation menu Escape and focus return; history information popup focus | Pass in baseline layout suite; goal checked-state retest also passes |
 | Notes recovery control reachability | Pass in baseline layout suite; not every conflict/failure variant was rerun in this audit |
-| Retention chart theme switching and populated layout at 1280px | Pass in baseline suite; narrow Analysis review remains outstanding |
+| Retention chart theme switching and populated layout | Pass at all five audit sizes in both themes; data disclosure keyboard operation and last-row viewport reachability also pass in the continuation |
 | 200% browser zoom; physical mobile keyboard; actual screen-reader announcements | **Not tested**; viewport resizing and DOM semantics do not prove these cases |
 | Full matrix of incoming edits, failed writes, denied/loading states and concurrent changes | **Not rerun in this pass**; retain existing regression coverage without claiming new audit evidence |
 
@@ -88,6 +88,41 @@ pushing it before continuing the remaining audit.
 
 This pass remains **in progress**, not a complete Q2 compliance certification.
 No server was restarted and no personal browser profile was accessed.
+
+### Continuation after checkpoint `40103243`
+
+The accessibility checkpoint was committed and pushed as `40103243`. The user
+confirmed manual inspection and a passing full local E2E run for the continuation
+below, and authorized committing and pushing it on 2026-11-25.
+
+| Surface / entry | Rules | Expected vs observed | Severity / root cause | Fix | Retest |
+| --- | --- | --- | --- | --- | --- |
+| Goals → Edit → Evaluation Choice | F1 | Explanation accepts an empty value but was not marked optional; mixed required/optional guidance was absent | P3; form copy did not expose the existing validation contract | Label Explanation (optional), with required-fields guidance; no validation or persistence changes | Goal editor's 14 unit cases pass, including independent choice saves and failed-save draft retention |
+| Analysis → retention estimate → data disclosure | C1 | App-owned disclosure label used sentence capitalization | P3; older label predates the agreed copy convention | View Retention Estimate Data | Chart's two unit tests and desktop/mobile browser checks pass |
+
+- Expanded the populated retention test to 320/390/768/1280px and 667×320,
+  light/dark, including keyboard disclosure and data-table content. Combined
+  focused browser run: **7 passed including auth setup** (also verifies the
+  committed goal assignment workflow). Log `/tmp/426-ui-continuation-browser.log`.
+- Strengthened the retention coverage further to explicitly scroll to and assert
+  viewport reachability of both the disclosure and the last data row. This avoids
+  confusing DOM visibility with unobstructed access in the docked-panel layout;
+  final strengthened rerun passes on both projects in both themes (**5 passed
+  including auth setup**). Log `/tmp/426-ui-retention-reachability.log`.
+- Rechecked draft/recovery behavior through **18 passing component tests**:
+  Goals save boundaries, pending-write exit guards, failed persistence retry,
+  incoming goal updates, calendar recovery, and History failures across
+  repertoire switches. Log `/tmp/426-ui-continuation-recovery.log`. These tests
+  use mocked persistence and do not certify real network or screen-reader behavior.
+- Editor/chart focused units: **16 passed**. No unexpected console diagnostics
+  in either focused unit run. Typecheck and targeted Biome checks pass.
+- Screenshot inspection confirms the last retention row is reachable at short
+  landscape height. It also reveals an unrelated shared-header defect at 667px:
+  repertoire text overlaps the account email (R1, P2). Recorded for the whole-app
+  #600 review; no shared navigation redesign is included in this goal-specific
+  batch. Evidence: `retention-667.png` in the dark Chromium populated-layout run.
+- Real 200% browser zoom, physical on-screen keyboard and screen-reader output
+  remain untested. Do not interpret responsive viewport tests as those checks.
 
 ## First-pass historical record
 

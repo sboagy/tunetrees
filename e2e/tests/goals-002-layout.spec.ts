@@ -213,7 +213,31 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/analysis");
     const retention = page.getByTestId("fsrs-retention-chart");
     await expect(retention.locator("canvas")).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: testInfo.outputPath("retention.png") });
+    const dataDisclosure = retention.locator("summary");
+    for (const viewport of layouts) {
+      await page.setViewportSize(viewport);
+      await retention.scrollIntoViewIfNeeded();
+      expect
+        .soft(await retention.evaluate((el) => el.scrollWidth - el.clientWidth))
+        .toBeLessThanOrEqual(1);
+      await dataDisclosure.scrollIntoViewIfNeeded();
+      await dataDisclosure.focus();
+      await expect(dataDisclosure).toBeInViewport({ ratio: 1 });
+      await page.keyboard.press("Enter");
+      const dataTable = page.getByTestId("retention-estimate-data");
+      await expect(dataTable).toBeVisible({ timeout: 10000 });
+      await expect(dataTable).toContainText("100%");
+      const lastDataRow = dataTable.locator("tbody tr").last();
+      await lastDataRow.scrollIntoViewIfNeeded();
+      await expect(lastDataRow).toBeInViewport({ ratio: 1 });
+      await page.screenshot({
+        path: testInfo.outputPath(`retention-${viewport.width}.png`),
+      });
+      await dataDisclosure.scrollIntoViewIfNeeded();
+      await dataDisclosure.press("Enter");
+      await expect(dataTable).not.toBeVisible({ timeout: 10000 });
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
     const canvas = retention.locator("canvas");
     const before = await canvas.evaluate((el: HTMLCanvasElement) =>
       el.toDataURL()

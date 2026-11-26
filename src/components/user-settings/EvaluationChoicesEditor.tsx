@@ -276,6 +276,9 @@ export function EvaluationChoicesEditor(props: {
                   disabled={locked() || props.disabled}
                   class="space-y-3"
                 >
+                  <p class="text-sm text-muted-foreground">
+                    All other fields are required.
+                  </p>
                   <label class="block space-y-1 text-sm">
                     <span>Label</span>
                     <input
@@ -293,7 +296,7 @@ export function EvaluationChoicesEditor(props: {
                     />
                   </label>
                   <label class="block space-y-1 text-sm">
-                    <span>Explanation</span>
+                    <span>Explanation (optional)</span>
                     <input
                       class="w-full min-h-11 rounded-md border border-input bg-background px-3 text-foreground"
                       data-testid={`goal-choice-description-${index()}`}
