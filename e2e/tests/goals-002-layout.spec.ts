@@ -145,6 +145,10 @@ for (const theme of ["light", "dark"] as const) {
     page,
     testUser,
   }, testInfo) => {
+    // Setup, history entry creation, and both five-viewport audits share this
+    // budget. CI mobile navigation alone can take ~16s; retain the individual
+    // assertion deadlines so a broken interaction still fails promptly.
+    test.setTimeout(90000);
     await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
     await page.addInitScript(
       (mode) => localStorage.setItem("themeMode", mode),
