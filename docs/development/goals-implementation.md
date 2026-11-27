@@ -1870,3 +1870,43 @@ assertions pass. Unit output still includes jsdom scrollTo diagnostics; local E2
 output includes the existing Postgres collation warning. Full E2E, authenticated
 production-bundle offline navigation, and hosted Lighthouse on this change remain
 pending at this checkpoint.
+
+### Scroll regression in the tab loading boundary
+
+The subsequent full E2E run exposed scroll resets in Repertoire and Practice.
+Browser tracing confirmed that the tab-level Suspense boundary detached the grid
+when descendant data resources loaded after scroll-state persistence. This lost
+native scroll position, even before navigating away. The new `TabPage` loader
+awaits only the dynamic module import and renders the page without that Suspense
+boundary. Code splitting, the loading indicator, and per-tab error recovery remain.
+The main entry remains about 281 KB gzip; Lighthouse was not rerun for this fix.
+
+The existing scroll E2E assertions are unchanged. All six scroll scenarios and
+the tab-download recovery scenario pass, plus setup. A new component regression
+checks that pending descendant data does not detach the tab or lose focus/input;
+temporarily reinstating Suspense makes that test fail. All 1,524 unit tests,
+typecheck, lint, formatting and production build pass. Full E2E remains pending.
+
+The test fixes assert exact seeded row/Submit counts instead of sampling transient
+DOM counts. These strengthen tests but did not fix the production detachment bug.
+
+Follow-up desktop/mobile practice-grid, evaluation-count, and tab-recovery checks:
+25 passed (including setup), four existing skips. CodeRabbit reviewed all eight
+uncommitted files and returned zero findings. Changes remain uncommitted.
+
+The subsequent full local E2E run passed, as reported by the developer. The
+anonymous sign-out test now requires populated data on desktop and mobile before
+sign-out, awaits the fresh-session empty state, and rejects retained repertoire
+data. Its prior immediate visibility checks raced the tab module load, and its
+table-only setup silently skipped adding a tune on mobile.
+
+A fresh CodeRabbit review raised two questions. Removed the added post-sync
+row-count stability wait: repeated counts cannot establish refresh completion,
+and it was a workaround preceding the production tab-detachment fix. The
+rejected-module concern is covered by the existing tab-download E2E, which asserts
+the error UI, navigation to Practice, and recovery on reload. No additional
+production changes were required by this review.
+
+Post-review verification: 25 focused desktop/mobile E2E checks pass (including
+setup), with four existing skips; typecheck, repo-wide lint, formatting and
+`git diff --check` pass. The full suite was not repeated after removing the wait.

@@ -57,9 +57,9 @@ test.describe
       // Count data rows - works for both table mode and mobile stacked list
       const ttPage = new TuneTreesPage(page);
       const dataRows = ttPage.getRows("scheduled");
-      const rowCount = await dataRows.count();
-      console.log(`📊 Practice grid has ${rowCount} data rows`);
-      expect(rowCount).toBeGreaterThan(0); // Should have at least some unscheduled tunes
+      // The grid container can remain visible while its rows refresh after sync.
+      // Await both seeded rows instead of taking a one-time DOM count.
+      await expect(dataRows).toHaveCount(2, { timeout: 15000 });
     });
 
     test("should display 'New' bucket label for unscheduled tunes", async ({

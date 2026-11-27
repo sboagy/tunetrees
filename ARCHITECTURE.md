@@ -376,8 +376,10 @@ These principles define the product behavior and should be preserved.
 `src/App.tsx` loads secondary history, tune-editor/detail, group and debug routes
 on demand with Solid's `lazy`, as it does Settings. Route guards and providers
 stay in the existing shell. `src/routes/Home.tsx` also loads its five tab pages
-on demand after authentication, with a content-level Suspense boundary that
-keeps navigation and the surrounding layout mounted while a tab loads.
+on demand after authentication. `src/routes/TabPage.tsx` shows a loading
+placeholder only while importing the selected module. It deliberately does not
+wrap the tab in Suspense: descendant data refreshes must not detach the grid
+and reset its native scroll position or keyboard focus.
 A per-tab error boundary offers Reload Page on failure and resets when the
 selected tab changes, keeping other tabs usable.
 Vite/Workbox precaches the emitted route chunks so
