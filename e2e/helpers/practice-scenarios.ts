@@ -1620,14 +1620,18 @@ async function seedGoalDailySettings(
 ): Promise<void> {
   if (!settings.length) return;
   const { supabase } = await getTestUserClient(user.email.split(".")[0]);
-  const { error } = await supabase.from("goal_user_settings").upsert(
-    settings.map(({ goalId, daily }) => ({
-      user_id: user.userId,
-      goal_id: goalId,
-      overrides: JSON.stringify({ daily }),
-    }))
-  );
-  if (error) throw new Error(`Failed to seed goal settings: ${error.message}`);
+  const rows = settings.map(({ goalId, daily }) => ({
+    user_id: user.userId,
+    goal_id: goalId,
+    overrides: JSON.stringify({ daily }),
+  }));
+  // Repeating this user/goal upsert is safe even if an upstream response was
+  // lost after the write. Persistent and non-transient failures still fail setup.
+  await retryTransientSetupOperation("seed goal settings", async () => {
+    const { error } = await supabase.from("goal_user_settings").upsert(rows);
+    if (error)
+      throw new Error(`Failed to seed goal settings: ${error.message}`);
+  });
 }
 
 /**
