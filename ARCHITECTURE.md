@@ -375,7 +375,12 @@ These principles define the product behavior and should be preserved.
 
 `src/App.tsx` loads secondary history, tune-editor/detail, group and debug routes
 on demand with Solid's `lazy`, as it does Settings. Route guards and providers
-stay in the existing shell. Vite/Workbox precaches the emitted route chunks so
+stay in the existing shell. `src/routes/Home.tsx` also loads its five tab pages
+on demand after authentication, with a content-level Suspense boundary that
+keeps navigation and the surrounding layout mounted while a tab loads.
+A per-tab error boundary offers Reload Page on failure and resets when the
+selected tab changes, keeping other tabs usable.
+Vite/Workbox precaches the emitted route chunks so
 deferring their initial execution does not exclude them from offline installation.
 
 ## Spaced Repetition (FSRS)

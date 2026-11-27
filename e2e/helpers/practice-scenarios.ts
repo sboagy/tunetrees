@@ -2414,9 +2414,11 @@ export async function setupForSetlistTestsParallel(
 
   const desktopGroupSelect = page.getByTestId("setlists-group-select");
   const mobileGroupSelect = page.getByTestId("setlists-group-select-mobile");
-  const groupSelect = (await desktopGroupSelect.isVisible().catch(() => false))
-    ? desktopGroupSelect
-    : mobileGroupSelect;
+  // Lazy tab code may still be loading; don't infer mobile from an absent
+  // desktop control. The locator waits for whichever responsive control mounts.
+  const groupSelect = desktopGroupSelect
+    .or(mobileGroupSelect)
+    .filter({ visible: true });
   await expect(groupSelect).toBeVisible({ timeout: 15000 });
   await groupSelect.selectOption(scenario.groupId);
 
@@ -2425,11 +2427,9 @@ export async function setupForSetlistTestsParallel(
     const mobileSetlistSelect = page.getByTestId(
       "setlists-setlist-select-mobile"
     );
-    const setlistSelect = (await desktopSetlistSelect
-      .isVisible()
-      .catch(() => false))
-      ? desktopSetlistSelect
-      : mobileSetlistSelect;
+    const setlistSelect = desktopSetlistSelect
+      .or(mobileSetlistSelect)
+      .filter({ visible: true });
     await expect(setlistSelect).toBeVisible({ timeout: 15000 });
     await setlistSelect.selectOption(scenario.setlists[0]!.id);
   }

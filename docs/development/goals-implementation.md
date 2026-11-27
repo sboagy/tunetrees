@@ -1827,3 +1827,46 @@ passed (setup plus desktop/mobile), including the original badge case and inject
 
 The user subsequently confirmed the full local E2E run passed and authorized
 committing and pushing this functional/recovery batch on 2026-11-20.
+
+## Lighthouse startup margin follow-up (2026-11-26)
+
+Hosted Lighthouse failed twice on `1c590c88` with the unchanged 2,000 ms FCP
+budget. All three repeat-run samples were over budget (2,032 / 2,019 / 2,003 ms).
+The only change since the preceding passing SHA was an E2E fixture retry; that
+passing run was also borderline. Rerunning therefore did not resolve the lack of
+startup margin.
+
+Home now loads Practice, Repertoire, Catalog, Analysis and Setlists with Solid's
+existing lazy-loading pattern. Authentication and navigation remain in the shell;
+a content-level Suspense boundary shows a labeled loading indicator while the
+selected tab loads. Inactive tab implementations no longer have to execute before
+the login page can render. No Lighthouse limits or collection settings changed.
+
+Same-machine production builds and three-run LHCI 0.13.0 desktop measurements on
+an isolated port 4187 gave baseline FCP 1,908 / 1,892 / 1,894 ms and candidate FCP
+1,799 / 1,789 / 1,788 ms after the recovery fixes below. All candidate assertions
+passed. Main entry gzip size fell from 554.58 KB to 281.21 KB. These local numbers demonstrate improvement,
+not a guarantee of hosted-runner timing. All emitted tab chunks appear in the
+Workbox precache; only the two previously excluded unused SQLite worker/OPFS
+helper assets remain excluded. Existing dev and preview servers were untouched.
+
+The focused navigation run exposed an immediate `isVisible()` branch in the
+setlist direct-entry test that mistook a not-yet-mounted desktop page for mobile.
+Its assertion now waits for the visible responsive group selector; it still
+verifies the same navigation destination/control, without changing app behavior.
+
+CodeRabbit flagged missing tab-download error recovery. Added a tab-scoped error
+boundary with an explicit Reload Page action; changing tabs mounts a fresh
+boundary so a failed tab cannot block navigation elsewhere. Its follow-up review
+caught the zero-argument keyed Show callback, which was also caught by typecheck
+and corrected to consume the tab argument. A new desktop/mobile browser test
+blocks the Analysis module download, verifies navigation back to Practice,
+restores the download, and verifies Reload Page opens Analysis successfully.
+Both findings are addressed; the subsequent browser run passes.
+
+Validation: 1,523 unit tests, 11 focused desktop/mobile browser checks (including
+setup), typecheck, focused Biome, production build and final three-run Lighthouse
+assertions pass. Unit output still includes jsdom scrollTo diagnostics; local E2E
+output includes the existing Postgres collation warning. Full E2E, authenticated
+production-bundle offline navigation, and hosted Lighthouse on this change remain
+pending at this checkpoint.

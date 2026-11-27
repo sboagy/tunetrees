@@ -1675,21 +1675,16 @@ export class TuneTreesPage {
   }
 
   private async getVisibleSetlistsGroupSelect(): Promise<Locator> {
-    const desktopVisible = await this.setlistsGroupSelect
-      .isVisible()
-      .catch(() => false);
-    return desktopVisible
-      ? this.setlistsGroupSelect
-      : this.setlistsGroupSelectMobile;
+    // Resolve visibility when the locator is used, after lazy tab loading.
+    return this.setlistsGroupSelect
+      .or(this.setlistsGroupSelectMobile)
+      .filter({ visible: true });
   }
 
   private async getVisibleSetlistsSetlistSelect(): Promise<Locator> {
-    const desktopVisible = await this.setlistsSetlistSelect
-      .isVisible()
-      .catch(() => false);
-    return desktopVisible
-      ? this.setlistsSetlistSelect
-      : this.setlistsSetlistSelectMobile;
+    return this.setlistsSetlistSelect
+      .or(this.setlistsSetlistSelectMobile)
+      .filter({ visible: true });
   }
 
   async selectSetlistsGroup(valueOrLabel: string) {
