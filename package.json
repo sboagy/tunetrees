@@ -150,7 +150,7 @@
     "tailwind-merge": "^3.7.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-fsrs": "6.0.0",
-    "wavesurfer.js": "^8.0.5"
+    "wavesurfer.js": "^8.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.5",
