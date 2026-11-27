@@ -46,6 +46,7 @@ import {
   type SqliteDatabase,
   setupAutoPersist,
 } from "../db/client-sqlite";
+import { discardBlockedDatabase } from "../db/discard-blocked-database";
 import {
   enableSyncTriggers,
   suppressSyncTriggers,
@@ -2139,6 +2140,14 @@ const TTInner: ParentComponent = (props) => {
       setLastSyncErrorCount(0);
       setLastSyncErrorSummary(null);
 
+      // A blocked switch may leave the runtime pointing at the previous account.
+      // Delete only the explicitly confirmed account, then reload the runtime.
+      if (upgradeBlocked()) {
+        await discardBlockedDatabase(currentUser.id);
+        if (ownsReset()) globalThis.location.reload();
+        return;
+      }
+
       await clearSqliteDb();
       if (!ownsReset()) return;
 
@@ -2289,7 +2298,14 @@ const TTInner: ParentComponent = (props) => {
         style={{ display: "contents" }}
       >
         <Show when={upgradeBlocked()} fallback={props.children}>
-          {(reason) => <DatabaseUpgradeBlocked reason={reason()} />}
+          {(reason) => (
+            <DatabaseUpgradeBlocked
+              reason={reason()}
+              userId={rhizome.user()?.id}
+              account={rhizome.user()?.email ?? "Anonymous account"}
+              onDiscard={forceCleanLocalReset}
+            />
+          )}
         </Show>
       </div>
     </TTAuthContext.Provider>

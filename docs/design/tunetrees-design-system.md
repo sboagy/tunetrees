@@ -213,7 +213,7 @@ Component documentation describes props, composition, and examples and links to 
 
 ## 11. Exceptions and maintenance
 
-Approved exceptions: T5 filter-dialog commit vocabulary; E6 Settings shell and independent Goals record dialogs; C3 evaluation arrays; V2 categorical chart and goal-identity palettes; A3 filled destructive for account-wide irreversible deletion. No blanket grandfathering for existing screens. New exceptions need scope, rationale, and review condition here; a comment saying “matches existing UI” is insufficient. When changing policy, update affected references and acceptance expectations together. Keep rules here, examples in component documentation, and audit findings in the Q1 tracking destination so this file stays compact.
+Approved exceptions: the blocked-upgrade recovery confirmation may use filled destructive for explicitly discarding an account’s entire local database and recovery backup; T5 filter-dialog commit vocabulary; E6 Settings shell and independent Goals record dialogs; C3 evaluation arrays; V2 categorical chart and goal-identity palettes; A3 filled destructive for account-wide irreversible deletion. No blanket grandfathering for existing screens. New exceptions need scope, rationale, and review condition here; a comment saying “matches existing UI” is insufficient. When changing policy, update affected references and acceptance expectations together. Keep rules here, examples in component documentation, and audit findings in the Q1 tracking destination so this file stays compact.
 
 ## 12. Audit and acceptance protocol
 

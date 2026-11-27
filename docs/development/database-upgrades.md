@@ -89,3 +89,24 @@ The goals configuration expansion now advances SQLite to version 28 with migrati
 list. Populated `goal_user_settings` is currently blocked on a subsequent rebuild
 until its new application write paths receive a preservation review. Finish and
 synchronize pending practice before testing a version-27 database upgrade.
+
+## Explicit discard from blocked startup
+
+The blocked-upgrade screen offers **Discard Local Data and Download Again…**
+when online. Its confirmation names the current account and site, explains the
+permanent loss of unsynced database work and recovery backups, and initially
+focuses Cancel. Escape cancels; backdrop interaction does not dismiss or confirm.
+Close other TuneTrees tabs first. Retry alone still preserves everything.
+
+Confirmed recovery uses the existing reset teardown, then atomically removes only
+that account's SQLite blob, version and outbox backup. The active runtime clear
+alone cannot do this when initialization was blocked. A full-download marker is
+written before deletion, followed by reload and normal initialization/download.
+Server data, other accounts, sign-in and separate media stores remain untouched.
+Failures remain visible and retryable; download interruption uses the existing
+full-pull recovery path. This action is not an export or a backup mechanism.
+
+Validation: component/provider unit tests and isolated Chromium/Mobile Chrome
+checks cover confirmation/cancellation, safe initial focus and focus return,
+account-scoped IndexedDB deletion and retained recovery intent. End-to-end
+staging download and interrupted-download acceptance remain part of rehearsal.

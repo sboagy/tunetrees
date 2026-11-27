@@ -208,8 +208,16 @@ automatically discarded. `view_column_meta` and `sync_change_log` are regenerabl
 The local-table inventory is recorded in `docs/development/database-upgrades.md`.
 Separate media/BYOS IndexedDB stores, cached blobs, OAuth secrets and localStorage
 preferences are not cleared by this rebuild. A blocked initialization replaces
-the application screen with recovery guidance and a reload-only retry action;
-it never calls the destructive reset or sign-out flow.
+the application screen with recovery guidance and a reload-only retry action.
+An explicit Discard Local Data confirmation also permits account-scoped recovery:
+the normal reset teardown drains sync and stops persistence, then
+`db/discard-blocked-database.ts` atomically deletes that account's saved SQLite
+blob, version and outbox backup using the codegen storage configuration. This
+special case is needed because blocked initialization has no active runtime DB
+identity for `clearDb`. It records full-download intent before deletion and
+reloads without signing out. Other accounts and separate media/auth stores survive.
+Automatic upgrades and Retry never invoke this destructive path. Users must close
+other TuneTrees tabs before confirming; cross-tab reset coordination is not provided.
 
 A per-user `TT_UPGRADE_FULL_PULL_<userId>` marker is set on creation or migration
 clearing. Existing databases with that marker discard the sync watermark before

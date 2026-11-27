@@ -1,4 +1,5 @@
-import { cleanup, render, waitFor } from "@solidjs/testing-library";
+import { cleanup, render, screen, waitFor } from "@solidjs/testing-library";
+import { BrowserSqliteMigrationBlockedError } from "oosync/runtime/browser-sqlite";
 import { createSignal, type ParentProps, useContext } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -36,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   close: vi.fn(),
   persist: vi.fn(),
   clear: vi.fn(),
+  discardBlocked: vi.fn(),
   autoCleanup: vi.fn(),
   selectRows: vi.fn(),
   insert: vi.fn(),
@@ -51,6 +53,9 @@ const mocks = vi.hoisted(() => ({
   destroy: vi.fn(),
   down: vi.fn(),
   up: vi.fn(),
+}));
+vi.mock("../../../src/lib/db/discard-blocked-database", () => ({
+  discardBlockedDatabase: mocks.discardBlocked,
 }));
 vi.mock("@rhizome/core", () => ({
   AuthProvider: (props: ParentProps) => props.children,
@@ -186,6 +191,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("provider sync completion lifetime", () => {
@@ -760,4 +766,28 @@ it("does not turn startup skipSync reconciliation into a delayed full pull", asy
   );
   expect(mocks.up).not.toHaveBeenCalled();
   expect(mocks.down).not.toHaveBeenCalled();
+});
+
+it("discards the blocked account snapshot before reloading without starting sync", async () => {
+  setUser({ ...user, email: "recovery@example.com" });
+  const blocked = new BrowserSqliteMigrationBlockedError("outbox");
+  mocks.initialize.mockRejectedValueOnce(blocked);
+  mocks.discardBlocked.mockResolvedValue(undefined);
+  expectConsole(
+    "error",
+    "Failed to initialize local database:",
+    expect.objectContaining({ message: blocked.message, reason: "outbox" })
+  );
+  const reload = vi.fn();
+  vi.stubGlobal("location", { reload, host: "staging.tunetrees.com" });
+  mount();
+  await screen.findByTestId("database-upgrade-blocked");
+  expect(mocks.start).not.toHaveBeenCalled();
+  await state.forceCleanLocalReset();
+  expect(mocks.discardBlocked).toHaveBeenCalledExactlyOnceWith(user.id);
+  // Runtime ownership can still belong to a previously initialized account.
+  expect(mocks.clear).not.toHaveBeenCalled();
+  expect(reload).toHaveBeenCalledOnce();
+  expect(mocks.initialize).toHaveBeenCalledOnce();
+  expect(mocks.auth.signOut).not.toHaveBeenCalled();
 });
