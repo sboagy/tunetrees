@@ -147,7 +147,7 @@
     "quickjs-emscripten": "^0.32.0",
     "solid-js": "^1.9.18",
     "solid-sonner": "^0.3.3",
-    "tailwind-merge": "^3.7.0",
+    "tailwind-merge": "^3.7.1",
     "tailwindcss-animate": "^1.0.7",
     "ts-fsrs": "6.0.0",
     "wavesurfer.js": "^8.1.0"
