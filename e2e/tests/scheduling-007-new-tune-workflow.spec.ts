@@ -565,8 +565,13 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     // Lapses only increment on an Again when prior state was Review (state=2).
     expect(record.lapses).toBe(0); // Remains 0 in Learning
 
-    // Interval should be minimum (1 day) since "Again" is hardest
-    expect(record.interval).toBe(1); // Minimum interval (1 day)
+    // Same-day reviews are off by default: preserve the existing 25-hour
+    // next-day floor. The legacy integer column is now a ceiling projection;
+    // timestamps, rather than that compatibility column, define the interval.
+    const intervalHours =
+      (Date.parse(record.due) - Date.parse(record.practiced)) / 3600000;
+    expect(intervalHours).toBe(25);
+    expect(record.interval).toBe(2);
 
     try {
       console.log(

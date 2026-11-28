@@ -8,10 +8,14 @@
 
 import {
   createContext,
+  createEffect,
   createSignal,
+  on,
   type ParentComponent,
   useContext,
 } from "solid-js";
+
+import { useAuth } from "../auth/AuthContext";
 
 interface CurrentRepertoireContextValue {
   currentRepertoireId: () => string | null;
@@ -24,6 +28,18 @@ export const CurrentRepertoireProvider: ParentComponent = (props) => {
   const [currentRepertoireId, setCurrentRepertoireId] = createSignal<
     string | null
   >(null);
+
+  const { user } = useAuth();
+  // This provider survives route changes. Never carry an account's selection
+  // into another session; the dropdown restores that user's saved selection.
+  createEffect(
+    on(
+      () => user()?.id,
+      (userId, previousUserId) => {
+        if (userId !== previousUserId) setCurrentRepertoireId(null);
+      }
+    )
+  );
 
   const value: CurrentRepertoireContextValue = {
     currentRepertoireId,

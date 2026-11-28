@@ -23,7 +23,9 @@ import { TunesGridScheduled } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import { FlashcardView, PracticeControlBanner } from "../components/practice";
+import { PracticeSubmitRecovery } from "../components/practice/PracticeSubmitRecovery";
 import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
+import { Button } from "../components/ui/button";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { useCurrentTuneSet } from "../lib/context/CurrentTuneSetContext";
@@ -31,11 +33,17 @@ import { useOnboarding } from "../lib/context/OnboardingContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import { getTuneIdsForTuneSet } from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
-import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
+import { runGoalQueueCommand } from "../lib/goals/queue-commands";
+import {
+  offerGoalQueueSaveRecovery,
+  reportGoalQueueNotices,
+} from "../lib/goals/queue-feedback";
 import { useStarterRepertoire } from "../lib/hooks/useStarterRepertoire";
-import { generateOrGetPracticeQueue } from "../lib/services/practice-queue";
-import { getPracticeDate } from "../lib/utils/practice-date";
+import {
+  formatAsWindowStart,
+  getPracticeDate,
+} from "../lib/utils/practice-date";
 import { useFlashcardPersistence } from "./practice/useFlashcardPersistence";
 import { usePracticeEvaluations } from "./practice/usePracticeEvaluations";
 import { usePracticeListData } from "./practice/usePracticeListData";
@@ -131,30 +139,6 @@ const PracticePage: Component = () => {
     return userId() ?? user()?.id ?? null;
   };
 
-  const [goalsData] = createResource(
-    () => {
-      const db = localDb();
-      const uid = userId();
-      return db && uid ? { db, uid } : null;
-    },
-    async (params) => {
-      if (!params) return [];
-      return getGoals(params.db, params.uid);
-    }
-  );
-
-  const goalsMap = createMemo(() => {
-    const map = new Map<string, GoalRow>();
-    const goals = goalsData() ?? [];
-    for (const goal of goals) {
-      if (goal.privateFor === null) map.set(goal.name, goal);
-    }
-    for (const goal of goals) {
-      if (goal.privateFor !== null) map.set(goal.name, goal);
-    }
-    return map;
-  });
-
   const SHOW_SUBMITTED_STORAGE_KEY = "TT_PRACTICE_SHOW_SUBMITTED";
   const [showSubmitted, setShowSubmitted] = createSignal(false);
 
@@ -178,6 +162,7 @@ const PracticePage: Component = () => {
     queueReady,
     setManualDate,
     clearManualAndSetToday,
+    captureQueueSelection,
     selectLatestQueueDate,
     refreshQueueWindowState,
     loadMoreRecentQueueDates,
@@ -231,7 +216,12 @@ const PracticePage: Component = () => {
         : undefined,
   });
 
+  const [submissionPending, setSubmissionPending] = createSignal(false);
   const {
+    getEvaluationModel,
+    practiceAgain,
+    retryEvaluation,
+    hasEvaluationErrors,
     evaluations,
     isStaging,
     evaluationsCount,
@@ -244,22 +234,33 @@ const PracticePage: Component = () => {
     currentRepertoireId,
     practiceListData: practiceRows,
     filteredPracticeList,
-    goalsMap,
+    userId,
+    windowStart: () => formatAsWindowStart(queueDate()),
+    isSubmitting: submissionPending,
+    settingsVersion: () =>
+      `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`,
     incrementPracticeListStagedChanged,
     suppressNextViewRefresh,
   });
 
   const {
+    submitError,
+    recovery,
+    clearReviewedNotes,
     handleSubmitEvaluations,
     handleAddTunes,
     handleQueueReset: resetQueue,
   } = usePracticeSubmit({
+    userId,
     localDb,
     getUserId,
     currentRepertoireId,
     queueDate,
+    captureQueueSelection,
     evaluationsCount,
     isStaging,
+    hasEvaluationErrors,
+    onSubmittingChange: setSubmissionPending,
     prepareClearEvaluations,
     incrementPracticeListStagedChanged,
     syncPracticeScope,
@@ -307,10 +308,13 @@ const PracticePage: Component = () => {
   };
 
   const handlePracticeDateRefresh = async () => {
+    const isCurrentSelection = captureQueueSelection();
     const practiceDate = getPracticeDate();
     const db = localDb();
     const repertoireId = currentRepertoireId();
     const userIdValue = await getUserId();
+
+    if (!isCurrentSelection()) return;
 
     if (!db || !repertoireId || !userIdValue) {
       console.warn(
@@ -324,29 +328,54 @@ const PracticePage: Component = () => {
       return;
     }
 
-    clearManualAndSetToday();
-
+    let refreshedEmpty = false;
     try {
-      await generateOrGetPracticeQueue(
+      const result = await runGoalQueueCommand(
+        db,
+        { userId: userIdValue, repertoireId, practiceDate },
+        { kind: "refresh" },
+        isCurrentSelection
+      );
+      if (!isCurrentSelection()) return;
+      refreshedEmpty = result.rows.length === 0;
+      reportGoalQueueNotices(result);
+      await refreshQueueWindowState();
+    } catch (error) {
+      offerGoalQueueSaveRecovery(
         db,
         userIdValue,
-        repertoireId,
-        practiceDate,
-        null,
-        "per_day",
-        true
+        () => localDb() === db && userId() === userIdValue,
+        async (saved) => {
+          if (!isCurrentSelection() || !saved?.refreshDate) return;
+          clearManualAndSetToday(
+            saved.refreshDate,
+            saved.result.rows.length === 0
+          );
+          incrementPracticeListStagedChanged();
+          await refreshQueueWindowState();
+        }
       );
-    } catch (error) {
       console.warn(
         "[PracticePage] Failed to regenerate queue during refresh:",
         error
       );
+      if (isCurrentSelection())
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not refresh the practice queue. Please try again."
+        );
+      return;
     }
 
+    // A newer calendar/Latest selection owns the view even if this refresh saved.
+    if (!isCurrentSelection()) return;
+    // Generation awaits IndexedDB persistence. Keep the rollover button visible
+    // and busy until that completes so hiding it means a reload is safe.
+    clearManualAndSetToday(practiceDate, refreshedEmpty);
     console.log(
       `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()}`
     );
-    await refreshQueueWindowState();
     incrementPracticeListStagedChanged();
   };
 
@@ -371,7 +400,7 @@ const PracticePage: Component = () => {
     <div class="h-full flex flex-col">
       <PracticeControlBanner
         evaluationsCount={evaluationsCount()}
-        isStaging={isStaging()}
+        isStaging={isStaging() || submissionPending()}
         onSubmitEvaluations={handleSubmitEvaluations}
         onAddTunes={handleAddTunes}
         queueDate={queueDate()}
@@ -396,6 +425,31 @@ const PracticePage: Component = () => {
         onPracticeDateRefresh={handlePracticeDateRefresh}
       />
 
+      <Show when={submitError()}>
+        <div
+          role="alert"
+          class="border-b border-border p-3 text-sm text-destructive"
+          data-testid="practice-submit-error"
+        >
+          {submitError()}{" "}
+          <Show when={recovery()} keyed>
+            {(problem) => (
+              <PracticeSubmitRecovery
+                recovery={problem}
+                pending={submissionPending() || isStaging()}
+                onClearNotes={clearReviewedNotes}
+              />
+            )}
+          </Show>
+          <Button
+            variant="outline"
+            disabled={submissionPending() || isStaging()}
+            onClick={handleSubmitEvaluations}
+          >
+            Retry Submit
+          </Button>
+        </div>
+      </Show>
       <div class={GRID_CONTENT_CONTAINER}>
         <Show when={isPracticeGateOpen()} fallback={renderPracticeFallback()}>
           <Show
@@ -406,6 +460,9 @@ const PracticePage: Component = () => {
                 fieldVisibility={flashcardFieldVisibility()}
                 evaluations={evaluations()}
                 onRecallEvalChange={handleRecallEvalChange}
+                getEvaluationModel={getEvaluationModel}
+                onPracticeAgain={practiceAgain}
+                onRetryEvaluation={retryEvaluation}
                 localDb={localDb}
                 userId={userId()!}
                 repertoireId={currentRepertoireId()!}
@@ -417,6 +474,9 @@ const PracticePage: Component = () => {
               repertoireId={currentRepertoireId()!}
               tablePurpose="scheduled"
               onRecallEvalChange={handleRecallEvalChange}
+              getEvaluationModel={getEvaluationModel}
+              onPracticeAgain={practiceAgain}
+              onRetryEvaluation={retryEvaluation}
               onGoalChange={handleGoalChange}
               onScheduledChange={handleScheduledChange}
               onTuneSelect={handleTuneSelect}

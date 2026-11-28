@@ -39,8 +39,8 @@ describe("TABLE_REGISTRY completeness", () => {
 
   it("has the expected number of tables", () => {
     // Update this if adding/removing tables
-    expect(SYNCABLE_TABLES.length).toBe(31);
-    expect(Object.keys(TABLE_REGISTRY).length).toBe(31);
+    expect(SYNCABLE_TABLES.length).toBe(32);
+    expect(Object.keys(TABLE_REGISTRY).length).toBe(32);
   });
 });
 
@@ -61,8 +61,8 @@ describe("COMPOSITE_PK_TABLES", () => {
     expect(COMPOSITE_PK_TABLES).toContain("user_genre_selection");
   });
 
-  it("has 6 composite key tables", () => {
-    expect(COMPOSITE_PK_TABLES.length).toBe(6);
+  it("has 7 composite key tables", () => {
+    expect(COMPOSITE_PK_TABLES.length).toBe(7);
   });
 });
 

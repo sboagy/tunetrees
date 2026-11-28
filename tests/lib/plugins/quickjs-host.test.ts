@@ -8,6 +8,7 @@ import {
   isWorkerInput,
   isWorkerOutput,
 } from "../../../src/lib/plugins/quickjs-protocol";
+import { expectConsole } from "../../helpers/expected-console";
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -41,7 +42,6 @@ beforeEach(() => {
   vi.stubGlobal("Worker", FakeWorker);
   vi.useFakeTimers();
   vi.spyOn(console, "info").mockImplementation(() => {});
-  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 afterEach(() => {
   disposeQuickJsWorker();
@@ -51,13 +51,13 @@ afterEach(() => {
 });
 
 describe("worker transport lifetime", () => {
-  it("rejects a missing scheduler method without interrupting active work", async () => {
+  it("rejects a removed scheduler API without interrupting active work", async () => {
     const active = runQuickJsPlugin(params);
     const worker = latest();
     await expect(
       // @ts-expect-error Exercise invalid input from an untyped caller.
       runQuickJsPlugin({ ...params, functionName: "createScheduler" })
-    ).rejects.toThrow("Missing scheduler method name");
+    ).rejects.toThrow("Invalid plugin invocation parameters");
     expect(worker.messages).toHaveLength(1);
     expect(worker.terminate).not.toHaveBeenCalled();
     worker.receive({ id: worker.invocation.id, ok: true, result: 6 });
@@ -78,6 +78,15 @@ describe("worker transport lifetime", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
   it("distinguishes a timeout from another invocation interrupted by reset", async () => {
+    expectConsole(
+      "warn",
+      "[QuickJS][host] invoke timeout",
+      expect.objectContaining({
+        functionName: "parseImport",
+        timeoutMs: 100,
+        pendingCount: 2,
+      })
+    );
     const a = runQuickJsPlugin(params);
     const b = runQuickJsPlugin({ ...params, timeoutMs: 500 });
     const assertions = Promise.all([
@@ -92,6 +101,15 @@ describe("worker transport lifetime", () => {
     expect(await c).toBe(7);
   });
   it("does not deliver an old bridge reply to a replacement worker", async () => {
+    expectConsole(
+      "warn",
+      "[QuickJS][host] invoke timeout",
+      expect.objectContaining({
+        functionName: "parseImport",
+        timeoutMs: 100,
+        pendingCount: 1,
+      })
+    );
     let release!: (value: unknown) => void;
     const a = runQuickJsPlugin({
       ...params,
@@ -135,6 +153,19 @@ describe("worker transport lifetime", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
   it("returns a useful bridge-unavailable response", async () => {
+    expectConsole(
+      "warn",
+      "[QuickJS][host] queryDb bridge missing",
+      expect.objectContaining({ queryId: 1 })
+    );
+    expectConsole(
+      "warn",
+      "[QuickJS][host] invoke failed",
+      expect.objectContaining({
+        functionName: "parseImport",
+        error: "queryDb not available",
+      })
+    );
     const a = runQuickJsPlugin(params);
     const worker = latest();
     worker.receive({
@@ -156,6 +187,16 @@ describe("worker transport lifetime", () => {
     await expect(a).rejects.toThrow("queryDb not available");
   });
   it("serializes a non-Error bridge rejection instead of hanging", async () => {
+    expectConsole(
+      "warn",
+      "[QuickJS][host] queryDb failed",
+      expect.objectContaining({ queryId: 1, error: "null" })
+    );
+    expectConsole(
+      "warn",
+      "[QuickJS][host] invoke failed",
+      expect.objectContaining({ functionName: "parseImport", error: "null" })
+    );
     const task = runQuickJsPlugin({
       ...params,
       bridge: { queryDb: async () => Promise.reject(null) },
@@ -189,6 +230,29 @@ describe("worker transport lifetime", () => {
   });
 });
 describe("worker protocol validation", () => {
+  it("accepts the versioned goal entry point", () => {
+    expect(
+      isWorkerInput({
+        type: "invoke",
+        id: 1,
+        functionName: "scheduleGoalV1",
+        script: "",
+        payload: {},
+      })
+    ).toBe(true);
+  });
+  it("rejects legacy method dispatch on the goal entry point", () => {
+    expect(
+      isWorkerInput({
+        type: "invoke",
+        id: 1,
+        functionName: "scheduleGoalV1",
+        methodName: "processReview",
+        script: "",
+        payload: {},
+      })
+    ).toBe(false);
+  });
   it.each([
     null,
     [],
@@ -204,16 +268,20 @@ describe("worker protocol validation", () => {
       isWorkerInput({
         type: "invoke",
         id: 1,
-        functionName: "createScheduler",
-        methodName: "processReview",
+        functionName: "scheduleGoalV1",
         script: "",
         payload: {},
       })
     ).toBe(true);
   });
-  it("rejects an invalid FSRS method from a worker", () => {
+  it("rejects the removed FSRS bridge from a worker", () => {
     expect(
-      isWorkerOutput({ type: "fsrs", id: 1, invokeId: 2, method: "delete" })
+      isWorkerOutput({
+        type: "fsrs",
+        id: 1,
+        invokeId: 2,
+        method: "processReview",
+      })
     ).toBe(false);
   });
 });

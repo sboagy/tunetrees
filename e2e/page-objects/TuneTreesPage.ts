@@ -181,10 +181,9 @@ export class TuneTreesPage {
   readonly userSettingsButton: Locator;
 
   readonly userSettingsCatalogSyncButton: Locator;
-  readonly userSettingsSchedulingOptionsButton: Locator;
-  readonly userSettingsSpacedRepetitionButton: Locator;
   readonly userSettingsAccountButton: Locator;
   readonly userSettingsAvatarButton: Locator;
+  readonly goalFsrsAdvanced: Locator;
 
   readonly settingsMenuToggle: Locator;
   readonly addTuneDialog: Locator;
@@ -520,14 +519,9 @@ export class TuneTreesPage {
     this.userSettingsCatalogSyncButton = page.getByTestId(
       "settings-tab-catalog-sync"
     );
-    this.userSettingsSchedulingOptionsButton = page.getByTestId(
-      "settings-tab-scheduling-options"
-    );
-    this.userSettingsSpacedRepetitionButton = page.getByTestId(
-      "settings-tab-spaced-repetition"
-    );
     this.userSettingsAccountButton = page.getByTestId("settings-tab-account");
     this.userSettingsAvatarButton = page.getByTestId("settings-tab-avatar");
+    this.goalFsrsAdvanced = page.getByTestId("goal-fsrs-advanced");
 
     this.settingsMenuToggle = page.getByTestId("settings-menu-toggle");
 
@@ -760,6 +754,12 @@ export class TuneTreesPage {
     await this.page.waitForTimeout(1500);
 
     if (repertoire) {
+      // A fresh anonymous session must finish onboarding when a repertoire was
+      // requested. Initial sync can outlast the fixed delay above; do not mistake
+      // a not-yet-visible welcome panel for an already configured account.
+      await expect(this.onboardingWelcomeHeading).toBeVisible({
+        timeout: 30000,
+      });
       const completed =
         await this.completeOnboardingWithRepertoireConfig(repertoire);
       if (!completed) {
@@ -1313,27 +1313,9 @@ export class TuneTreesPage {
       timeout: timeoutMs,
     });
     await this.dateRolloverRefreshButton.click();
-    await expect
-      .poll(
-        async () => {
-          const visible = await this.dateRolloverRefreshButton
-            .isVisible()
-            .catch(() => false);
-          if (!visible) {
-            return "hidden";
-          }
-
-          const enabled = await this.dateRolloverRefreshButton
-            .isEnabled()
-            .catch(() => false);
-          return enabled ? "enabled" : "disabled";
-        },
-        {
-          timeout: timeoutMs,
-          intervals: [100, 250, 500, 1000],
-        }
-      )
-      .not.toBe("enabled");
+    // The refresh control stays visible until persistence completes. Wait for
+    // that final state directly: a separate isVisible/isEnabled poll races with
+    // removal and can wait for an already-completed refresh button to reappear.
     await expect(this.dateRolloverRefreshButton).toBeHidden({
       timeout: timeoutMs,
     });
@@ -1693,21 +1675,16 @@ export class TuneTreesPage {
   }
 
   private async getVisibleSetlistsGroupSelect(): Promise<Locator> {
-    const desktopVisible = await this.setlistsGroupSelect
-      .isVisible()
-      .catch(() => false);
-    return desktopVisible
-      ? this.setlistsGroupSelect
-      : this.setlistsGroupSelectMobile;
+    // Resolve visibility when the locator is used, after lazy tab loading.
+    return this.setlistsGroupSelect
+      .or(this.setlistsGroupSelectMobile)
+      .filter({ visible: true });
   }
 
   private async getVisibleSetlistsSetlistSelect(): Promise<Locator> {
-    const desktopVisible = await this.setlistsSetlistSelect
-      .isVisible()
-      .catch(() => false);
-    return desktopVisible
-      ? this.setlistsSetlistSelect
-      : this.setlistsSetlistSelectMobile;
+    return this.setlistsSetlistSelect
+      .or(this.setlistsSetlistSelectMobile)
+      .filter({ visible: true });
   }
 
   async selectSetlistsGroup(valueOrLabel: string) {
@@ -4591,9 +4568,8 @@ export class TuneTreesPage {
 
   async selectRowFluency(row: Locator) {
     await row.getByRole("button", { name: /recall/i }).click();
-    await this.page
-      .getByRole("menuitem", { name: "fluency", exact: true })
-      .click();
+    // Goal labels and descriptions are editable; select by the stable goal key.
+    await this.page.getByTestId("goal-option-fluency").click();
   }
 
   async setRowEvaluation(
@@ -4628,7 +4604,7 @@ export class TuneTreesPage {
     await expect(evalTrigger).toBeEnabled({ timeout: 5000 });
 
     const expectedLabel =
-      evalValue === "not-set" ? String.raw`\(Not Set\)` : `${evalValue}:`;
+      evalValue === "not-set" ? String.raw`^\(Not Set\)$` : `^${evalValue}$`;
 
     const triggerAlreadySelected = async () => {
       const text = (await evalTrigger.textContent().catch(() => null)) ?? "";
@@ -4657,13 +4633,13 @@ export class TuneTreesPage {
     );
   }
 
-  private pauseIfNotClosed(doTimeouts: boolean | number) {
+  private async pauseIfNotClosed(doTimeouts: boolean | number) {
     if (!doTimeouts || this.page.isClosed()) return;
     const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
-    this.page
+    await this.page
       .waitForLoadState("domcontentloaded", { timeout: 1500 })
       .catch(() => undefined);
-    this.page.waitForTimeout(delay);
+    await this.page.waitForTimeout(delay);
   }
 
   private async isEvalMenuOpen(
@@ -4739,7 +4715,7 @@ export class TuneTreesPage {
     evalValue: string,
     expectedLabel: string,
     isAlreadySelected: () => Promise<boolean>,
-    settle: () => void
+    settle: () => Promise<void>
   ): Promise<boolean> {
     await this.closeEvalMenu(menu, trigger);
 
@@ -4747,7 +4723,7 @@ export class TuneTreesPage {
       await this.openEvalMenu(menu, trigger, row);
     } catch (error) {
       if (this.page.isClosed()) throw error;
-      settle();
+      await settle();
       return false;
     }
 
@@ -4760,7 +4736,7 @@ export class TuneTreesPage {
       await whichOption.click({ timeout: 3000 });
     } catch {
       await this.closeEvalMenu(menu, trigger);
-      settle();
+      await settle();
       return false;
     }
 
@@ -4784,7 +4760,7 @@ export class TuneTreesPage {
         });
     } catch {
       await this.closeEvalMenu(menu, trigger);
-      settle();
+      await settle();
       return false;
     }
 
@@ -4796,7 +4772,7 @@ export class TuneTreesPage {
       ]);
       if (!stillSelected || !submitReady) {
         await this.closeEvalMenu(menu, trigger);
-        settle();
+        await settle();
         return false;
       }
     }
@@ -4876,15 +4852,23 @@ export class TuneTreesPage {
         return;
       }
 
+      // Retain this DOM node: the first() locator otherwise moves to the next
+      // toast after dismissal and incorrectly waits for that different toast.
+      const closer = await toastCloser.elementHandle();
+      if (!closer) continue;
       try {
-        await toastCloser.click({ timeout: 5_000 });
-      } catch (error) {
-        // A transient toast can expire while Playwright waits for its exit
-        // animation to settle. Disappearance already satisfies dismissal;
-        // a still-visible obstruction must retain the original failure.
-        if (await toastCloser.isVisible()) throw error;
+        try {
+          await closer.click({ timeout: 5_000 });
+        } catch (error) {
+          // Expiration during the click also satisfies dismissal.
+          if (await closer.isVisible()) throw error;
+        }
+        await expect
+          .poll(() => closer.isVisible(), { timeout: 10_000 })
+          .toBe(false);
+      } finally {
+        await closer.dispose();
       }
-      await expect(toastCloser).toBeHidden({ timeout: 5_000 });
     }
   }
 
@@ -5017,7 +5001,7 @@ export class TuneTreesPage {
    * @remarks
    * - Uses multiple retry loops to mitigate flakiness due to animations, delayed renders, or focus issues.
    * - Assumes the first matching `recall-eval-*` control is the intended combobox for the card.
-   * - Verifies the final selected value by matching the evaluation button text (e.g., `"good:"` or `"(Not Set)"`).
+   * - Verifies the final selected value by matching the evaluation button text (e.g., `"Good"` or `"(Not Set)"`).
    */
   async selectFlashcardEvaluation(
     value: "again" | "hard" | "good" | "easy" | "not-set" = "good",
@@ -5035,7 +5019,8 @@ export class TuneTreesPage {
         this.logFlashcard("tune", { tuneId, value, attempt });
 
         const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
-        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
+        const expectedLabel =
+          value === "not-set" ? String.raw`^\(Not Set\)$` : `^${value}$`;
         const elapsed = () => Date.now() - startedAt;
 
         if (

@@ -10,9 +10,11 @@
  */
 
 import { and, eq, isNull, or } from "drizzle-orm";
+import { parseGoalOverrides } from "../../goals/config";
 import type { SqliteDatabase } from "../client-sqlite";
 import {
   goal,
+  goalUserSettings,
   prefsSchedulingOptions,
   prefsSpacedRepetition,
   userProfile,
@@ -104,9 +106,10 @@ function buildSchedulingOptionsUpdateSet(
       data.maxReviewsPerDay,
       existing.maxReviewsPerDay
     ),
-    daysPerWeek: resolveOptionalUpdate(data.daysPerWeek, existing.daysPerWeek),
-    weeklyRules: resolveOptionalUpdate(data.weeklyRules, existing.weeklyRules),
-    exceptions: resolveOptionalUpdate(data.exceptions, existing.exceptions),
+    // Undefined omits a field; explicit null clears an optional calendar value.
+    daysPerWeek: data.daysPerWeek,
+    weeklyRules: data.weeklyRules,
+    exceptions: data.exceptions,
     autoScheduleNew: toDbBool(data.autoScheduleNew),
     lastModifiedAt: now,
   };
@@ -413,6 +416,8 @@ export async function updateUserProfile(
  * Mirrors the goal table columns used by the UI.
  */
 export interface GoalRow {
+  displayName?: string | null;
+  description?: string | null;
   id: string;
   name: string;
   privateFor: string | null;
@@ -442,82 +447,29 @@ export async function getGoals(
       )
     );
 
+  const settings = db
+    .select()
+    .from(goalUserSettings)
+    .where(
+      and(eq(goalUserSettings.userId, userId), eq(goalUserSettings.deleted, 0))
+    )
+    .all();
+  const namedRows = rows.map((row) => {
+    const setting = settings.find((item) => item.goalId === row.id);
+    const personal = parseGoalOverrides(
+      setting ? JSON.parse(setting.overrides) : {}
+    );
+    return {
+      ...row,
+      displayName: personal.displayName ?? row.displayName ?? row.name,
+      description: personal.description ?? row.description,
+    };
+  });
+
   // Sort: system goals (privateFor IS NULL) first, then user goals by name
-  return rows.sort((a, b) => {
+  return namedRows.sort((a, b) => {
     if (a.privateFor === null && b.privateFor !== null) return -1;
     if (a.privateFor !== null && b.privateFor === null) return 1;
-    return a.name.localeCompare(b.name);
+    return a.displayName.localeCompare(b.displayName);
   });
-}
-
-/**
- * Insert a new user-owned goal, or update an existing one if the (name, privateFor)
- * pair already exists for this user.
- *
- * Enforces ownership: privateFor is always set to userId, ignoring any
- * caller-supplied value.
- *
- * @throws if name is empty
- */
-export async function upsertGoal(
-  db: SqliteDatabase,
-  userId: string,
-  data: {
-    id?: string;
-    name: string;
-    defaultTechnique?: string;
-    baseIntervals?: string | null;
-  }
-): Promise<GoalRow> {
-  if (!data.name.trim()) {
-    throw new Error("Goal name must not be empty");
-  }
-
-  const now = new Date().toISOString();
-  const id = data.id ?? crypto.randomUUID();
-
-  await db
-    .insert(goal)
-    .values({
-      id,
-      name: data.name.trim(),
-      privateFor: userId,
-      defaultTechnique: data.defaultTechnique ?? "fsrs",
-      baseIntervals: data.baseIntervals ?? null,
-      deleted: 0,
-      lastModifiedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [goal.id],
-      set: {
-        name: data.name.trim(),
-        defaultTechnique: data.defaultTechnique ?? "fsrs",
-        baseIntervals: data.baseIntervals ?? null,
-        deleted: 0,
-        lastModifiedAt: now,
-      },
-    });
-
-  const rows = await db.select().from(goal).where(eq(goal.id, id)).limit(1);
-
-  if (rows.length === 0) {
-    throw new Error(`Failed to retrieve goal after upsert (id=${id})`);
-  }
-  return rows[0];
-}
-
-/**
- * Soft-delete a user-owned goal (sets deleted = 1).
- * Silently no-ops if the goal doesn't exist or isn't owned by the user
- * (protects system goals from accidental deletion).
- */
-export async function softDeleteGoal(
-  db: SqliteDatabase,
-  userId: string,
-  goalId: string
-): Promise<void> {
-  await db
-    .update(goal)
-    .set({ deleted: 1, lastModifiedAt: new Date().toISOString() })
-    .where(and(eq(goal.id, goalId), eq(goal.privateFor, userId)));
 }

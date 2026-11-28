@@ -337,8 +337,9 @@ const CatalogPage: Component = () => {
 
   return (
     <div class="h-full flex flex-col">
-      {/* Toolbar with Search and Filters */}
-      <Show when={!allTunes.loading}>
+      {/* Background catalog refreshes must not unmount the toolbar and discard
+          its open Add Tune dialog, draft input or mobile menu state. */}
+      <Show when={allTunes.latest !== undefined || !allTunes.loading}>
         <CatalogToolbar
           searchQuery={searchQuery()}
           onSearchChange={setSearchQuery}
@@ -359,7 +360,7 @@ const CatalogPage: Component = () => {
             repertoires: userRepertoires.loading,
           }}
           selectedRowsCount={selectedRowsCount()}
-          table={tableInstance() || undefined}
+          table={tableInstance() ?? undefined}
           repertoireId={currentRepertoireId() || undefined}
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}

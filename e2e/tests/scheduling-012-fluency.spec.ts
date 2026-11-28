@@ -1,7 +1,10 @@
-import { expect } from "@playwright/test";
-import { DEFAULT_PLUGIN_SCRIPT } from "../../src/lib/plugins/scheduling-template";
+import { expect, type Page } from "@playwright/test";
 import { TEST_TUNE_BANISH_ID } from "../../tests/fixtures/test-data";
-import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
+import {
+  advanceHours,
+  STANDARD_TEST_DATE,
+  setStableDate,
+} from "../helpers/clock-control";
 import {
   seedSchedulingPluginLocally,
   setupForPracticeTestsParallel,
@@ -11,20 +14,31 @@ import {
   submitAndWaitForPracticeSettled,
 } from "../helpers/practice-view";
 import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
-/** SCHEDULING-012 (HIGH): Fluency evaluates, stages, submits and persists.
- * The production template must actually query local history; merely falling
- * back without a toast cannot satisfy the asserted two/four-day intervals.
- */
+const fluencyId = "00000000-0000-0000-0000-000000000003";
+const declaration = `function describeGoalSchedulerV1() {
+  return { apiVersion: 1, stateVersion: 1, compatibleStateVersions: [1],
+    actions: [{ id: "smooth", label: "Smooth", description: "Review in six hours" }] };
+}`;
+async function selectEvaluation(page: Page, value: string) {
+  const trigger = page.getByTestId(`recall-eval-${TEST_TUNE_BANISH_ID}`);
+  await expect(trigger).toBeEnabled({ timeout: 10000 });
+  await trigger.click({ timeout: 10000 });
+  await page.getByTestId(`recall-eval-option-${value}`).click();
+  await page.waitForLoadState("networkidle", { timeout: 15000 });
+}
+
+/** Goal-specific choices and new-event submission, including explicit plugins.
+ * Legacy automatic plugin matching and silent fallback are intentionally gone. */
 test.describe("Fluency scheduling", () => {
   test.setTimeout(120000);
   let tt: TuneTreesPage;
   test.beforeEach(async ({ page, context, testUser }) => {
     await setStableDate(context, new Date(STANDARD_TEST_DATE));
     tt = new TuneTreesPage(page);
-    await tt.setSchedulingPrefs();
     await setupForPracticeTestsParallel(page, testUser, {
       repertoireTunes: [TEST_TUNE_BANISH_ID],
       scheduleDaysAgo: 1,
@@ -34,49 +48,184 @@ test.describe("Fluency scheduling", () => {
     const row = tt.getRows("scheduled").first();
     await tt.selectRowFluency(row);
     await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await expect(tt.getRowFluencyButton(row)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(tt.getRowFluencyButton(row)).toBeVisible({ timeout: 10000 });
   });
-  test("submits a first Fluency review and preserves it on reload", async ({
+
+  test("shows ladder due estimates without staging an evaluation", async ({
     page,
     testUser,
   }) => {
-    await seedSchedulingPluginLocally(page, {
-      script: DEFAULT_PLUGIN_SCRIPT,
-      goals: ["fluency"],
-      userId: testUser.userId,
-    });
-    await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
+    await page.getByTestId(`recall-eval-${TEST_TUNE_BANISH_ID}`).click();
+    await expect(
+      page.getByTestId("recall-eval-option-effortless")
+    ).toContainText("Due ", { timeout: 10000 });
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getPracticeDraft(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toBeNull();
+    await page.keyboard.press("Escape");
+    await expect(tt.submitEvaluationsButton).toBeDisabled({ timeout: 10000 });
+  });
+
+  test("preserves draft notes on failed Submit and clears only after explicit recovery", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    await selectEvaluation(page, "effortless");
+    const draft = await page.evaluate(
+      async ({ rep, tune }) =>
+        window.__ttTestApi?.seedPracticeSubmissionRecovery({
+          repertoireId: rep,
+          tuneId: tune,
+          kind: "notes",
+        }),
+      { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+    );
+    await tt.submitEvaluationsButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
-    const preview = await page.evaluate(
-      async (rep) => window.__ttTestApi?.getPracticeListStaged(rep),
-      testUser.repertoireId
+    await expect(page.getByTestId("recovery-private-note")).toHaveValue(
+      "Private text to preserve",
+      { timeout: 10000 }
+    );
+    await expect(page.getByTestId("recovery-public-note")).toHaveValue(
+      "Public text to preserve",
+      { timeout: 10000 }
+    );
+    await expect(page.getByTestId("recovery-clear-notes")).toBeDisabled({
+      timeout: 10000,
+    });
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getPracticeDraft(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toEqual(draft);
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getDistinctPracticeRecordCount(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toBe(0);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.getByTestId("recovery-copy-notes").click();
+    await expect(page.getByTestId("practice-submit-recovery")).toContainText(
+      "Copied.",
+      { timeout: 10000 }
+    );
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+      "Private text to preserve"
+    );
+    await page.getByTestId("recovery-notes-saved").check();
+    await page.getByTestId("recovery-clear-notes").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("practice-submit-error")).toContainText(
+      "Draft notes cleared",
+      { timeout: 10000 }
     );
     expect(
-      preview?.find((row) => row.id === TEST_TUNE_BANISH_ID)
-    ).toMatchObject({ latest_interval: 2, has_staged: 1 });
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getPracticeDraft(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toMatchObject({
+      practiceRecordId: draft?.practiceRecordId,
+      evaluationId: "effortless",
+      notePrivate: null,
+      notePublic: null,
+    });
     await submitAndWaitForPracticeSettled(page, tt);
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getDistinctPracticeRecordCount(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toBe(1);
+  });
+
+  for (const kind of ["time-conflict", "id-conflict"] as const) {
+    test(`preserves ${kind} practice and the draft with a History recovery link`, async ({
+      page,
+      testUser,
+    }) => {
+      await selectEvaluation(page, "effortless");
+      const draft = await page.evaluate(
+        async ({ rep, tune, kind }) =>
+          window.__ttTestApi?.seedPracticeSubmissionRecovery({
+            repertoireId: rep,
+            tuneId: tune,
+            kind,
+          }),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID, kind }
+      );
+      const recorded = await queryLatestPracticeRecord(
+        page,
+        TEST_TUNE_BANISH_ID,
+        testUser.repertoireId
+      );
+      await tt.submitEvaluationsButton.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await expect(page.getByTestId("practice-submit-recovery")).toContainText(
+        "Your draft is preserved",
+        { timeout: 10000 }
+      );
+      await expect(
+        page.getByTestId("recovery-practice-history")
+      ).toHaveAttribute(
+        "href",
+        `/tunes/${TEST_TUNE_BANISH_ID}/practice-history`,
+        { timeout: 10000 }
+      );
+      expect(
+        await queryLatestPracticeRecord(
+          page,
+          TEST_TUNE_BANISH_ID,
+          testUser.repertoireId
+        )
+      ).toEqual(recorded);
+      expect(
+        await page.evaluate(
+          async ({ rep, tune }) =>
+            window.__ttTestApi?.getPracticeDraft(rep, tune),
+          { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+        )
+      ).toEqual(draft);
+      expect(
+        await page.evaluate(
+          async ({ rep, tune }) =>
+            window.__ttTestApi?.getDistinctPracticeRecordCount(rep, tune),
+          { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+        )
+      ).toBe(1);
+    });
+  }
+
+  test("submits a goal-specific ladder evaluation and preserves it on reload", async ({
+    page,
+    testUser,
+  }) => {
+    await selectEvaluation(page, "effortless");
+    await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
+    await submitAndWaitForPracticeSettled(page, tt);
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
       testUser.repertoireId,
       { waitForRecordMs: 10000 }
     );
-    expect(record?.interval).toBe(2);
-    expect(record?.due).toBe(
-      preview?.find((row) => row.id === TEST_TUNE_BANISH_ID)?.latest_due
-    );
-    const stagedAfter = await page.evaluate(
-      async (rep) => window.__ttTestApi?.getPracticeListStaged(rep),
-      testUser.repertoireId
-    );
-    expect(
-      stagedAfter?.find((row) => row.id === TEST_TUNE_BANISH_ID)?.has_staged ??
-        0
-    ).toBe(0);
+    expect(record).toMatchObject({
+      goal_id: fluencyId,
+      evaluation_id: "effortless",
+      scheduler_id: "builtin:interval-ladder",
+      interval_days: 3,
+    });
     await page.reload();
     const reloaded = await queryLatestPracticeRecord(
       page,
@@ -92,31 +241,87 @@ test.describe("Fluency scheduling", () => {
         { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
       )
     ).toBe(1);
-    await expect(
-      page.getByText("Scheduling plugin failed", { exact: true })
-    ).toHaveCount(0);
   });
-  test("uses review history offline and syncs the submitted result after reconnect", async ({
+
+  test("Practice Again appends an event and cancellation preserves the prior completion", async ({
     page,
     context,
     testUser,
   }) => {
-    await seedSchedulingPluginLocally(page, {
-      script: DEFAULT_PLUGIN_SCRIPT,
-      goals: ["fluency"],
-      userId: testUser.userId,
-    });
-    await page.evaluate(
-      async (input) => window.__ttTestApi?.seedPracticeHistory(input),
-      {
-        repertoireId: testUser.repertoireId,
-        tuneId: TEST_TUNE_BANISH_ID,
-        qualities: [3, 3],
-        practicedBefore: new Date(STANDARD_TEST_DATE).toISOString(),
-      }
+    await selectEvaluation(page, "effortless");
+    await submitAndWaitForPracticeSettled(page, tt);
+    const first = await queryLatestPracticeRecord(
+      page,
+      TEST_TUNE_BANISH_ID,
+      testUser.repertoireId,
+      { waitForRecordMs: 10000 }
     );
-    // Warm the real worker/WASM before disabling the network; the review itself
-    // must still obtain its history from SQLite rather than a remote service.
+    await tt.setShowSubmitted(true);
+    const completed = page.getByTestId(`practice-again-${TEST_TUNE_BANISH_ID}`);
+    await expect(completed).toHaveAccessibleName("Submitted: Effortless", {
+      timeout: 10000,
+    });
+    await expect(completed).toContainText("Effortless", { timeout: 10000 });
+    await completed.click();
+    const submittedMenu = page.getByTestId(
+      `submitted-eval-menu-${TEST_TUNE_BANISH_ID}`
+    );
+    await expect(submittedMenu).toHaveCSS("width", "320px", { timeout: 10000 });
+    await expect(completed).toContainText("Effortless", { timeout: 10000 });
+    await page.keyboard.press("Escape");
+    await expect(completed).toBeFocused({ timeout: 10000 });
+    await completed.click();
+    await page.getByTestId("practice-again-action").click();
+    await selectEvaluation(page, "not-set");
+    await expect(completed).toContainText("Effortless", { timeout: 10000 });
+    expect(
+      (
+        await queryLatestPracticeRecord(
+          page,
+          TEST_TUNE_BANISH_ID,
+          testUser.repertoireId
+        )
+      )?.id
+    ).toBe(first?.id);
+    await advanceHours(context, 6, new Date(STANDARD_TEST_DATE));
+    await completed.click();
+    await page.getByTestId("practice-again-action").click();
+    await selectEvaluation(page, "fluent");
+    await submitAndWaitForPracticeSettled(page, tt);
+    const second = await queryLatestPracticeRecord(
+      page,
+      TEST_TUNE_BANISH_ID,
+      testUser.repertoireId,
+      { waitForRecordMs: 10000 }
+    );
+    expect(second?.id).not.toBe(first?.id);
+    expect(second).toMatchObject({ evaluation_id: "fluent", interval_days: 3 });
+    expect(
+      await page.evaluate(
+        async ({ rep, tune }) =>
+          window.__ttTestApi?.getDistinctPracticeRecordCount(rep, tune),
+        { rep: testUser.repertoireId, tune: TEST_TUNE_BANISH_ID }
+      )
+    ).toBe(2);
+  });
+
+  test("runs the explicitly selected plugin offline and syncs after reconnect", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    const plugin = await seedSchedulingPluginLocally(page, {
+      userId: testUser.userId,
+      goalId: fluencyId,
+      script:
+        declaration +
+        `function scheduleGoalV1(input) { return { due: new Date(Date.parse(input.practiced) + 21600000).toISOString(), state: { count: 1 } }; }`,
+    });
+    await page.reload();
+    await expect(
+      page.getByTestId(`recall-eval-${TEST_TUNE_BANISH_ID}`)
+    ).toBeEnabled({ timeout: 10000 });
+    // Warm the worker after reload; the actual scheduling and submission then run offline.
     await page.evaluate(async () =>
       window.__ttTestApi?.runPlugin({
         script: "function parseImport(){return true;}",
@@ -124,26 +329,23 @@ test.describe("Fluency scheduling", () => {
         payload: {},
       })
     );
-    await context.setOffline(true);
-    await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
+    await setOfflineForTest(context, true);
+    await selectEvaluation(page, "smooth");
     await submitAndWaitForPracticeSettled(page, tt);
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
       testUser.repertoireId,
       { waitForRecordMs: 10000 }
     );
-    expect(record?.interval).toBe(4);
-    await expect(
-      page.getByText("Scheduling plugin failed", { exact: true })
-    ).toHaveCount(0);
-    await context.setOffline(false);
+    expect(record).toMatchObject({
+      scheduler_id: `plugin:${plugin.id}`,
+      evaluation_id: "smooth",
+      interval_days: 0.25,
+    });
+    await setOfflineForTest(context, false);
     await runTestHook(page, "__forceSyncUpForTest");
-    // Poll the specific submitted record, not the whole outbox, which may also
-    // contain unrelated preference or queue updates from the test fixture.
+    // Await the exact event's server acknowledgment, not unrelated outbox entries.
     await expect
       .poll(
         () =>
@@ -158,71 +360,61 @@ test.describe("Fluency scheduling", () => {
           ),
         { timeout: 30000 }
       )
-      .toMatchObject({ interval: 4 });
+      .toMatchObject({ interval_days: 0.25 });
   });
-  test("reports the historical script error and still allows fallback submission", async ({
-    page,
-    testUser,
-  }) => {
-    const historical = DEFAULT_PLUGIN_SCRIPT.replaceAll(
-      "repertoire_ref",
-      "playlist_ref"
-    ).replaceAll("repertoireRef", "playlistRef");
-    await seedSchedulingPluginLocally(page, {
-      script: historical,
-      goals: ["fluency"],
-      userId: testUser.userId,
-    });
-    await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await expect(
-      page.getByText("Scheduling plugin failed", { exact: true })
-    ).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByText(/This plugin uses the old playlist API/)
-    ).toBeVisible({ timeout: 10000 });
-    await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
-    await submitAndWaitForPracticeSettled(page, tt);
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    const record = await queryLatestPracticeRecord(
-      page,
-      TEST_TUNE_BANISH_ID,
-      testUser.repertoireId,
-      { waitForRecordMs: 10000 }
-    );
-    // Good advances a first review from step zero to the ladder's second
-    // entry: [1, 3, 7, 14, 21]. This differs from the plugin's two-day result.
-    expect(record?.interval).toBe(3);
-  });
-  test("unblocks Submit after a scheduling timeout", async ({
+
+  test("keeps a failed explicit plugin evaluation unsubmitted without fallback", async ({
     page,
     testUser,
   }) => {
     await seedSchedulingPluginLocally(page, {
-      script: `function createScheduler() {
-        const hang = () => new Promise(() => {});
-        return {processFirstReview: hang, processReview: hang};
-      }`,
-      goals: ["fluency"],
       userId: testUser.userId,
+      goalId: fluencyId,
+      script:
+        declaration +
+        `function scheduleGoalV1(){ throw new Error("Scheduler needs repair"); }`,
     });
-    await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
+    await page.reload();
+    await selectEvaluation(page, "smooth");
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Scheduler needs repair" })
+    ).toBeVisible({ timeout: 10000 });
     await expect(tt.submitEvaluationsButton).toBeDisabled({ timeout: 10000 });
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    // Exercise the production 30-second deadline all the way through staging.
-    // Short injected deadlines are covered separately by the transport tests.
-    await expect(page.getByText(/Plugin execution timed out/)).toBeVisible({
-      timeout: 40000,
+    expect(
+      await queryLatestPracticeRecord(
+        page,
+        TEST_TUNE_BANISH_ID,
+        testUser.repertoireId
+      )
+    ).toBeNull();
+  });
+
+  test("a scheduling timeout retains an actionable error without submitting fallback", async ({
+    page,
+    testUser,
+  }) => {
+    await seedSchedulingPluginLocally(page, {
+      userId: testUser.userId,
+      goalId: fluencyId,
+      script:
+        declaration +
+        `function scheduleGoalV1(){return new Promise(() => {});}`,
     });
-    await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
-    await submitAndWaitForPracticeSettled(page, tt);
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    const record = await queryLatestPracticeRecord(
-      page,
-      TEST_TUNE_BANISH_ID,
-      testUser.repertoireId,
-      { waitForRecordMs: 10000 }
-    );
-    expect(record?.interval).toBe(3);
+    await page.reload();
+    await selectEvaluation(page, "smooth");
+    await expect(
+      page.getByRole("alert").filter({ hasText: /timed out/i })
+    ).toBeVisible({ timeout: 40000 });
+    await expect(
+      page.getByRole("button", { name: "Retry", exact: true })
+    ).toBeEnabled({ timeout: 10000 });
+    await expect(tt.submitEvaluationsButton).toBeDisabled({ timeout: 10000 });
+    expect(
+      await queryLatestPracticeRecord(
+        page,
+        TEST_TUNE_BANISH_ID,
+        testUser.repertoireId
+      )
+    ).toBeNull();
   });
 });

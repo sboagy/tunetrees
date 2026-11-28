@@ -8,3 +8,9 @@ describe("worker delete policy overrides", () => {
     ).toBe(false);
   });
 });
+
+it("allows tag text renames without making tag ownership or tune editable", () => {
+  expect(
+    WORKER_SYNC_CONFIG.push.tableRules.tag.upsert.mutableNaturalKeyProps
+  ).toEqual(["tagText"]);
+});

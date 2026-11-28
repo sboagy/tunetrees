@@ -8,7 +8,6 @@ import { usePracticeListData } from "@/routes/practice/usePracticeListData";
 
 const { getPracticeList } = vi.hoisted(() => ({ getPracticeList: vi.fn() }));
 vi.mock("@/lib/db/queries/practice", () => ({ getPracticeList }));
-vi.mock("@/lib/services/practice-staging", () => ({}));
 vi.mock("solid-sonner", () => ({ toast: { error: vi.fn() } }));
 let dispose: () => void;
 afterEach(() => {
@@ -59,7 +58,8 @@ it.each([
         getUserId: async () => "user",
         practiceListData: list.practiceRows,
         filteredPracticeList: list.filteredPracticeList,
-        goalsMap: () => new Map(),
+        userId: () => "user",
+        windowStart: () => "2026-11-18T00:00:00Z",
         incrementPracticeListStagedChanged: () => {},
         suppressNextViewRefresh: () => {},
       });

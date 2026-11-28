@@ -127,10 +127,6 @@ export const WORKER_SYNC_CONFIG = {
           },
         },
       },
-      daily_practice_queue: {
-        kind: "eqUserId",
-        column: "user_ref",
-      },
       goal: {
         kind: "compound",
         operator: "or",
@@ -144,6 +140,14 @@ export const WORKER_SYNC_CONFIG = {
             column: "private_for",
           },
         ],
+      },
+      daily_practice_queue: {
+        kind: "eqUserId",
+        column: "user_ref",
+      },
+      goal_user_settings: {
+        kind: "eqUserId",
+        column: "user_id",
       },
       instrument: {
         kind: "orNullEqUserId",
@@ -505,8 +509,20 @@ export const WORKER_SYNC_CONFIG = {
             },
           ],
         },
-        bindAuthUserIdProps: ["private_for"],
-        denyDelete: false,
+        bindAuthUserIdProps: ["privateFor"],
+        denyDelete: true,
+      },
+      goal_user_settings: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+        bindAuthUserIdProps: ["userId"],
+        denyDelete: true,
       },
       group_member: {
         sanitize: {
@@ -593,6 +609,10 @@ export const WORKER_SYNC_CONFIG = {
               kind: "float",
             },
             {
+              prop: "intervalDays",
+              kind: "float",
+            },
+            {
               prop: "stability",
               kind: "float",
             },
@@ -614,6 +634,10 @@ export const WORKER_SYNC_CONFIG = {
             },
             {
               prop: "repetitions",
+              kind: "int",
+            },
+            {
+              prop: "schedulerVersion",
               kind: "int",
             },
             {
@@ -639,20 +663,6 @@ export const WORKER_SYNC_CONFIG = {
         },
         upsert: {
           omitSetProps: ["id"],
-          retryMinimalPayloadKeepProps: [
-            "id",
-            "repertoireRef",
-            "tuneRef",
-            "practiced",
-            "quality",
-            "due",
-            "backupPracticed",
-            "goal",
-            "technique",
-            "syncVersion",
-            "lastModifiedAt",
-            "deviceId",
-          ],
         },
       },
       prefs_scheduling_options: {
@@ -817,6 +827,10 @@ export const WORKER_SYNC_CONFIG = {
               kind: "float",
             },
             {
+              prop: "intervalDays",
+              kind: "float",
+            },
+            {
               prop: "stability",
               kind: "float",
             },
@@ -830,6 +844,10 @@ export const WORKER_SYNC_CONFIG = {
             },
             {
               prop: "repetitions",
+              kind: "int",
+            },
+            {
+              prop: "schedulerVersion",
               kind: "int",
             },
             {
@@ -856,6 +874,9 @@ export const WORKER_SYNC_CONFIG = {
               kind: "int",
             },
           ],
+        },
+        upsert: {
+          mutableNaturalKeyProps: ["tagText"],
         },
       },
       tune: {

@@ -11,8 +11,8 @@
 import { FlipVertical2 } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
-import { getSubmittedEvaluationDisplay } from "../grids/evaluation-display";
-import { RecallEvalComboBox } from "../grids/RecallEvalComboBox";
+import type { PracticeEvaluationModel } from "../../lib/goals/practice-session";
+import { PracticeEvaluationCell } from "../grids/PracticeEvaluationCell";
 import type { ITuneOverview } from "../grids/types";
 import type {
   FlashcardFieldVisibility,
@@ -21,6 +21,9 @@ import type {
 
 export interface FlashcardCardProps {
   tune: ITuneOverview;
+  evaluationModel?: PracticeEvaluationModel;
+  onPracticeAgain?: () => void;
+  onRetryEvaluation?: () => void;
   currentEvaluation: string; // Current evaluation value
   isRevealed: boolean;
   fieldVisibility?: FlashcardFieldVisibilityByFace;
@@ -70,42 +73,24 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
    * Render evaluation control or static text based on completed_at status
    * Matches the logic from TuneColumns.tsx evaluation cell
    */
-  const renderEvaluation = () => {
-    const completedAt = props.tune.completed_at;
-
-    // If completed_at is set, show static text (tune already submitted)
-    if (completedAt) {
-      const evaluationDisplay = getSubmittedEvaluationDisplay({
+  const renderEvaluation = () => (
+    <PracticeEvaluationCell
+      tuneId={props.tune.id}
+      value={props.currentEvaluation}
+      completed={!!props.tune.completed_at}
+      model={props.evaluationModel}
+      legacy={{
         latestQuality: props.tune.latest_quality,
         latestTechnique: props.tune.latest_technique,
         recallEval: props.currentEvaluation,
-      });
-
-      return (
-        <div class="text-center">
-          <span
-            class={`text-lg ${evaluationDisplay.colorClass} italic font-medium`}
-          >
-            {evaluationDisplay.label}
-          </span>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            (Submitted)
-          </p>
-        </div>
-      );
-    }
-
-    // Otherwise show editable combobox
-    return (
-      <RecallEvalComboBox
-        tuneId={props.tune.id}
-        value={props.currentEvaluation}
-        open={isEvalDropdownOpen()}
-        onOpenChange={setIsEvalDropdownOpen}
-        onChange={handleEvalChange}
-      />
-    );
-  };
+      }}
+      open={isEvalDropdownOpen()}
+      onOpenChange={setIsEvalDropdownOpen}
+      onChange={handleEvalChange}
+      onPracticeAgain={props.onPracticeAgain}
+      onRetry={props.onRetryEvaluation}
+    />
+  );
 
   return (
     <div

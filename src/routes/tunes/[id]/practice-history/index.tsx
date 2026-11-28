@@ -2,23 +2,40 @@
  * Practice History Route
  *
  * Displays practice records for a tune in a read-only history table with
- * lightweight FSRS analytics and an optional manual backfill form.
+ * goal-aware analytics and an optional manual backfill form.
  *
  * @module routes/tunes/[id]/practice-history
  */
 
-import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { Plus, Save, Trash2 } from "lucide-solid";
+import {
+  useBeforeLeave,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "@solidjs/router";
+import { eq, isNull, or } from "drizzle-orm";
+import { LoaderCircle, Plus, Save, X } from "lucide-solid";
 import {
   type Component,
+  createEffect,
   createMemo,
   createResource,
   createSignal,
   For,
   Match,
+  onCleanup,
   Show,
   Switch,
 } from "solid-js";
+import { toast } from "solid-sonner";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,7 +44,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { BarChart, LineChart } from "@/components/ui/charts";
+import { createDraftExitGuard } from "@/components/ui/createDraftExitGuard";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentRepertoire } from "@/lib/context/CurrentRepertoireContext";
 import {
@@ -35,27 +52,64 @@ import {
   getPracticeRecordsForTune,
 } from "@/lib/db/queries/practice-records";
 import { getTuneForUserById } from "@/lib/db/queries/tunes";
-import type { PracticeRecord } from "@/lib/db/types";
-import { FSRS_QUALITY_MAP } from "@/lib/scheduling/fsrs-service";
-import { recordPracticeRating } from "@/lib/services/practice-recording";
+import { goal } from "@/lib/db/schema";
+import type { EvaluationChoice } from "@/lib/goals/config";
 import {
-  buildPracticeHistoryQualityChart,
-  buildPracticeHistoryStabilityChart,
-  buildPracticeHistorySummary,
-  formatPracticeHistoryDate,
-  getPracticeHistoryQualityDisplay,
-  getPracticeHistoryStateLabel,
-} from "./practice-history-utils";
+  ManualPracticePersistenceError,
+  type ManualPracticeReceipt,
+  ManualPracticeRemovedError,
+  manualGoalConfigurationKey,
+  prepareManualPractice,
+  saveManualPractice,
+} from "@/lib/goals/manual-practice";
+import { buildHistoryEvents } from "@/lib/goals/practice-history";
+import { readGoalPracticeContext } from "@/lib/goals/resolve";
+import { readGoalSettingsCatalog } from "@/lib/goals/settings";
+import {
+  tuneTaskReturn,
+  tuneTaskReturnState,
+} from "@/lib/tune-task-navigation";
+import { HistoryEventsTable } from "./HistoryEventsTable";
 
 interface DraftPracticeRecord {
+  scope: string;
   practiced: string;
-  quality: number;
+  goalId: string;
+  evaluationId: string;
+}
+
+/** Component-lifetime form state is isolated by database and history scope. */
+function createEntryForm() {
+  const [draftRecord, setDraftRecord] =
+    createSignal<DraftPracticeRecord | null>(null);
+  const [pendingSave, setPendingSave] =
+    createSignal<ManualPracticeReceipt | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = createSignal(false);
+  const [mutationError, setMutationError] = createSignal<string | null>(null);
+  return {
+    draftRecord,
+    setDraftRecord,
+    pendingSave,
+    setPendingSave,
+    isSavingDraft,
+    setIsSavingDraft,
+    mutationError,
+    setMutationError,
+  };
+}
+
+function defaultEvaluationId(choices: readonly EvaluationChoice[]) {
+  return (
+    choices.find(
+      (choice) => choice.action.kind === "fsrs" && choice.action.rating === 3
+    )?.id ?? ""
+  );
 }
 
 /**
  * Practice History Page Component
  *
- * Shows immutable historical FSRS reviews and tune-specific analytics.
+ * Shows recorded evaluations and scheduler-specific details across goals.
  */
 const PracticeHistoryPage: Component = () => {
   const params = useParams();
@@ -64,15 +118,64 @@ const PracticeHistoryPage: Component = () => {
   const { localDb, userIdInt } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
 
-  const [draftRecord, setDraftRecord] =
-    createSignal<DraftPracticeRecord | null>(null);
-  const [isSavingDraft, setIsSavingDraft] = createSignal(false);
   const [deletingIds, setDeletingIds] = createSignal<Set<string>>(new Set());
-  const [mutationError, setMutationError] = createSignal<string | null>(null);
-
+  const scopeKey = () => `${userIdInt()}:${currentRepertoireId()}:${params.id}`;
+  const [deleteTarget, setDeleteTarget] = createSignal<{
+    id: string;
+    scope: string;
+    db: ReturnType<typeof localDb>;
+  } | null>(null);
+  // Undefined means the user has not selected a filter in this history scope.
+  // An explicit empty string keeps All Goals selected, even with one goal.
+  const [selectedHistoryGoal, setHistoryGoal] = createSignal<string>();
+  const forms = new WeakMap<
+    NonNullable<ReturnType<typeof localDb>>,
+    Map<string, ReturnType<typeof createEntryForm>>
+  >();
+  const unavailableForm = createEntryForm();
+  const form = createMemo(() => {
+    const db = localDb();
+    const scope = scopeKey();
+    if (!db) return unavailableForm;
+    let scopes = forms.get(db);
+    if (!scopes) {
+      scopes = new Map();
+      forms.set(db, scopes);
+    }
+    let entry = scopes.get(scope);
+    if (!entry) {
+      entry = createEntryForm();
+      scopes.set(scope, entry);
+    }
+    return entry;
+  });
+  const draftRecord = () => form().draftRecord();
+  const pendingSave = () => form().pendingSave();
+  const isSavingDraft = () => form().isSavingDraft();
+  const mutationError = () => form().mutationError();
+  let mounted = true;
+  onCleanup(() => {
+    mounted = false;
+  });
+  createEffect(() => {
+    const scope = `${userIdInt()}:${currentRepertoireId()}:${params.id}`;
+    if (scope) {
+      setHistoryGoal(undefined);
+      setDeleteTarget(null);
+    }
+  });
+  const [goalCatalog, { refetch: refetchCatalog }] = createResource(
+    () =>
+      localDb() && userIdInt() ? { db: localDb()!, uid: userIdInt()! } : null,
+    ({ db, uid }) => readGoalSettingsCatalog(db, uid)
+  );
+  const catalogEntries = () =>
+    goalCatalog.error ? [] : (goalCatalog()?.entries ?? []);
+  const selectedDefinition = createMemo(() =>
+    catalogEntries().find((entry) => entry.row.id === draftRecord()?.goalId)
+  );
   const returnPath = createMemo(() => {
-    const state = location.state as { from?: string } | undefined;
-    return state?.from || `/tunes/${params.id}`;
+    return tuneTaskReturn(location.state, params.id);
   });
 
   const [tune] = createResource(
@@ -109,17 +212,43 @@ const PracticeHistoryPage: Component = () => {
     }
   );
 
-  const summary = createMemo(() =>
-    buildPracticeHistorySummary(practiceRecords() ?? [])
+  const [historicalGoals, { refetch: refetchGoals }] = createResource(
+    () =>
+      localDb() && userIdInt() ? { db: localDb()!, uid: userIdInt()! } : null,
+    (input) =>
+      input.db
+        .select()
+        .from(goal)
+        .where(or(isNull(goal.privateFor), eq(goal.privateFor, input.uid)))
+        .all()
+  );
+  const events = createMemo(() =>
+    buildHistoryEvents(
+      practiceRecords.error ? [] : (practiceRecords() ?? []),
+      historicalGoals.error ? [] : (historicalGoals() ?? []),
+      userIdInt() ?? ""
+    )
   );
 
-  const qualityChart = createMemo(() =>
-    buildPracticeHistoryQualityChart(practiceRecords() ?? [])
-  );
+  const historyGoal = createMemo(() => {
+    const selected = selectedHistoryGoal();
+    if (selected !== undefined) return selected;
+    const keys = new Set(events().map((event) => event.goalKey));
+    return keys.size === 1 ? [...keys][0] : "";
+  });
 
-  const stabilityChart = createMemo(() =>
-    buildPracticeHistoryStabilityChart(practiceRecords() ?? [])
-  );
+  createEffect(() => {
+    if (
+      practiceRecords.loading ||
+      historicalGoals.loading ||
+      practiceRecords.error ||
+      historicalGoals.error
+    )
+      return;
+    const key = historyGoal();
+    if (key && !events().some((event) => event.goalKey === key))
+      setHistoryGoal("");
+  });
 
   const canAddRecord = createMemo(() => {
     return (
@@ -128,6 +257,8 @@ const PracticeHistoryPage: Component = () => {
       !!params.id &&
       !!userIdInt() &&
       !practiceRecords.loading &&
+      !goalCatalog.loading &&
+      !goalCatalog.error &&
       !draftRecord()
     );
   });
@@ -140,9 +271,31 @@ const PracticeHistoryPage: Component = () => {
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
 
+    const db = localDb();
+    const uid = userIdInt();
+    const rep = currentRepertoireId();
+    const tuneId = params.id;
+    if (!db || !uid || !rep || !tuneId)
+      throw new Error("Practice history is unavailable");
+    let goalId = historyGoal().startsWith("goal:")
+      ? historyGoal().slice(5)
+      : "";
+    if (!historyGoal()) {
+      try {
+        goalId = readGoalPracticeContext(db, uid, rep, tuneId).goalId;
+      } catch {
+        /* An unavailable assignment must not prevent choosing another goal. */
+      }
+    }
+    if (!catalogEntries().some((entry) => entry.row.id === goalId)) goalId = "";
+    const choices =
+      catalogEntries().find((entry) => entry.row.id === goalId)?.effective
+        .config.evaluations ?? [];
     return {
+      scope: `${uid}:${rep}:${tuneId}`,
+      goalId,
+      evaluationId: defaultEvaluationId(choices),
       practiced: `${year}-${month}-${day}T${hours}:${minutes}`,
-      quality: FSRS_QUALITY_MAP.GOOD,
     };
   };
 
@@ -153,21 +306,46 @@ const PracticeHistoryPage: Component = () => {
     return parsed.toISOString();
   };
 
-  const handleBack = () => {
-    navigate(returnPath());
+  const handleClose = () => {
+    navigate(returnPath(), { state: tuneTaskReturnState(location.state) });
   };
 
-  const handleStartAdd = () => {
-    setMutationError(null);
-    setDraftRecord(createDefaultDraftRecord());
+  const handleStartAdd = async () => {
+    const entryForm = form();
+    entryForm.setMutationError(null);
+    try {
+      await refetchCatalog();
+      if (!mounted || form() !== entryForm) return;
+      entryForm.setDraftRecord(createDefaultDraftRecord());
+    } catch (error) {
+      if (!mounted || form() !== entryForm) return;
+      entryForm.setMutationError(
+        error instanceof Error ? error.message : "Unable to open entry form"
+      );
+    }
   };
 
-  const handleCancelDraft = () => {
-    setMutationError(null);
-    setDraftRecord(null);
+  const discardDraft = () => {
+    form().setMutationError(null);
+    form().setDraftRecord(null);
+    form().setPendingSave(null);
   };
+
+  const { requestExit, Confirmation } = createDraftExitGuard({
+    dirty: () => Boolean(draftRecord()),
+    pending: () => isSavingDraft() || Boolean(pendingSave()),
+    discard: discardDraft,
+    description: "Your unfinished practice entry will be lost.",
+  });
+  const handleCancelDraft = () => requestExit(discardDraft);
+  useBeforeLeave((event) => {
+    if (!draftRecord() && !isSavingDraft() && !pendingSave()) return;
+    event.preventDefault();
+    requestExit(() => event.retry(true));
+  });
 
   const handleSaveDraft = async () => {
+    const entryForm = form();
     const db = localDb();
     const repertoireId = currentRepertoireId();
     const tuneId = params.id;
@@ -179,37 +357,70 @@ const PracticeHistoryPage: Component = () => {
       return;
     }
 
+    if (draft.scope !== `${uid}:${repertoireId}:${tuneId}`) {
+      entryForm.setMutationError(
+        "History context changed. Cancel and reopen the form."
+      );
+      return;
+    }
+    if (isSavingDraft()) return;
     if (!practicedIso) {
-      setMutationError("Enter a valid practice date and time before saving.");
+      entryForm.setMutationError(
+        "Enter a valid practice date and time before saving."
+      );
       return;
     }
 
-    setMutationError(null);
-    setIsSavingDraft(true);
+    entryForm.setMutationError(null);
+    entryForm.setIsSavingDraft(true);
+
+    const current = () =>
+      mounted &&
+      form() === entryForm &&
+      localDb() === db &&
+      userIdInt() === uid &&
+      currentRepertoireId() === repertoireId &&
+      params.id === tuneId;
 
     try {
-      const result = await recordPracticeRating(db, uid, {
-        repertoireRef: repertoireId,
-        tuneRef: tuneId,
-        quality: draft.quality,
-        practiced: new Date(practicedIso),
-        goal: "recall",
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || "Unable to save practice record.");
+      const receipt =
+        pendingSave() ??
+        (await prepareManualPractice(db, {
+          userId: uid,
+          repertoireId,
+          tuneId,
+          goalId: draft.goalId,
+          evaluationId: draft.evaluationId,
+          expectedConfiguration: selectedDefinition()
+            ? manualGoalConfigurationKey(selectedDefinition()!.effective)
+            : "unavailable",
+          practiced: new Date(practicedIso),
+        }));
+      try {
+        await saveManualPractice(db, receipt, current);
+      } catch (error) {
+        if (error instanceof ManualPracticePersistenceError)
+          entryForm.setPendingSave(receipt);
+        throw error;
       }
-
-      setDraftRecord(null);
+      entryForm.setPendingSave(null);
+      entryForm.setDraftRecord(null);
+      if (!current()) return;
+      toast.success("Practice entry saved to this device");
       await refetch();
     } catch (error) {
-      setMutationError(
+      if (error instanceof ManualPracticeRemovedError) {
+        entryForm.setPendingSave(null);
+        entryForm.setDraftRecord(null);
+      }
+      if (!current()) return;
+      entryForm.setMutationError(
         error instanceof Error
           ? error.message
           : "Failed to save practice history entry."
       );
     } finally {
-      setIsSavingDraft(false);
+      entryForm.setIsSavingDraft(false);
     }
   };
 
@@ -219,14 +430,14 @@ const PracticeHistoryPage: Component = () => {
       return;
     }
 
-    setMutationError(null);
+    form().setMutationError(null);
     setDeletingIds((current) => new Set(current).add(recordId));
 
     try {
       await deletePracticeRecord(db, recordId);
       await refetch();
     } catch (error) {
-      setMutationError(
+      form().setMutationError(
         error instanceof Error
           ? error.message
           : "Failed to delete practice history entry."
@@ -240,138 +451,202 @@ const PracticeHistoryPage: Component = () => {
     }
   };
 
-  const statTiles = createMemo(() => [
-    {
-      label: "Sessions",
-      value: summary().totalSessions.toString(),
-    },
-    {
-      label: "Success Rate",
-      value: `${summary().successRate}%`,
-    },
-    {
-      label: "Current Streak",
-      value: `${summary().currentStreak}`,
-    },
-    {
-      label: "Avg Interval",
-      value: `${summary().averageInterval}d`,
-    },
-  ]);
-
+  const AddPracticeButton = () => (
+    <Button
+      type="button"
+      variant="accent"
+      class="min-h-11 gap-1"
+      onClick={handleStartAdd}
+      disabled={!canAddRecord()}
+      data-testid="practice-history-add-button"
+    >
+      <Plus class="size-4" aria-hidden="true" />
+      <span>Add</span>
+    </Button>
+  );
   return (
     <div
-      class="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900"
+      class="h-full overflow-y-auto bg-background text-foreground [color-scheme:light] dark:[color-scheme:dark]"
       data-testid="practice-history-container"
     >
+      <Confirmation />
       <div class="w-full max-w-6xl px-4 py-4">
-        <Card class="shadow-lg">
-          <CardHeader class="border-b border-gray-200 dark:border-gray-700">
+        <Card>
+          <CardHeader class="border-b border-border">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <CardTitle class="text-lg font-semibold text-gray-900 dark:text-white">
+                <CardTitle class="text-lg font-semibold text-foreground">
                   Practice History
                   <Show when={tune()}>
-                    <span class="font-normal text-gray-500 dark:text-gray-400">
+                    <span class="font-normal text-muted-foreground">
                       {" "}
                       — {tune()!.title}
                     </span>
                   </Show>
                 </CardTitle>
                 <CardDescription>
-                  Recorded FSRS reviews for this tune, plus tune-specific
-                  trends.
+                  Submitted practice across this tune’s goals in the current
+                  repertoire.
                 </CardDescription>
               </div>
 
               <div class="order-first flex flex-wrap items-center gap-2 self-end lg:order-none lg:self-auto">
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBack}
+                  variant="ghost"
+                  class="min-h-11 min-w-11"
+                  aria-label="Close practice history"
+                  title="Close practice history"
+                  onClick={handleClose}
+                  disabled={isSavingDraft() || !!pendingSave()}
                   data-testid="practice-history-cancel-button"
                 >
-                  <span>Cancel</span>
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleStartAdd}
-                  disabled={!canAddRecord()}
-                  data-testid="practice-history-add-button"
-                >
-                  <Plus class="h-4 w-4" />
-                  <span>Add</span>
+                  <X class="size-4" aria-hidden="true" />
                 </Button>
               </div>
             </div>
           </CardHeader>
 
-          <CardContent class="space-y-6 p-6">
+          <CardContent class="space-y-6 p-4 sm:p-6">
+            <Show
+              when={
+                practiceRecords.error ||
+                historicalGoals.error ||
+                goalCatalog.error
+              }
+            >
+              <div role="alert" class="text-destructive">
+                Practice history could not be loaded.{" "}
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    // Each resource owns its error state; let every retry finish.
+                    await Promise.allSettled([
+                      refetch(),
+                      refetchGoals(),
+                      refetchCatalog(),
+                    ]);
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            </Show>
             <Show when={mutationError()}>
               <div
-                class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                class="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
                 role="alert"
               >
                 {mutationError()}
               </div>
             </Show>
 
+            <Show when={pendingSave()}>
+              <p role="alert" class="text-sm text-destructive">
+                This entry is in memory but still needs saving to this device.
+                Retry Save; it will not create another entry.
+              </p>
+            </Show>
             <Show when={draftRecord()}>
               {(draft) => (
-                <Card
-                  class="border-dashed"
+                <form
+                  class="max-w-3xl space-y-4 border-t border-border pt-4"
                   data-testid="practice-history-add-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleSaveDraft();
+                  }}
                 >
-                  <CardHeader class="space-y-3 pb-3">
-                    <header class="flex justify-between items-center w-full mb-4">
-                      <div class="flex flex-1 justify-start">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCancelDraft}
-                          disabled={isSavingDraft()}
-                          data-testid="practice-history-discard-button"
+                  <header class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background py-3">
+                    <h3 class="text-base font-semibold">Add Practice Entry</h3>
+                    <div class="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="min-h-11"
+                        onClick={handleCancelDraft}
+                        disabled={isSavingDraft() || !!pendingSave()}
+                        data-testid="practice-history-discard-button"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        class="min-h-11 min-w-24 gap-1"
+                        disabled={isSavingDraft() || !draft().evaluationId}
+                        aria-busy={isSavingDraft()}
+                        data-testid="practice-history-save-button"
+                      >
+                        <Show
+                          when={isSavingDraft()}
+                          fallback={<Save class="size-4" aria-hidden="true" />}
                         >
-                          Cancel
-                        </Button>
-                      </div>
-                      <div class="flex min-w-0 flex-1 justify-center px-3">
-                        <CardTitle class="text-center text-base font-semibold">
-                          Add Practice Entry
-                        </CardTitle>
-                      </div>
-                      <div class="flex flex-1 justify-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleSaveDraft}
-                          disabled={isSavingDraft()}
-                          data-testid="practice-history-save-button"
-                        >
-                          <Save class="h-4 w-4" />
-                          <span>Save</span>
-                        </Button>
-                      </div>
-                    </header>
+                          <LoaderCircle
+                            class="size-4 animate-spin motion-reduce:animate-none"
+                            aria-hidden="true"
+                          />
+                        </Show>
+                        <span>{isSavingDraft() ? "Saving…" : "Save"}</span>
+                      </Button>
+                    </div>
+                  </header>
+                  <div class="space-y-4">
                     <CardDescription>
-                      Manual backfill uses FSRS ratings and calculates the next
-                      due date automatically.
+                      Uses the selected goal’s current settings. Older entries
+                      leave later records and the current schedule unchanged. A
+                      new latest entry updates the next due date. Future
+                      practice dates are not allowed.
                     </CardDescription>
-                  </CardHeader>
-                  <CardContent class="space-y-4">
+
                     <div class="grid gap-4 md:grid-cols-2">
-                      <label class="grid gap-1.5 text-sm">
+                      <label class="grid min-w-0 gap-1.5 text-sm">
+                        <span>Goal</span>
+                        <select
+                          data-testid="practice-history-entry-goal"
+                          class="w-full min-w-0 min-h-11 rounded-md border border-input bg-background px-3 text-foreground"
+                          disabled={isSavingDraft() || !!pendingSave()}
+                          value={draft().goalId}
+                          onChange={(event) => {
+                            const goalId = event.currentTarget.value;
+                            const entry = catalogEntries().find(
+                              (item) => item.row.id === goalId
+                            );
+                            form().setDraftRecord({
+                              ...draft(),
+                              goalId,
+                              evaluationId: defaultEvaluationId(
+                                entry?.effective.config.evaluations ?? []
+                              ),
+                            });
+                          }}
+                        >
+                          <option value="" disabled>
+                            Choose a Goal
+                          </option>
+                          <Show when={draft().goalId && !selectedDefinition()}>
+                            <option value={draft().goalId} disabled>
+                              Selected goal is unavailable — choose another
+                            </option>
+                          </Show>
+                          <For each={catalogEntries()}>
+                            {(entry) => (
+                              <option value={entry.row.id}>
+                                {entry.effective.displayName}
+                              </option>
+                            )}
+                          </For>
+                        </select>
+                      </label>
+                      <label class="grid min-w-0 gap-1.5 text-sm">
                         <span class="font-medium text-foreground">
                           Date Practiced
                         </span>
                         <input
                           type="datetime-local"
+                          disabled={isSavingDraft() || !!pendingSave()}
                           value={draft().practiced}
                           onInput={(event) =>
-                            setDraftRecord((current) =>
+                            form().setDraftRecord((current) =>
                               current
                                 ? {
                                     ...current,
@@ -380,51 +655,65 @@ const PracticeHistoryPage: Component = () => {
                                 : current
                             )
                           }
-                          class="h-9 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                          class="w-full min-w-0 min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                           data-testid="practice-history-practiced-input"
                         />
                       </label>
 
-                      <label class="grid gap-1.5 text-sm">
+                      <label class="grid min-w-0 gap-1.5 text-sm">
                         <span class="font-medium text-foreground">
-                          FSRS Rating
+                          Evaluation
                         </span>
                         <select
-                          value={String(draft().quality)}
+                          value={draft().evaluationId}
+                          disabled={isSavingDraft() || !!pendingSave()}
                           onChange={(event) =>
-                            setDraftRecord((current) =>
-                              current
-                                ? {
-                                    ...current,
-                                    quality: Number(event.currentTarget.value),
-                                  }
-                                : current
-                            )
+                            form().setDraftRecord({
+                              ...draft(),
+                              evaluationId: event.currentTarget.value,
+                            })
                           }
-                          class="h-9 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                          class="w-full min-w-0 min-h-11 rounded-md border border-input bg-background px-3 text-foreground"
                           data-testid="practice-history-quality-select"
                         >
-                          <option value={FSRS_QUALITY_MAP.AGAIN}>Again</option>
-                          <option value={FSRS_QUALITY_MAP.HARD}>Hard</option>
-                          <option value={FSRS_QUALITY_MAP.GOOD}>Good</option>
-                          <option value={FSRS_QUALITY_MAP.EASY}>Easy</option>
+                          <option value="" disabled>
+                            Choose an evaluation
+                          </option>
+                          <For
+                            each={
+                              selectedDefinition()?.effective.config.evaluations
+                            }
+                          >
+                            {(choice) => (
+                              <option value={choice.id}>
+                                {choice.label} — {choice.description}
+                              </option>
+                            )}
+                          </For>
                         </select>
                       </label>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </form>
               )}
             </Show>
 
             <Show
-              when={!practiceRecords.loading}
+              when={
+                !practiceRecords.loading &&
+                !historicalGoals.loading &&
+                !practiceRecords.error &&
+                !historicalGoals.error
+              }
               fallback={
-                <div class="py-8 text-center">
-                  <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-                  <p class="mt-4 text-gray-600 dark:text-gray-400">
-                    Loading practice history...
-                  </p>
-                </div>
+                <Show when={practiceRecords.loading || historicalGoals.loading}>
+                  <div class="py-8 text-center">
+                    <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent motion-reduce:animate-none" />
+                    <p class="mt-4 text-muted-foreground">
+                      Loading practice history...
+                    </p>
+                  </div>
+                </Show>
               }
             >
               <Switch>
@@ -433,8 +722,9 @@ const PracticeHistoryPage: Component = () => {
                     (practiceRecords()?.length ?? 0) === 0 && !draftRecord()
                   }
                 >
-                  <div class="py-8 text-center text-gray-500 dark:text-gray-400">
+                  <div class="py-8 text-center text-muted-foreground">
                     <p>No practice records found for this tune.</p>
+                    <AddPracticeButton />
                     <p class="mt-2 text-sm">
                       Use &quot;Add&quot; to backfill a prior session if needed.
                     </p>
@@ -442,260 +732,62 @@ const PracticeHistoryPage: Component = () => {
                 </Match>
 
                 <Match when={(practiceRecords()?.length ?? 0) > 0}>
-                  <div class="space-y-6">
-                    <div class="overflow-x-auto">
-                      <table class="w-full text-sm">
-                        <thead>
-                          <tr class="border-b border-gray-200 dark:border-gray-700">
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              Date Practiced
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              FSRS Rating
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              Due Date
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              Stability
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              Difficulty
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              Reps
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              Lapses
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                              State
-                            </th>
-                            <th class="px-3 py-2 text-center font-medium text-gray-700 dark:text-gray-300">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <For each={practiceRecords()}>
-                            {(record: PracticeRecord) => {
-                              const qualityDisplay =
-                                getPracticeHistoryQualityDisplay(
-                                  record.quality
-                                );
-
-                              return (
-                                <tr class="border-b border-gray-100 dark:border-gray-700/50">
-                                  <td class="px-3 py-2 text-gray-700 dark:text-gray-200">
-                                    {formatPracticeHistoryDate(
-                                      record.practiced
-                                    )}
-                                  </td>
-                                  <td class="px-3 py-2">
-                                    <span
-                                      class={`font-medium ${qualityDisplay.colorClass}`}
-                                    >
-                                      {qualityDisplay.label}
-                                    </span>
-                                  </td>
-                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                                    {formatPracticeHistoryDate(record.due)}
-                                  </td>
-                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                                    {record.stability?.toFixed(2) ?? "—"}
-                                  </td>
-                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                                    {record.difficulty?.toFixed(2) ?? "—"}
-                                  </td>
-                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                                    {record.repetitions ?? "—"}
-                                  </td>
-                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                                    {record.lapses ?? "—"}
-                                  </td>
-                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                                    {getPracticeHistoryStateLabel(record.state)}
-                                  </td>
-                                  <td class="px-3 py-2 text-center">
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleDelete(record.id)}
-                                      disabled={deletingIds().has(record.id)}
-                                      title="Delete record"
-                                    >
-                                      <Trash2 class="h-4 w-4 text-red-600 dark:text-red-400" />
-                                      <span class="sr-only">
-                                        Delete practice history entry
-                                      </span>
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            }}
-                          </For>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div
-                      class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-                      data-testid="practice-history-summary"
-                    >
-                      <For each={statTiles()}>
-                        {(tile) => (
-                          <div class="rounded-lg border border-border bg-muted/40 p-3">
-                            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              {tile.label}
-                            </div>
-                            <div class="mt-1 text-xl font-semibold text-foreground">
-                              {tile.value}
-                            </div>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-
-                    <div
-                      class="grid gap-4 lg:grid-cols-2"
-                      data-testid="practice-history-analytics"
-                    >
-                      <Card data-testid="practice-history-quality-chart">
-                        <CardHeader class="pb-2">
-                          <CardTitle class="text-base font-semibold">
-                            Rating Trend
-                          </CardTitle>
-                          <CardDescription>
-                            Review outcomes across this tune&apos;s practice
-                            history
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <Switch>
-                            <Match when={qualityChart()}>
-                              {(data) => (
-                                <div class="relative h-48 w-full">
-                                  <BarChart
-                                    data={data()}
-                                    options={{
-                                      responsive: true,
-                                      maintainAspectRatio: false,
-                                      scales: {
-                                        x: {
-                                          border: { display: false },
-                                          grid: { display: false },
-                                          ticks: { font: { size: 11 } },
-                                        },
-                                        y: {
-                                          min: 1,
-                                          max: 4,
-                                          border: { display: false },
-                                          ticks: {
-                                            stepSize: 1,
-                                            callback: (value) =>
-                                              getPracticeHistoryQualityDisplay(
-                                                Number(value)
-                                              ).label,
-                                            font: { size: 11 },
-                                          },
-                                          grid: {
-                                            color:
-                                              "hsla(240, 3.8%, 46.1%, 0.3)",
-                                          },
-                                        },
-                                      },
-                                      plugins: {
-                                        legend: { display: false },
-                                        tooltip: {
-                                          enabled: true,
-                                          callbacks: {
-                                            label: (context) =>
-                                              ` ${getPracticeHistoryQualityDisplay(context.parsed.y).label}`,
-                                          },
-                                        },
-                                      },
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </Match>
-                          </Switch>
-                        </CardContent>
-                      </Card>
-
-                      <Card data-testid="practice-history-stability-chart">
-                        <CardHeader class="pb-2">
-                          <CardTitle class="text-base font-semibold">
-                            Stability Trend
-                          </CardTitle>
-                          <CardDescription>
-                            How the tune&apos;s memory stability has changed
-                            over time
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <Switch>
-                            <Match when={stabilityChart()}>
-                              {(data) => (
-                                <div class="relative h-48 w-full">
-                                  <LineChart
-                                    data={data()}
-                                    options={{
-                                      responsive: true,
-                                      maintainAspectRatio: false,
-                                      scales: {
-                                        x: {
-                                          border: { display: false },
-                                          grid: { display: false },
-                                          ticks: { font: { size: 11 } },
-                                        },
-                                        y: {
-                                          beginAtZero: true,
-                                          border: { display: false },
-                                          ticks: { font: { size: 11 } },
-                                          grid: {
-                                            color:
-                                              "hsla(240, 3.8%, 46.1%, 0.3)",
-                                          },
-                                        },
-                                      },
-                                      plugins: {
-                                        legend: { display: false },
-                                        tooltip: {
-                                          enabled: true,
-                                          callbacks: {
-                                            label: (context) => {
-                                              const value =
-                                                typeof context.parsed.y ===
-                                                "number"
-                                                  ? context.parsed.y
-                                                  : 0;
-                                              return ` ${value.toFixed(2)} stability`;
-                                            },
-                                          },
-                                        },
-                                      },
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </Match>
-                            <Match when={!stabilityChart()}>
-                              <div class="flex h-48 items-center justify-center text-sm text-muted-foreground">
-                                Not enough stability data yet
-                              </div>
-                            </Match>
-                          </Switch>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
+                  <HistoryEventsTable
+                    actions={<AddPracticeButton />}
+                    goalKey={historyGoal()}
+                    onGoalChange={setHistoryGoal}
+                    events={events()}
+                    deletingIds={deletingIds()}
+                    onDelete={(id) =>
+                      setDeleteTarget({ id, scope: scopeKey(), db: localDb() })
+                    }
+                  />
                 </Match>
               </Switch>
             </Show>
           </CardContent>
         </Card>
+        <AlertDialog
+          open={deleteTarget() !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null);
+          }}
+        >
+          <AlertDialogContent
+            class="max-w-md w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto"
+            onInteractOutside={(event) => event.preventDefault()}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete practice entry?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes the selected entry from local history for this
+                tune. It does not undo the tune’s schedule or restore its
+                practice queue. Deletion synchronization is not yet supported; a
+                full download may restore this entry.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <Button
+                class="min-h-11"
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive-ghost"
+                onClick={async () => {
+                  const target = deleteTarget();
+                  setDeleteTarget(null);
+                  if (target?.scope === scopeKey() && target.db === localDb())
+                    await handleDelete(target.id);
+                }}
+              >
+                Delete Entry
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

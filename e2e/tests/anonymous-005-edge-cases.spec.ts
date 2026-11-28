@@ -11,7 +11,8 @@
  * - Development server running on ${BASE_URL}
  */
 
-import { test as base, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test as base } from "../helpers/sync-test";
 import { getRequiredTestPassword } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 import { BASE_URL } from "../test-config";
@@ -131,28 +132,22 @@ test.describe("Anonymous User Edge Cases", () => {
     await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Select and add first tune to repertoire
-    const firstTuneCheckbox = ttPage.catalogGrid
-      .locator("tbody tr[data-index]")
+    const firstTuneCheckbox = ttPage
+      .getRows("catalog")
       .first()
       .locator('input[type="checkbox"]');
 
-    if (await firstTuneCheckbox.isVisible()) {
-      await firstTuneCheckbox.click();
-      await ttPage.catalogAddToRepertoireButton.click();
-      await page.waitForTimeout(1000);
+    // Require real data before testing cleanup; do not skip setup on mobile.
+    await expect(firstTuneCheckbox).toBeVisible({ timeout: 20000 });
+    await firstTuneCheckbox.click();
+    await ttPage.clickCatalogAddToRepertoire();
+    await expect(firstTuneCheckbox).not.toBeChecked({ timeout: 10000 });
 
-      // Verify in repertoire
-      await ttPage.navigateToTab("repertoire");
-      await expect(ttPage.repertoireColumnsButton).toBeVisible({
-        timeout: 20000,
-      });
-      await ttPage.expectGridHasContent(ttPage.repertoireGrid);
-
-      const beforeCount = await ttPage.repertoireGrid
-        .locator("tbody tr[data-index]")
-        .count();
-      expect(beforeCount).toBeGreaterThan(0);
-    }
+    await ttPage.navigateToTab("repertoire");
+    await ttPage.expectGridHasContent(ttPage.repertoireGrid);
+    await expect(ttPage.getRows("repertoire")).toHaveCount(1, {
+      timeout: 20000,
+    });
 
     // Sign out
     await ttPage.signOut();
@@ -161,42 +156,22 @@ test.describe("Anonymous User Edge Cases", () => {
     // because a new anonymous session starts fresh
     await ttPage.signInAnonymously();
 
-    // Check that we're back on the home page
-    // A fresh anonymous session now lands on the starter-repertoire empty state.
-    // Older flows may still show a legacy no-repertoire message.
     await ttPage.navigateToTab("repertoire", { waitForContent: false });
 
-    // Accept either persisted repertoire data, the legacy empty-state copy, or
-    // the new starter-repertoire chooser.
-    const noRepertoireMessage = page.getByText("No current repertoire");
-    const repertoireGridVisible = await ttPage.repertoireGrid
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    const noRepertoireVisible = await noRepertoireMessage
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    const starterEmptyStateVisible = await ttPage.onboardingWelcomeHeading
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    const starterCreateButtonVisible =
-      await ttPage.onboardingCreateRepertoireButton
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
-
-    expect(
-      repertoireGridVisible ||
-        noRepertoireVisible ||
-        (starterEmptyStateVisible && starterCreateButtonVisible)
-    ).toBe(true);
-
-    // Log the state for debugging
-    console.log(
-      "After re-login:" +
-        ` repertoireGrid=${repertoireGridVisible},` +
-        ` noRepertoire=${noRepertoireVisible},` +
-        ` starterEmptyState=${starterEmptyStateVisible},` +
-        ` starterCreateButton=${starterCreateButtonVisible}`
-    );
+    // Tab navigation updates the URL before the tab module finishes loading.
+    // Await the fresh-session empty state rather than sampling isVisible(),
+    // which returns immediately even when given a timeout.
+    await expect(ttPage.onboardingWelcomeHeading).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(ttPage.onboardingCreateRepertoireButton).toBeVisible({
+      timeout: 20000,
+    });
+    // A populated grid must fail this cleanup test, not count as success.
+    await expect(ttPage.repertoireGrid).not.toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText("Sign Out Test Repertoire", { exact: true })
+    ).toHaveCount(0, { timeout: 10000 });
   });
 
   test("5.5 Conversion from banner preserves URL parameters", async ({

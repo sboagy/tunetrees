@@ -6,7 +6,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { extname, relative, resolve, sep } from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
+import { test } from "../helpers/sync-test";
 
 let server: Server;
 let origin: string;
@@ -161,7 +163,7 @@ test("keeps cached assets and existing tabs usable after a service-worker update
   });
   await Promise.all([firstUpdate, secondUpdate]);
 
-  await context.setOffline(true);
+  await setOfflineForTest(context, true);
   for (const tab of [page, secondTab]) {
     const response = await tab.reload();
     expect(response?.fromServiceWorker()).toBe(true);

@@ -1,5 +1,5 @@
 # Lighthouse CI - Performance Monitoring
-# Runs Lighthouse audits on every push to feat/pwa1 branch
+# Runs Lighthouse audits on configured pushes and pull requests
 # Fails build if performance metrics fall below thresholds
 
 name: Lighthouse CI
@@ -69,8 +69,8 @@ jobs:
         run: |
           npm install -g --ignore-scripts @lhci/cli@0.13.0
           lhci autorun
-        env:
-          LHCI_GITHUB_APP_TOKEN: ${{ github.token }}
+        # The Actions job reports assertion failures. Do not pass github.token
+        # as an LHCI App token: that separate integration requires its own token.
 
       # 6. Upload Lighthouse reports
       - name: Upload Lighthouse Reports
@@ -79,6 +79,7 @@ jobs:
         with:
           name: lighthouse-reports
           path: .lighthouseci/
+          include-hidden-files: true
           retention-days: 30
           if-no-files-found: ignore
 
@@ -105,11 +106,11 @@ jobs:
             ${reports.map((url, i) => `- [Report ${i + 1}](${url})`).join('\n')}
 
             **Performance Targets:**
-            - ✅ FCP < 1.5s
-            - ✅ LCP < 2.5s
-            - ✅ TTI < 3.0s
-            - ✅ TBT < 300ms
-            - ✅ CLS < 0.1
+            - FCP ≤ 2.0s
+            - LCP ≤ 3.5s
+            - TTI ≤ 4.0s
+            - TBT ≤ 500ms
+            - CLS ≤ 0.15
 
             See workflow artifacts for detailed reports.
             `;

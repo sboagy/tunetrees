@@ -328,7 +328,6 @@ export interface SyncConflict<T extends SyncableRecord> {
 // FSRS Scheduling Types
 // ============================================================================
 
-export type { Card as FSRSCard, RecordLog } from "ts-fsrs";
 /**
  * FSRS card state (matches ts-fsrs library)
  * Re-exported from ts-fsrs for convenience
@@ -344,18 +343,6 @@ export interface PracticeRecordWithTune extends PracticeRecord {
 }
 
 /**
- * Input for recording a practice session
- */
-export interface RecordPracticeInput {
-  repertoireRef: string; // UUID (was integer)
-  tuneRef: string; // UUID (was integer)
-  quality: number; // Rating quality (1-4 for FSRS: Again, Hard, Good, Easy)
-  practiced: Date; // Practice session date/time
-  goal?: string; // Practice goal (recall, initial_learn, fluency, etc.)
-  technique?: string; // Practice technique (daily_practice, motor_skills, metronome, etc.)
-}
-
-/**
  * FSRS scheduling parameters for a tune
  */
 export interface TuneSchedulingInfo {
@@ -366,22 +353,6 @@ export interface TuneSchedulingInfo {
   due: string | null; // ISO date string
   repetitions: number | null;
   lapses: number | null;
-}
-
-/**
- * Next review schedule calculation result from FSRS
- */
-export interface NextReviewSchedule {
-  nextDue: Date; // Next scheduled review date
-  state: number; // FSRS state (0=New, 1=Learning, 2=Review, 3=Relearning)
-  stability: number; // Memory stability
-  difficulty: number; // Item difficulty
-  elapsed_days: number; // Days since last review
-  scheduled_days: number; // Days until next review
-  reps: number; // Total repetitions
-  lapses: number; // Number of lapses
-  last_review: Date; // Last review date
-  interval: number; // Interval in days (calculated)
 }
 
 /**

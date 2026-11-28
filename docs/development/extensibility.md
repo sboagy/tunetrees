@@ -1,6 +1,6 @@
-# Extensibility Proposals (Imports + Goal Scheduling)
+# Extensibility: Imports and Goal Scheduling
 
-This document outlines **three minimal, secure extension approaches** for TuneTrees that keep complexity low while enabling new import sources and goal-specific scheduling logic.
+The current QuickJS contracts are described first. Earlier alternatives are retained in a clearly marked historical section; they are not supported runtime APIs.
 
 ## Current Implementation: Sandboxed JS Plugins (QuickJS)
 
@@ -29,7 +29,7 @@ Plugins declare capabilities as JSON (`capabilities` column):
 Supported capabilities:
 
 - `parseImport` — parse external inputs into TuneTrees tune fields
-- `scheduleGoal` — override scheduling for a goal (via `createScheduler`)
+- `scheduleGoal` — calculate scheduling for an explicitly selected goal (versioned API below)
 
 ### Host helpers
 
@@ -66,85 +66,44 @@ Return an object with tune fields:
 }
 ```
 
-### `createScheduler({ fsrsScheduler, queryDb })`
+### Versioned Goal Scheduler Contract
 
-The factory returns an object with `processFirstReview` and `processReview`.
-Input payload includes a `fallback` schedule (FSRS result). Return a full or
-partial schedule; missing fields will be filled from the fallback. The factory
-itself is synchronous; its review methods may return a value or a promise.
-Return `null` to decline an override. Returning `payload.fallback` explicitly
-chooses FSRS. Missing returns (`undefined`), arrays, and other primitives are
-errors and produce a notification before default scheduling resumes.
+Select an enabled scheduler plugin explicitly in a goal's editor. Pair its named
+actions with editable evaluation labels. `scheduleGoal` denotes this capability;
+it does not select a plugin by matching a goal name.
 
-`queryDb`, both `fsrsScheduler` methods, and `fetchUrl` return promises. Always
-await them (or return their promise). `parseCsv`, `parseJson`, and `log` are
-synchronous. Host requests started without awaiting them are abandoned when
-the invocation ends.
+- `describeGoalSchedulerV1()` returns `apiVersion: 1`, `stateVersion`,
+  `compatibleStateVersions`, and named `actions` (`id`, `label`, `description`).
+- `scheduleGoalV1(input)` receives `apiVersion`, `goalId`, `evaluation` (including
+  `actionId`), ISO `practiced`, goal `options`, requested `stateVersion`, and either
+  null or `previousState: { version, data }`.
+- Return `{ due, state }`: a valid future due timestamp and bounded JSON state.
+  The host derives the fractional interval and wraps state with plugin identity,
+  version and script hash. Continuation is limited to the latest submitted event
+  with the same goal/plugin and a declared compatible state version.
 
-A scheduling failure does not discard the evaluation: the practice flow uses
-the goal's interval ladder when available, otherwise FSRS, then finishes staging
-so Submit becomes available. A timeout terminates the shared worker; other
-active calls receive a worker-reset error and also recover through their caller's
-fallback. The next call starts a fresh worker. The scheduling deadline remains
-30 seconds to accommodate cold WASM initialization.
+Use the maintained [scheduler template](../../src/lib/plugins/scheduling-template.ts)
+for a complete executable example. The [executor](../../src/lib/plugins/goal-scheduler.ts)
+validates declarations, results and state. The Test Runner offers the same versioned
+entry points; legacy factory-only scripts require an explicit rewrite.
 
-Older saved scripts using `playlist_ref` / `input.playlistRef` must be reviewed
-and updated to `repertoire_ref` / `input.repertoireRef` in User Settings → Plugins.
-Updating the app's template does not rewrite saved or customized scripts.
+Errors, invalid results and timeouts leave the evaluation unsubmitted with a
+retryable error. There is no implicit built-in fallback. A timed-out worker is
+replaced, and old replies cannot complete calls in its replacement. Scheduling
+uses the captured script/declaration and passes state/options explicitly; no host
+FSRS scheduler or database-query bridge is supplied by the goal executor.
 
-Helpers available:
+Save revalidates the plugin declaration and caller ownership. Staging fingerprints
+include script/metadata; Submit validates the captured receipt without running a
+possibly nondeterministic script again. Label changes do not rewrite recorded
+history. Updating the app template does not rewrite a user's saved scripts.
 
-- `fsrsScheduler`: full FSRS scheduler interface for fallback results.
-- `queryDb(sql)`: read-only SQL with a 500-row limit and table allowlist.
+### Migrations and Codegen
 
-```typescript
-function createScheduler({ fsrsScheduler, queryDb }) {
-  return {
-    async processFirstReview(payload) {
-      return payload.fallback;
-    },
-    async processReview(payload) {
-      return payload.fallback;
-    },
-  };
-}
-```
-
-Payload example:
-
-```json
-{
-  "input": {
-    "repertoireRef": "...",
-    "tuneRef": "...",
-    "quality": 3,
-    "practiced": "2026-01-20T12:00:00.000Z",
-    "goal": "recall"
-  },
-  "prior": null,
-  "preferences": {},
-  "scheduling": {},
-  "fallback": {
-    "nextDue": "2026-01-27T12:00:00.000Z",
-    "lastReview": "2026-01-20T12:00:00.000Z",
-    "state": 2,
-    "stability": 5,
-    "difficulty": 3,
-    "elapsedDays": 0,
-    "scheduledDays": 7,
-    "reps": 1,
-    "lapses": 0,
-    "interval": 7
-  }
-}
-```
-
-### Migrations + codegen
-
-When adding/altering plugin schema:
-
-1. `supabase db reset` (or `npm run db:local:reset`)
-2. `npm run codegen:schema`
+Follow the repository's additive schema workflow: apply the source migration to
+local Postgres, regenerate with `npm run codegen:schema`, and run the schema check,
+typecheck, lint and unit tests. Do not reset a database merely to edit a plugin.
+Deployment compatibility is governed by [schema promotion](schema-promotion.md).
 
 ### Proxy configuration
 
@@ -154,7 +113,12 @@ The generic proxy lives at `/api/proxy` with the following env vars:
 - `PROXY_TIMEOUT_MS` — request timeout (default 10000)
 - `PROXY_MAX_BYTES` — response size limit (default 2000000)
 
-## Constraints & Goals
+## Historical Alternatives (Not the Implemented Contract)
+
+The proposals below record earlier design exploration. They do not override the
+current QuickJS contract above.
+
+### Constraints & Goals
 
 - **PWA + offline-first:** Avoid runtime downloads of arbitrary code.
 - **Security first:** No untrusted code execution in the browser.

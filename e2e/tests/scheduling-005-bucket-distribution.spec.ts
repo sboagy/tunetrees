@@ -25,7 +25,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  *
  * Validates:
  * - Correct bucket assignment based on scheduled dates
- * - Bucket ordering in queue (Q1 first, then Q2, then Q3, then Q4)
+ * - Bucket ordering in queue (Q1 first, then Q2, then Q4, then Q3)
  * - Bucket counts match expected distribution
  */
 
@@ -77,20 +77,33 @@ test.describe
       // Set up all tunes in repertoire (no scheduling yet)
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: ALL_TUNES,
+        // This test classifies all nine tunes. Explicit top-up includes the three
+        // new tunes after overdue work; it must not rely on the retired allocator.
+        goalDailySettings: [
+          {
+            goalId: "00000000-0000-0000-0000-000000000001",
+            daily: {
+              minimum: ALL_TUNES.length,
+              maximum: ALL_TUNES.length,
+              autoNew: true,
+              delinquencyDays: 7,
+            },
+          },
+        ],
         startTab: "practice",
       });
 
       // Now configure scheduled dates LOCALLY (no Supabase round-trip needed)
       // This is purely testing local bucket assignment logic
-      // Uses default acceptableDelinquencyWindow of 21 days
+      // Uses explicit per-goal delinquency window of 7 days
       const todayStr = currentDate.toISOString();
 
-      // Q2: Recently Lapsed (3 days overdue - within 21-day window)
+      // Q2: Recently Lapsed (3 days overdue - within 7-day window)
       const recentlyLapsedDate = new Date(currentDate);
       recentlyLapsedDate.setDate(recentlyLapsedDate.getDate() - 3);
       const recentlyLapsedStr = recentlyLapsedDate.toISOString();
 
-      // Q4: Old Lapsed (22 days overdue - beyond 21-day default window)
+      // Q4: Old Lapsed (22 days overdue - beyond 7-day window)
       const oldLapsedDate = new Date(currentDate);
       oldLapsedDate.setDate(oldLapsedDate.getDate() - 22);
       const oldLapsedStr = oldLapsedDate.toISOString();
@@ -133,10 +146,10 @@ test.describe
       // Regenerate the queue with correct scheduled dates
       await page.evaluate(async (repertoireId: string) => {
         const api = (globalThis as any).__ttTestApi;
-        if (!api) return;
+        if (!api) throw new Error("Test API missing");
 
-        // Use seedAddToReview with empty tuneIds to trigger queue regeneration
-        await api.seedAddToReview({ repertoireId, tuneIds: [] });
+        // Refresh through the active goal-aware queue implementation.
+        await api.refreshPracticeQueue(repertoireId);
       }, testUser.repertoireId);
 
       await verifyClockFrozen(
@@ -201,39 +214,12 @@ test.describe
       // Validate total
       expect(distribution.total).toBe(ALL_TUNES.length);
 
-      // Validate bucket ordering: Q1 items should have lower order_index than Q2, etc.
-      const q1Items = queue.filter((q) => q.bucket === 1);
-      const q2Items = queue.filter((q) => q.bucket === 2);
-      const q3Items = queue.filter((q) => q.bucket === 3);
-      const q4Items = queue.filter((q) => q.bucket === 4);
-
-      // Check ordering between buckets
-      if (q1Items.length > 0 && q2Items.length > 0) {
-        const maxQ1Order = Math.max(...q1Items.map((q) => q.order_index));
-        const minQ2Order = Math.min(...q2Items.map((q) => q.order_index));
-        console.log(
-          `  Q1 max order: ${maxQ1Order}, Q2 min order: ${minQ2Order}`
-        );
-        expect(maxQ1Order).toBeLessThan(minQ2Order);
-      }
-
-      if (q2Items.length > 0 && q3Items.length > 0) {
-        const maxQ2Order = Math.max(...q2Items.map((q) => q.order_index));
-        const minQ3Order = Math.min(...q3Items.map((q) => q.order_index));
-        console.log(
-          `  Q2 max order: ${maxQ2Order}, Q3 min order: ${minQ3Order}`
-        );
-        expect(maxQ2Order).toBeLessThan(minQ3Order);
-      }
-
-      if (q3Items.length > 0 && q4Items.length > 0) {
-        const maxQ3Order = Math.max(...q3Items.map((q) => q.order_index));
-        const minQ4Order = Math.min(...q4Items.map((q) => q.order_index));
-        console.log(
-          `  Q3 max order: ${maxQ3Order}, Q4 min order: ${minQ4Order}`
-        );
-        expect(maxQ3Order).toBeLessThan(minQ4Order);
-      }
+      // Due work comes first, including old backlog, before unscheduled top-up.
+      expect(
+        [...queue]
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((row) => row.bucket)
+      ).toEqual([1, 1, 2, 2, 4, 4, 3, 3, 3]);
 
       // Validate specific tune assignments
       console.log("\n  Validating specific tune bucket assignments...");

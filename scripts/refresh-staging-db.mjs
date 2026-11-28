@@ -837,6 +837,7 @@ async function main() {
   const sanitizePath = join(workDir, "sanitize.sql");
   const cleanupPath = join(workDir, "cleanup.sql");
 
+  let destructiveRestoreStarted = false;
   try {
     await writeFile(preRestorePath, preRestoreSql());
     await writeFile(
@@ -872,6 +873,9 @@ async function main() {
       whitelist
     );
     const publicSql = await readFile(publicDump, "utf8");
+    const goalSeedPath = resolve("sql_scripts/seed_goal_configuration.sql");
+    // Fail before truncation if the checked-in restore seed is unavailable.
+    await readFile(goalSeedPath, "utf8");
     const expectedTables = [
       { schema: "auth", table: "users" },
       ...extractCopyTables(publicSql).filter(
@@ -879,13 +883,19 @@ async function main() {
       ),
     ];
     await writeFile(schemaPreflightPath, schemaPreflightSql(expectedTables));
-    await writeFile(combinedDump, `${authSql}\n${publicSql}`);
+    // This trusted transaction restores shared definitions; ordinary Worker
+    // connections never set this migration-only authorization flag.
+    await writeFile(
+      combinedDump,
+      `SET LOCAL tunetrees.goal_seed_write = 'on';\n${authSql}\n${publicSql}`
+    );
 
     await runPsql(
       targetDatabaseUrl,
       schemaPreflightPath,
       "staging schema preflight"
     );
+    destructiveRestoreStarted = true;
     await runPsql(
       targetDatabaseUrl,
       preRestorePath,
@@ -899,6 +909,13 @@ async function main() {
       "--file",
       combinedDump,
     ]);
+    // Production may still have the old goal schema/defaults. Reapply this
+    // release's definitions without touching restored personal overrides.
+    await runPsql(
+      targetDatabaseUrl,
+      goalSeedPath,
+      "restore built-in goal defaults"
+    );
     await runPsql(
       targetDatabaseUrl,
       sanitizePath,
@@ -909,6 +926,12 @@ async function main() {
       "Staging database refresh, sanitization, and validation completed."
     );
   } catch (error) {
+    if (!destructiveRestoreStarted) {
+      console.error(
+        "Staging refresh preflight failed; target data was not changed."
+      );
+      throw error;
+    }
     console.error(
       "Staging refresh failed. Running fail-safe auth.users cleanup before exiting."
     );

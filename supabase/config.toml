@@ -78,8 +78,10 @@ enabled = true
 # rhizome before TuneTrees migrations/seeds run. Apply the canonical
 # genre/rhythm update SQL after the baseline because the baseline truncates
 # tune_type/genre with CASCADE, which also clears rhythm_patterns.
+# Reapply current goal definitions after the legacy baseline overwrites them.
 sql_paths = [
 	"./seeds/baseline_local_20260217.sql",
+	"./seeds/seed_goal_configuration.sql",
 	"../sql_scripts/update_genre_tune_tempo_and_rhythms.sql",
 ]
 
@@ -111,7 +113,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
 # are monitored, and you can view the emails that would have been sent from the web interface.
-[inbucket]
+[local_smtp]
 enabled = true
 # Port to use for the email testing server web interface.
 port = 54324

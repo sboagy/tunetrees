@@ -7,6 +7,7 @@ import {
 } from "@solidjs/testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import WaveformAudioPlayer from "../../../src/components/audio/WaveformAudioPlayer";
+import { expectConsole } from "../../helpers/expected-console";
 
 type MockRegion = {
   id: string;
@@ -420,9 +421,11 @@ describe("WaveformAudioPlayer persistence", () => {
   });
 
   it("falls back to the network source if the media-vault lookup fails", async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    expectConsole(
+      "error",
+      "Failed to load pinned audio from media vault:",
+      expect.objectContaining({ message: "vault blocked" })
+    );
     getMediaVaultBlob.mockRejectedValue(new Error("vault blocked"));
 
     render(() => (
@@ -444,11 +447,6 @@ describe("WaveformAudioPlayer persistence", () => {
       expect(screen.queryByTestId("audio-player-source-status")).toBeNull();
       expect(screen.queryByText("vault blocked")).toBeNull();
     });
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Failed to load pinned audio from media vault:",
-      expect.any(Error)
-    );
   });
 
   it("flushes pending annotation and setting changes when the player closes", async () => {

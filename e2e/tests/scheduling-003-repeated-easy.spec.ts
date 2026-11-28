@@ -5,10 +5,6 @@ import {
   setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
-import {
-  applyDeterministicFsrsConfig,
-  DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG,
-} from "../helpers/fsrs-test-config";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
   runTestHook,
@@ -44,12 +40,6 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 // CI shortening: set CI_DIAG_FAST=1 to reduce loop days for diagnostics
 const MAX_DAYS = 5;
-const REPERTOIRE_SIZE = DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG.repertoireSize;
-const MAX_DAILY_TUNES = DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG.maxReviews;
-const ENABLE_FUZZ = DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG.enableFuzz;
-
-const MAX_INTERVAL = Math.round(3 * (REPERTOIRE_SIZE / MAX_DAILY_TUNES));
-
 // Diagnostic helper: invoke auth session diagnostic hook with label if available.
 async function diagAuth(page: import("@playwright/test").Page, label: string) {
   await page.evaluate(
@@ -69,20 +59,20 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
-    // Override repertoire size for FSRS testing to ensure max_interval is large enough
-    // (Formula: 3 * (repertoireSize / maxReviewsPerDay))
-    await applyDeterministicFsrsConfig(page, {
-      repertoireSize: REPERTOIRE_SIZE,
-      enableFuzz: ENABLE_FUZZ,
-      maxReviews: MAX_DAILY_TUNES,
-    });
-
     // Set up ONE tune for repeated evaluation
     await setupForPracticeTestsParallel(page, testUser, {
       repertoireTunes: [TEST_TUNE_BANISH_ID],
       scheduleDaysAgo: 1, // Due yesterday (overdue)
       scheduleBaseDate: currentDate, // Align Supabase scheduled dates with frozen browser date
       startTab: "practice",
+      // Use actual goal settings: a one-tune fixture otherwise hits the default
+      // 15-day cap, hiding the FSRS growth this test is intended to exercise.
+      goalDailySettings: [
+        {
+          goalId: "00000000-0000-0000-0000-000000000001",
+          daily: { minimum: 1, maximum: 1 },
+        },
+      ],
     });
 
     // Verify clock is frozen
@@ -93,20 +83,6 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       test.info().project.name
     );
   });
-
-  function expectWithinFuzzRange(actual: number, base: number) {
-    if (base < 3) {
-      expect(actual).toEqual(base);
-      return;
-    }
-
-    // Allow for a slightly generous 5% + 1 day buffer to handle rounding differences
-    const min = Math.floor(base * 0.95) - 1;
-    const max = Math.ceil(base * 1.05) + 1;
-
-    expect(actual).toBeGreaterThanOrEqual(min);
-    expect(actual).toBeLessThanOrEqual(max);
-  }
 
   test("should advance scheduling dates with repeated Easy evaluations over 10 days", async ({
     page,
@@ -130,11 +106,6 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     // Enable flashcard mode for easier evaluation
     await ttPage.enableFlashcardMode();
     await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
-
-    console.log(
-      `\n== MAX_DAYS: ${MAX_DAYS}, REPERTOIRE_SIZE: ${REPERTOIRE_SIZE}, ` +
-        `MAX_DAILY_TUNES: ${MAX_DAILY_TUNES}, MAX_INTERVAL: ${MAX_INTERVAL}  ==`
-    );
 
     // Day loop (diagnostic-aware)
     for (let day = 1; day <= MAX_DAYS; day++) {
@@ -244,28 +215,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         const currentInterval = intervals[day - 1];
         const previousInterval = intervals[day - 2];
 
-        if (ENABLE_FUZZ) {
-          // LOGIC TO DETERMINE BASE
-          let base = 0;
-          let doFuzzCheck = true;
-
-          // Check if we are likely hitting the cap
-          // (If the current interval is close to or above the max, the base IS the max)
-          if (currentInterval >= MAX_INTERVAL * 0.9) {
-            base = MAX_INTERVAL;
-          } else {
-            // We are in growth phase.
-            // We can't easily know the exact base without re-doing the math.
-            // Option A: Skip fuzz check and just check for growth:
-            expect(currentInterval).toBeGreaterThan(previousInterval);
-            doFuzzCheck = false; // Skip specific fuzz check
-          }
-          if (doFuzzCheck) {
-            expectWithinFuzzRange(currentInterval, base);
-          }
-        } else {
-          expect(currentInterval).toBeGreaterThanOrEqual(previousInterval);
-        }
+        expect(currentInterval).toBeGreaterThanOrEqual(previousInterval);
       }
 
       // 3. Stability should generally increase with "Easy"

@@ -16,10 +16,12 @@
  * @module lib/db/queries/practice
  */
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { orderPracticeHistory } from "../../utils/practice-history";
 import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
+import { practiceHistoryOrderSql } from "../practice-history-sql";
 import {
   practiceRecord,
   prefsSchedulingOptions,
@@ -36,6 +38,7 @@ import type {
   PrefsSpacedRepetition,
 } from "../types";
 import type { ITuneOverview } from "../view-types";
+import { readPracticeRecordsForTune } from "./practice-records";
 
 /**
  * Practice List Staged Row
@@ -287,19 +290,7 @@ export async function getLatestPracticeRecord(
   tuneId: string,
   repertoireId: string
 ): Promise<PracticeRecord | null> {
-  const results = await db
-    .select()
-    .from(practiceRecord)
-    .where(
-      and(
-        eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.repertoireRef, repertoireId)
-      )
-    )
-    .orderBy(desc(practiceRecord.practiced))
-    .limit(1);
-
-  return results[0] ?? null;
+  return readPracticeRecordsForTune(db, tuneId, repertoireId)[0] ?? null;
 }
 
 /**
@@ -408,30 +399,13 @@ export async function getPracticeHistory(
   repertoireId: string,
   limit?: number
 ): Promise<PracticeRecordWithTune[]> {
-  let query = db
+  const query = db
     .select({
-      // Practice record fields
-      id: practiceRecord.id,
-      repertoireRef: practiceRecord.repertoireRef,
-      tuneRef: practiceRecord.tuneRef,
-      practiced: practiceRecord.practiced,
-      quality: practiceRecord.quality,
-      easiness: practiceRecord.easiness,
-      interval: practiceRecord.interval,
-      repetitions: practiceRecord.repetitions,
-      due: practiceRecord.due,
+      // Include new event metadata as the generated schema expands. Retain the
+      // historical aliases below for existing consumers.
+      ...getTableColumns(practiceRecord),
       backup_practiced: practiceRecord.backupPracticed,
-      stability: practiceRecord.stability,
       elapsed_days: practiceRecord.elapsedDays,
-      lapses: practiceRecord.lapses,
-      state: practiceRecord.state,
-      difficulty: practiceRecord.difficulty,
-      step: practiceRecord.step,
-      goal: practiceRecord.goal,
-      technique: practiceRecord.technique,
-      syncVersion: practiceRecord.syncVersion,
-      lastModifiedAt: practiceRecord.lastModifiedAt,
-      deviceId: practiceRecord.deviceId,
 
       // Tune fields
       tune: {
@@ -468,14 +442,11 @@ export async function getPracticeHistory(
         eq(practiceRecord.tuneRef, tuneId),
         eq(practiceRecord.repertoireRef, repertoireId)
       )
-    )
-    .orderBy(desc(practiceRecord.practiced));
+    );
 
-  if (limit) {
-    query = query.limit(limit) as typeof query;
-  }
-
-  const results = await query;
+  // Apply limits after ordering actual instants, not SQLite timestamp text.
+  const ordered = orderPracticeHistory(await query, "as-missing");
+  const results = limit ? ordered.slice(0, limit) : ordered;
 
   // Convert null to undefined for repertoireName to match interface
   return results.map((r) => ({
@@ -496,7 +467,7 @@ export async function getPracticeHistory(
  * NOTE: This function intentionally does NOT set `scheduled = now`. The
  * `scheduled` field on repertoire_tune is reserved for explicit user-set
  * schedule overrides (via the ScheduledOverridePicker). Making tunes
- * immediately available for practice is handled by addSpecificTunesToExistingQueue
+ * immediately available for practice is handled by the manual action in updateGoalPracticeQueue
  * which writes directly to daily_practice_queue.
  *
  * This is the client-side equivalent of the legacy Python function:
@@ -624,28 +595,11 @@ export async function getPracticeRecords(
 ): Promise<PracticeRecordWithTune[]> {
   const results = await db
     .select({
-      // Practice record fields
-      id: practiceRecord.id,
-      repertoireRef: practiceRecord.repertoireRef,
-      tuneRef: practiceRecord.tuneRef,
-      practiced: practiceRecord.practiced,
-      quality: practiceRecord.quality,
-      easiness: practiceRecord.easiness,
-      interval: practiceRecord.interval,
-      repetitions: practiceRecord.repetitions,
-      due: practiceRecord.due,
+      // Include new event metadata as the generated schema expands. Retain the
+      // historical aliases below for existing consumers.
+      ...getTableColumns(practiceRecord),
       backup_practiced: practiceRecord.backupPracticed,
-      stability: practiceRecord.stability,
       elapsed_days: practiceRecord.elapsedDays,
-      lapses: practiceRecord.lapses,
-      state: practiceRecord.state,
-      difficulty: practiceRecord.difficulty,
-      step: practiceRecord.step,
-      goal: practiceRecord.goal,
-      technique: practiceRecord.technique,
-      syncVersion: practiceRecord.syncVersion,
-      lastModifiedAt: practiceRecord.lastModifiedAt,
-      deviceId: practiceRecord.deviceId,
 
       // Tune fields
       tune: {
@@ -678,7 +632,7 @@ export async function getPracticeRecords(
       eq(repertoire.repertoireId, practiceRecord.repertoireRef)
     )
     .where(eq(practiceRecord.repertoireRef, repertoireId))
-    .orderBy(desc(practiceRecord.practiced))
+    .orderBy(sql.raw(practiceHistoryOrderSql("practice_record")))
     .limit(limit);
 
   // Convert null to undefined for repertoireName to match interface

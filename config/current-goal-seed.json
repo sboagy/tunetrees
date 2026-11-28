@@ -1,0 +1,3 @@
+{
+  "migration": "supabase/migrations/20261125120000_shorten_evaluation_labels.sql"
+}

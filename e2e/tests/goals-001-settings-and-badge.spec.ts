@@ -1,9 +1,11 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { CATALOG_TUNE_COOLEYS_ID } from "../../src/lib/db/catalog-tune-ids";
 import {
+  seedSchedulingPluginLocally,
   setupDeterministicTestParallel,
   setupForRepertoireTestsParallel,
 } from "../helpers/practice-scenarios";
+import { setOfflineForTest } from "../helpers/sync-error-guard";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -25,7 +27,6 @@ async function openSettingsTab(
     | "appearance"
     | "catalog-sync"
     | "scheduling-options"
-    | "spaced-repetition"
     | "plugins"
     | "goals"
     | "account"
@@ -87,13 +88,14 @@ async function openSettingsTab(
 async function clickGoalBadgeMenuItem(
   page: Page,
   trigger: Locator,
-  itemName: string | RegExp
+  itemName: string | RegExp,
+  role: "menuitem" | "menuitemradio" = "menuitem"
 ) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await trigger.scrollIntoViewIfNeeded().catch(() => undefined);
     await expect(trigger).toBeVisible({ timeout: 10000 });
 
-    const menuItem = page.getByRole("menuitem", { name: itemName }).last();
+    const menuItem = page.getByRole(role, { name: itemName }).last();
     const menuItemVisible = await menuItem
       .isVisible({ timeout: 250 })
       .catch(() => false);
@@ -124,7 +126,7 @@ async function clickGoalBadgeMenuItem(
     await page.waitForTimeout(100);
   }
 
-  await page.getByRole("menuitem", { name: itemName }).last().click();
+  await page.getByRole(role, { name: itemName }).last().click();
 }
 
 test.describe("GOALS-001: Goals settings", () => {
@@ -135,6 +137,177 @@ test.describe("GOALS-001: Goals settings", () => {
       clearRepertoire: true,
       seedRepertoire: [],
     });
+  });
+
+  test("saves goals independently and guards modal dismissal", async ({
+    page,
+  }) => {
+    await openSettingsTab(page, "goals");
+    const recall = page.getByTestId(
+      "goal-edit-00000000-0000-0000-0000-000000000001"
+    );
+    const fluency = page.getByTestId(
+      "goal-edit-00000000-0000-0000-0000-000000000003"
+    );
+    const editor = page.getByTestId("goal-editor-dialog");
+    await expect(page.getByTestId("goal-save")).toHaveCount(0);
+    await recall.click();
+    await expect(page.getByTestId("goal-save")).toBeDisabled();
+    await page.getByTestId("goal-minimum").fill("2");
+    await page.getByTestId("goal-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(editor).toHaveCount(0, { timeout: 10000 });
+    await fluency.click();
+    await page.getByTestId("goal-minimum").fill("1");
+    await editor.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Discard Changes?" })
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByRole("button", { name: "Keep Editing" })
+    ).toBeFocused();
+    await page.getByRole("button", { name: "Keep Editing" }).click();
+    await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
+    await page.getByTestId("goal-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(editor).toHaveCount(0, { timeout: 10000 });
+    await page.reload();
+    await openSettingsTab(page, "goals");
+    await recall.click();
+    await expect(page.getByTestId("goal-minimum")).toHaveValue("2");
+    await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+    await fluency.click();
+    await expect(page.getByTestId("goal-minimum")).toHaveValue("1");
+  });
+
+  test("focuses invalid goal fields and discards only unsaved dialog edits", async ({
+    page,
+  }) => {
+    await openSettingsTab(page, "goals");
+    const recall = page.getByTestId(
+      "goal-edit-00000000-0000-0000-0000-000000000001"
+    );
+    await recall.click();
+    await page.getByTestId("goal-name").fill("");
+    await page.getByTestId("goal-save").click();
+    await expect(page.getByTestId("goal-name")).toBeFocused({ timeout: 10000 });
+    await page
+      .getByTestId("goal-editor-dialog")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Discard Changes", exact: true })
+      .click();
+    await expect(page.getByTestId("goal-editor-dialog")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("settings-modal")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(recall).toBeFocused();
+    await recall.click();
+    await expect(page.getByTestId("goal-name")).toHaveValue("Recall");
+    await expect(page.getByTestId("goal-save")).toBeDisabled();
+  });
+
+  test("persists the per-goal same-day FSRS option", async ({ page }) => {
+    await openSettingsTab(page, "goals");
+    const editRecall = page.getByTestId(
+      "goal-edit-00000000-0000-0000-0000-000000000001"
+    );
+    await editRecall.click();
+    await ttPage.goalFsrsAdvanced.click();
+    const sameDay = page.getByTestId("goal-allow-same-day-reviews");
+    await expect(sameDay).not.toBeChecked();
+    await sameDay.check();
+    await page.getByTestId("goal-save").click();
+    await expect(page.getByTestId("goal-editor")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await page.reload();
+    await openSettingsTab(page, "goals");
+    await editRecall.click();
+    await ttPage.goalFsrsAdvanced.click();
+    await expect(sameDay).toBeChecked();
+  });
+
+  test("C: selects named plugin actions and preserves personal labels after offline save", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    const goalName = `custom_scheduler_${test.info().workerIndex}_${Date.now()}`;
+    await seedSchedulingPluginLocally(page, {
+      userId: testUser.userId,
+      name: "Named action scheduler",
+      script: `
+        function describeGoalSchedulerV1() {
+          return { apiVersion: 1, stateVersion: 1, compatibleStateVersions: [1], actions: [
+            { id: "advance", label: "Advance", description: "Review tomorrow" },
+            { id: "repeat", label: "Repeat", description: "Review in six hours" }
+          ] };
+        }
+        function scheduleGoalV1(input) {
+          const hours = input.evaluation.actionId === "repeat" ? 6 : 24;
+          return { due: new Date(Date.parse(input.practiced) + hours * 3600000).toISOString(), state: {} };
+        }
+      `,
+    });
+    await openSettingsTab(page, "goals");
+    await page.getByTestId("goal-add").click();
+    await page.getByTestId("goal-name").fill(goalName);
+    await page
+      .getByTestId("goal-scheduler")
+      .selectOption({ label: "Named action scheduler (custom scheduler)" });
+    await page.getByTestId("goal-choice-edit-0").click();
+    await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
+      "Advance",
+      { timeout: 10000 }
+    );
+    await page.getByTestId("goal-choice-label-0").fill("At tempo");
+    await page.getByTestId("goal-choice-action-0").selectOption("repeat");
+    // Inspection loads the sandbox before going offline; saving must still use
+    // the locally stored script and declarations, not contact a remote service.
+    await setOfflineForTest(context, true);
+    await page.getByTestId("goal-choice-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("goal-choice-dialog")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    // The choice saved the new goal too. Cancel must not undo that write.
+    await page
+      .getByTestId("goal-editor-dialog")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    await expect(page.getByTestId("goal-editor")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    const row = page.locator("section[data-testid^='goal-panel-']").filter({
+      has: page.getByRole("heading", {
+        name: goalName,
+        exact: true,
+      }),
+    });
+    await expect(row).toContainText("Custom scheduler", { timeout: 10000 });
+    await setOfflineForTest(context, false);
+    await page.reload();
+    await openSettingsTab(page, "goals");
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await row.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByTestId("goal-plugin-reload")).toBeVisible({
+      timeout: 10000,
+    });
+    await page.getByTestId("goal-choice-edit-0").click();
+    await expect(page.getByTestId("goal-choice-label-0")).toHaveValue(
+      "At tempo",
+      { timeout: 10000 }
+    );
+    await expect(page.getByTestId("goal-choice-action-0")).toHaveValue(
+      "repeat",
+      { timeout: 10000 }
+    );
   });
 
   test("A: should create, edit, and delete a user-defined goal", async ({
@@ -149,43 +322,63 @@ test.describe("GOALS-001: Goals settings", () => {
     const goalName = `e2e_goal_${test.info().workerIndex}_${Date.now()}`;
     const updatedGoalName = `${goalName}_updated`;
 
-    await page.getByRole("button", { name: /\+\s*Add Goal|Add Goal/i }).click();
-
-    await page.getByLabel("Name").fill(goalName);
-    await page.getByRole("radio", { name: /Base Intervals/i }).check();
-    await page.getByLabel(/Interval ladder/i).fill("[0.5, 1, 2, 3]");
-
-    await page.getByRole("button", { name: /^Add Goal$/ }).click();
+    await page.getByTestId("goal-add").click();
+    await page.getByTestId("goal-name").fill(goalName);
+    await page
+      .getByTestId("goal-description")
+      .fill("Build confidence at session tempo");
+    await page
+      .getByTestId("goal-scheduler")
+      .selectOption("builtin:interval-ladder");
+    await page.getByTestId("goal-intervals").fill("0.5, 1, 2, 3");
+    await page.getByTestId("goal-minimum").fill("0");
+    await page.getByTestId("goal-unlimited").check();
+    await page.getByTestId("goal-choice-edit-0").click();
+    await page.getByTestId("goal-choice-label-0").fill("Start again slowly");
+    await page.getByTestId("goal-choice-save").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("goal-choice-dialog")).toHaveCount(0, {
+      timeout: 10000,
+    });
+    await page
+      .getByTestId("goal-editor-dialog")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     const createdRow = page
-      .locator("div", {
-        has: page.getByText(goalName, { exact: true }),
-      })
-      .filter({ hasText: "Base Intervals" })
-      .first();
-
+      .locator("section[data-testid^='goal-panel-']")
+      .filter({
+        has: page.getByRole("heading", { name: goalName, exact: true }),
+      });
     await expect(createdRow).toBeVisible({ timeout: 10000 });
-    await createdRow.getByRole("button", { name: "Edit" }).click();
-
-    const activeEditForm = page.locator("form").filter({
-      has: page.getByRole("button", { name: "Save" }),
-    });
-
-    await expect(activeEditForm).toBeVisible({ timeout: 5000 });
-    await activeEditForm.getByLabel("Name").fill(updatedGoalName);
-    await activeEditForm.getByRole("radio", { name: /FSRS/i }).check();
-    await activeEditForm.getByRole("button", { name: "Save" }).click();
+    await expect(createdRow).toContainText("Build confidence at session tempo");
+    await expect(createdRow).toContainText("Unlimited");
+    await createdRow.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByTestId("goal-choice-summary-0")).toHaveText(
+      "Start again slowly"
+    );
+    await expect(page.getByTestId("goal-intervals")).toHaveValue(
+      "0.5, 1, 2, 3"
+    );
+    await page.getByTestId("goal-name").fill(updatedGoalName);
+    await page.getByTestId("goal-scheduler").selectOption("builtin:fsrs6");
+    await page.getByTestId("goal-save").click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     const updatedRow = page
-      .locator("div", { has: page.getByText(updatedGoalName, { exact: true }) })
-      .first();
-
+      .locator("section[data-testid^='goal-panel-']")
+      .filter({
+        has: page.getByRole("heading", { name: updatedGoalName, exact: true }),
+      });
     await expect(updatedRow).toBeVisible({ timeout: 10000 });
-
-    page.once("dialog", (dialog) => dialog.accept());
-    await updatedRow.getByRole("button", { name: "Delete" }).click();
+    await updatedRow.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByTestId("goal-delete").click();
+    await page
+      .getByTestId("goal-replacement")
+      .selectOption({ label: "Recall" });
+    await page.getByTestId("goal-confirm-delete").click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect(page.getByText(updatedGoalName, { exact: true })).toHaveCount(
       0,
@@ -218,15 +411,20 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
 
     const goalTrigger = row.locator("button", { hasText: /recall/i }).first();
     await expect(goalTrigger).toBeVisible({ timeout: 10000 });
-    await clickGoalBadgeMenuItem(page, goalTrigger, "session_ready");
+    await clickGoalBadgeMenuItem(
+      page,
+      goalTrigger,
+      /^Session/,
+      "menuitemradio"
+    );
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    await expect(row.getByText("session_ready")).toBeVisible({
+    await expect(row.getByText("Session", { exact: true })).toBeVisible({
       timeout: 10000,
     });
 
     const updatedGoalTrigger = row
-      .locator("button", { hasText: /session_ready/i })
+      .locator("button", { hasText: /Session/i })
       .first();
     await clickGoalBadgeMenuItem(page, updatedGoalTrigger, /Edit Goals/i);
 
@@ -235,8 +433,8 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
     await expect(
       page.getByRole("heading", { name: "Goals", level: 3 })
     ).toBeVisible({ timeout: 10000 });
-    await expect(settingsModal.getByTestId("settings-tab-goals")).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(
+      settingsModal.getByTestId("settings-tab-goals")
+    ).toHaveAttribute("aria-current", "page");
   });
 });

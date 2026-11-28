@@ -54,6 +54,37 @@ function parseGoals(raw?: string | null): string[] {
   return [];
 }
 
+/** Explicit selection for a synchronous practice snapshot, never newest-plugin discovery. */
+export function readSelectedSchedulingPlugin(
+  db: SqliteDatabase,
+  userId: string,
+  pluginId: string
+) {
+  const row = db
+    .select()
+    .from(plugin)
+    .where(
+      and(
+        eq(plugin.id, pluginId),
+        eq(plugin.deleted, 0),
+        eq(plugin.enabled, 1),
+        or(eq(plugin.userRef, userId), eq(plugin.isPublic, 1))
+      )
+    )
+    .get();
+  if (!row || !hasCapability(row.capabilities, "scheduleGoal"))
+    throw new Error(
+      "The selected scheduling plugin is unavailable or disabled"
+    );
+  return {
+    id: row.id,
+    name: row.name,
+    version: row.version,
+    script: row.script,
+    capabilities: row.capabilities,
+  };
+}
+
 export async function getPlugins(
   db: SqliteDatabase,
   userId: string,

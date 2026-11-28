@@ -120,7 +120,11 @@ export function usePracticeListData(
 
     const filtered = shouldShow
       ? data
-      : data.filter((tune) => !tune.completed_at);
+      : data.filter(
+          (tune) =>
+            !tune.completed_at ||
+            (!!tune.recall_eval && Number(tune.has_staged) === 1)
+        );
 
     console.log(`[PracticePage] After filtering: ${filtered.length} tunes`);
     return filtered;

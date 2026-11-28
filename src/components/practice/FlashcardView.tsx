@@ -17,13 +17,18 @@
 import { ChevronLeft, ChevronRight } from "lucide-solid";
 import type { Accessor, Component } from "solid-js";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { useUserSettingsDialog } from "../../contexts/UserSettingsDialogContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
+import type { PracticeEvaluationModel } from "../../lib/goals/practice-session";
 import type { ITuneOverview } from "../grids/types";
 import { FlashcardCard } from "./FlashcardCard";
 import type { FlashcardFieldVisibilityByFace } from "./flashcard-fields";
 
 export interface FlashcardViewProps {
+  getEvaluationModel: (tuneId: string) => PracticeEvaluationModel;
+  onPracticeAgain?: (tuneId: string) => void;
+  onRetryEvaluation?: (tuneId: string) => void;
   tunes: Accessor<ITuneOverview[]>;
   onRecallEvalChange?: (tuneId: string, value: string) => void;
   fieldVisibility?: FlashcardFieldVisibilityByFace;
@@ -37,6 +42,7 @@ export interface FlashcardViewProps {
 
 export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+  const { isOpen: settingsOpen } = useUserSettingsDialog();
   const [currentIndex, setCurrentIndex] = createSignal(0);
   const [isRevealed, setIsRevealed] = createSignal(false);
   // Auth context currently only needed if future features require local staging directly
@@ -121,6 +127,17 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
 
   // Keyboard shortcuts
   const handleKeyDown = (e: KeyboardEvent) => {
+    const target = e.target;
+    if (
+      settingsOpen() ||
+      e.defaultPrevented ||
+      e.isComposing ||
+      (target instanceof Element &&
+        target.closest(
+          "input:not([type=checkbox]), textarea, select, [contenteditable=true], dialog, [role=dialog], [role=alertdialog], [role=menu], [role=menuitem], [aria-haspopup][aria-expanded=true]"
+        ))
+    )
+      return;
     switch (e.key) {
       case "ArrowLeft":
         e.preventDefault();
@@ -131,25 +148,29 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
         goToNext();
         break;
       case " ": // Spacebar
+        // Space activates a focused button; arrows and rating digits still act
+        // as flashcard shortcuts after a toolbar or navigation button is used.
+        if (
+          target instanceof Element &&
+          target.closest("button, input[type=checkbox]")
+        )
+          return;
         e.preventDefault();
         toggleReveal();
         break;
       case "1":
-        e.preventDefault();
-        handleRecallEvalChange("again");
-        break;
       case "2":
-        e.preventDefault();
-        handleRecallEvalChange("hard");
-        break;
       case "3":
-        e.preventDefault();
-        handleRecallEvalChange("good");
+      case "4": {
+        const tune = currentTune();
+        const model = tune && props.getEvaluationModel?.(tune.id);
+        const choice = model?.choices[Number(e.key) - 1];
+        if (choice && !model?.completed && !model?.pending) {
+          e.preventDefault();
+          handleRecallEvalChange(choice.id);
+        }
         break;
-      case "4":
-        e.preventDefault();
-        handleRecallEvalChange("easy");
-        break;
+      }
       default:
         break;
     }
@@ -308,6 +329,9 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
               {/* Card */}
               <FlashcardCard
                 tune={tune()}
+                evaluationModel={props.getEvaluationModel?.(tune().id)}
+                onPracticeAgain={() => props.onPracticeAgain?.(tune().id)}
+                onRetryEvaluation={() => props.onRetryEvaluation?.(tune().id)}
                 currentEvaluation={(() => {
                   const evals = evaluations();
                   const id = tune().id;

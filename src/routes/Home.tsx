@@ -13,20 +13,17 @@ import {
   type Component,
   createEffect,
   createSignal,
-  Match,
+  ErrorBoundary,
   Show,
-  Switch,
 } from "solid-js";
 import { MainLayout } from "../components/layout";
 import type { TabId } from "../components/layout/TabBar";
 import { OnboardingOverlay } from "../components/onboarding";
+import { Button } from "../components/ui/button";
 import { useAuth } from "../lib/auth/AuthContext";
 import { hasPendingSignUpConfirmation } from "../lib/auth/signup-confirmation-pending";
-import AnalysisPage from "./analysis";
-import CatalogPage from "./catalog";
-import PracticePage from "./practice";
-import RepertoirePage from "./repertoire";
-import SetlistsPage from "./setlists";
+
+import { TabPage } from "./TabPage";
 
 /**
  * Home Page Component
@@ -178,23 +175,28 @@ const Home: Component = () => {
         <OnboardingOverlay />
 
         <MainLayout activeTab={activeTab()} onTabChange={handleTabChange}>
-          <Switch>
-            <Match when={activeTab() === "practice"}>
-              <PracticePage />
-            </Match>
-            <Match when={activeTab() === "repertoire"}>
-              <RepertoirePage />
-            </Match>
-            <Match when={activeTab() === "catalog"}>
-              <CatalogPage />
-            </Match>
-            <Match when={activeTab() === "analysis"}>
-              <AnalysisPage />
-            </Match>
-            <Match when={activeTab() === "setlists"}>
-              <SetlistsPage />
-            </Match>
-          </Switch>
+          <Show when={activeTab()} keyed>
+            {(tab) => (
+              <ErrorBoundary
+                fallback={
+                  <div class="space-y-3 p-4" data-testid="tab-load-error">
+                    <p role="alert">
+                      This tab could not be opened. Reload the page to try
+                      again.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => globalThis.location.reload()}
+                    >
+                      Reload Page
+                    </Button>
+                  </div>
+                }
+              >
+                <TabPage tab={tab} />
+              </ErrorBoundary>
+            )}
+          </Show>
         </MainLayout>
       </Show>
     </Show>

@@ -6,7 +6,11 @@
  * @module lib/db/queries/practice-records
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import {
+  type InvalidPracticeTimestampPolicy,
+  orderPracticeHistory,
+} from "@/lib/utils/practice-history";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { practiceRecord } from "../schema";
@@ -24,16 +28,29 @@ export async function getPracticeRecordsForTune(
   tuneId: string,
   repertoireId: string
 ) {
-  return await db
-    .select()
-    .from(practiceRecord)
-    .where(
-      and(
-        eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.repertoireRef, repertoireId)
+  return readPracticeRecordsForTune(db, tuneId, repertoireId, "as-missing");
+}
+
+/** Shared synchronous read for scheduling snapshots and asynchronous query wrappers. */
+export function readPracticeRecordsForTune(
+  db: SqliteDatabase,
+  tuneId: string,
+  repertoireId: string,
+  invalid: InvalidPracticeTimestampPolicy = "reject"
+) {
+  return orderPracticeHistory(
+    db
+      .select()
+      .from(practiceRecord)
+      .where(
+        and(
+          eq(practiceRecord.tuneRef, tuneId),
+          eq(practiceRecord.repertoireRef, repertoireId)
+        )
       )
-    )
-    .orderBy(desc(practiceRecord.practiced));
+      .all(),
+    invalid
+  );
 }
 
 /**

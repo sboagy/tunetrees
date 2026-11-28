@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 export const AlertDialogTrigger = Dialog.Trigger;
 
-export const AlertDialog = Dialog;
+export { Dialog as AlertDialog } from "@kobalte/core/dialog";
 
 type AlertDialogContentPropsWithClass<T extends ValidComponent = "div"> =
   ParentProps<DialogContentProps<T> & { class?: string }>;
@@ -138,6 +138,7 @@ export const AlertDialogCloseButton = <T extends ValidComponent = "button">(
 
   return (
     <Dialog.CloseButton
+      aria-label="Close"
       class={cn(
         "absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-md bg-background/80 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-[1.5px] focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[expanded]:bg-accent data-[expanded]:text-muted-foreground",
         local.class

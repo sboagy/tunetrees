@@ -22,13 +22,12 @@ test.describe
 
       await page.goto("/?tab=setlists", { waitUntil: "domcontentloaded" });
       await expect(page).toHaveURL(/tab=setlists/);
-      const desktopVisible = await ttPage.setlistsGroupSelect
-        .isVisible()
-        .catch(() => false);
+      // The lazy tab may not have mounted yet. Wait for the responsive control
+      // instead of interpreting a not-yet-visible desktop control as mobile.
       await expect(
-        desktopVisible
-          ? ttPage.setlistsGroupSelect
-          : ttPage.setlistsGroupSelectMobile
+        ttPage.setlistsGroupSelect
+          .or(ttPage.setlistsGroupSelectMobile)
+          .filter({ visible: true })
       ).toBeVisible({ timeout: 10000 });
     });
 

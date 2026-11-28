@@ -21,6 +21,10 @@ import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { TABLE_REGISTRY } from "@sync-schema/table-meta";
 import { sql } from "drizzle-orm";
 import {
+  BrowserSqliteMigrationBlockedError,
+  type BrowserSqliteMigrationBlockReason,
+} from "oosync/runtime/browser-sqlite";
+import {
   type Accessor,
   createContext,
   createEffect,
@@ -29,20 +33,29 @@ import {
   onCleanup,
   onMount,
   type ParentComponent,
+  Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { DatabaseUpgradeBlocked } from "@/components/auth/DatabaseUpgradeBlocked";
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
   getSqliteInstance,
   initializeDb as initializeSqliteDb,
+  persistDb,
   type SqliteDatabase,
   setupAutoPersist,
 } from "../db/client-sqlite";
+import { discardBlockedDatabase } from "../db/discard-blocked-database";
 import {
   enableSyncTriggers,
   suppressSyncTriggers,
 } from "../db/install-triggers";
+import {
+  finishUpgradeFullPull,
+  getUpgradeFullPullGeneration,
+  withUpgradeIdentity,
+} from "../db/upgrade-policy";
 import {
   captureSyncBaselineSnapshot,
   installSyncBaselineFetchDiagnostics,
@@ -56,6 +69,7 @@ import {
   SyncInProgressError,
   type SyncService,
 } from "../sync";
+import { ownsActiveSync } from "../sync/completion-owner";
 
 // ---------------------------------------------------------------------------
 // Legacy anonymous user storage keys (kept for migration from old local-only approach)
@@ -153,12 +167,34 @@ export interface AuthState {
   /** Last successful syncDown ISO timestamp (null if none yet) */
   lastSyncTimestamp: Accessor<string | null>;
   /** Mode of last syncDown ('full' | 'incremental' | null if none yet) */
-  lastSyncMode: Accessor<"full" | "incremental" | null>;
+  lastSyncMode: Accessor<SyncPullMode>;
   /** Scoped practice sync (repertoire_tune, practice_record, daily_practice_queue, table_transient_data) */
   syncPracticeScope: () => Promise<void>;
 }
 
+type SyncPullMode = "full" | "incremental" | null;
+
 type ViewRefreshCategory = "repertoire" | "practice" | "catalog";
+
+function resolveCatalogGenreSelection(params: {
+  selected: string[];
+  required: string[];
+  repertoireCount: number;
+  repertoireTuneCount: number;
+  repertoireDefaults: string[];
+  tuneGenres: string[];
+}): string[] {
+  if (params.selected.length > 0) {
+    return Array.from(new Set([...params.selected, ...params.required]));
+  }
+  if (params.repertoireCount === 0) return [];
+  if (params.repertoireTuneCount > 0) {
+    return Array.from(
+      new Set([...params.tuneGenres, ...params.repertoireDefaults])
+    );
+  }
+  return Array.from(new Set(params.repertoireDefaults));
+}
 
 type AuthSessionDiagnostic = {
   label: string;
@@ -423,11 +459,15 @@ const TTInner: ParentComponent = (props) => {
   // TTAuthContext forwards these plus TT-specific state to consumers.
   const rhizome = useRhizomeAuth();
 
+  const [upgradeBlocked, setUpgradeBlocked] =
+    createSignal<BrowserSqliteMigrationBlockReason | null>(null);
+
   // TT-specific signals
   const [userIdInt, setUserIdInt] = createSignal<string | null>(null);
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
   const [remoteSyncDownCompletionVersion, setRemoteSyncDownCompletionVersion] =
     createSignal(0);
+  const [syncResultVersion, setSyncResultVersion] = createSignal(0);
   const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
   const [catalogSyncPending, setCatalogSyncPending] = createSignal(false);
   const [anonymousCatalogSyncRequested, setAnonymousCatalogSyncRequested] =
@@ -435,9 +475,7 @@ const TTInner: ParentComponent = (props) => {
   const [lastSyncTimestamp, setLastSyncTimestamp] = createSignal<string | null>(
     null
   );
-  const [lastSyncMode, setLastSyncMode] = createSignal<
-    "full" | "incremental" | null
-  >(null);
+  const [lastSyncMode, setLastSyncMode] = createSignal<SyncPullMode>(null);
   const [lastSyncSuccess, setLastSyncSuccess] = createSignal<boolean | null>(
     null
   );
@@ -459,13 +497,58 @@ const TTInner: ParentComponent = (props) => {
   let stopSyncWorker: (() => void) | null = null;
   let syncServiceInstance: SyncService | null = null;
   let autoPersistCleanup: (() => void) | null = null;
+  let isInitializing = false;
+  let disposed = false;
+  let lifecycleVersion = 0;
+  let injectedTestInitialization: Promise<void> | null = null;
+  let signOutCleanup: Promise<void> | null = null;
+  let syncShutdown: Promise<void> | null = null;
+  const retiringSyncServices = new Set<SyncService>();
+  let needsSignOutCleanup = false;
+  const captureLifetime = (userId: string) => {
+    const version = lifecycleVersion;
+    return () =>
+      !disposed &&
+      version === lifecycleVersion &&
+      rhizome.user()?.id === userId;
+  };
+  const invalidateSync = () => {
+    lifecycleVersion += 1;
+    isInitializing = false;
+    stopSyncWorker?.();
+    stopSyncWorker = null;
+    syncServiceInstance = null;
+  };
+  const drainSync = () => {
+    const service = syncServiceInstance;
+    invalidateSync();
+    if (service) retiringSyncServices.add(service);
+    // Keep detached services until teardown succeeds, including across an
+    // overlapping reset/sign-out or a retry after subscription cleanup fails.
+    syncShutdown ??= (async () => {
+      for (const retiring of retiringSyncServices) {
+        await retiring.destroy();
+        retiringSyncServices.delete(retiring);
+      }
+    })().finally(() => {
+      syncShutdown = null;
+    });
+    return syncShutdown;
+  };
+  onCleanup(() => {
+    disposed = true;
+    invalidateSync();
+    autoPersistCleanup?.();
+    autoPersistCleanup = null;
+  });
 
   // Catalog reconciliation tracking
   let catalogSelectionReconciledKey: string | null = null;
+  const pendingCatalogRefresh = new Set<string>();
+  const catalogReconciliations = new Set<string>();
   let reconcileRunCount = 0;
   const RECONCILE_CHECK_INTERVAL = 10;
 
-  let isInitializing = false;
   let offlineMediaMaintenancePromise: Promise<void> | null = null;
 
   const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
@@ -477,7 +560,10 @@ const TTInner: ParentComponent = (props) => {
     if (SYNC_DIAGNOSTICS) console.log(...args);
   };
 
-  const runOfflineMediaMaintenance = async () => {
+  const runOfflineMediaMaintenance = async (
+    isCurrent: () => boolean = () => true
+  ) => {
+    if (!isCurrent()) return;
     const db = localDb();
     const currentUser = rhizome.user();
     const accessToken = rhizome.session()?.access_token;
@@ -507,11 +593,13 @@ const TTInner: ParentComponent = (props) => {
             import("@/lib/media/audio-lookahead"),
           ]);
 
+        if (!isCurrent()) return;
         await processPendingNoteMediaDrafts({
           db,
           userId: currentUser.id,
           accessToken,
         });
+        if (!isCurrent()) return;
         await syncPinnedAudioVault({
           db,
           userId: currentUser.id,
@@ -536,9 +624,10 @@ const TTInner: ParentComponent = (props) => {
     await offlineMediaMaintenancePromise;
   };
 
-  const persistDbAfterSync = async () => {
+  const persistDbAfterSync = async (isCurrent: () => boolean) => {
     try {
       const { persistDb } = await import("@/lib/db/client-sqlite");
+      if (!isCurrent()) return;
       await persistDb();
     } catch (e) {
       console.warn("⚠️ [TTAuthProvider] Failed to persist after sync:", e);
@@ -697,32 +786,42 @@ const TTInner: ParentComponent = (props) => {
     userId: string;
     isAnonymousUser: boolean;
     skipSync?: boolean;
+    isCurrent: () => boolean;
   }) => {
+    const { isCurrent } = params;
+    if (!isCurrent() || catalogReconciliations.has(params.userId)) return;
+    catalogReconciliations.add(params.userId);
     try {
       const [genreSelection, genreQueries] = await Promise.all([
         import("@/lib/db/queries/user-genre-selection"),
         import("@/lib/db/queries/genres"),
       ]);
+      if (!isCurrent()) return;
 
       const selected = await genreSelection.getUserGenreSelection(
         params.db,
         params.userId
       );
+      if (!isCurrent()) return;
       const required = await genreSelection.getRequiredGenreIdsForUser(
         params.db,
         params.userId
       );
+      if (!isCurrent()) return;
       const { repertoireCount, repertoireTuneCount } =
         await genreSelection.getUserRepertoireStats(params.db, params.userId);
+      if (!isCurrent()) return;
       const repertoireDefaults =
         await genreSelection.getRepertoireGenreDefaultsForUser(
           params.db,
           params.userId
         );
+      if (!isCurrent()) return;
       const tuneGenres = await genreSelection.getRepertoireTuneGenreIdsForUser(
         params.db,
         params.userId
       );
+      if (!isCurrent()) return;
 
       const selectedKey = [...selected]
         .sort((a, b) => a.localeCompare(b))
@@ -747,6 +846,7 @@ const TTInner: ParentComponent = (props) => {
       ].join("|");
 
       const shouldReconcile =
+        pendingCatalogRefresh.has(params.userId) ||
         catalogSelectionReconciledKey !== reconcileKey ||
         reconcileRunCount % RECONCILE_CHECK_INTERVAL === 0;
 
@@ -756,60 +856,65 @@ const TTInner: ParentComponent = (props) => {
 
       catalogSelectionReconciledKey = reconcileKey;
 
-      let effectiveSelected: string[] = [];
-      if (selected.length > 0) {
-        effectiveSelected = Array.from(new Set([...selected, ...required]));
-      } else if (repertoireCount > 0) {
-        if (repertoireTuneCount > 0) {
-          effectiveSelected = Array.from(
-            new Set([...tuneGenres, ...repertoireDefaults])
-          );
-        } else {
-          effectiveSelected = Array.from(new Set(repertoireDefaults));
-        }
-      } else {
-        effectiveSelected = [];
-      }
+      const effectiveSelected = resolveCatalogGenreSelection({
+        selected,
+        required,
+        repertoireCount,
+        repertoireTuneCount,
+        repertoireDefaults,
+        tuneGenres,
+      });
 
       if (effectiveSelected.length === 0) return;
 
       const selectionChanged = !arraysEqual(selected, effectiveSelected);
       if (selectionChanged) {
+        // Startup reconciliation explicitly skips sync; it must not schedule a
+        // delayed full pull that races the user's first interactions.
+        if (!params.skipSync) pendingCatalogRefresh.add(params.userId);
         await genreSelection.upsertUserGenreSelection(
           params.db,
           params.userId,
           effectiveSelected
         );
+        if (!isCurrent()) return;
       }
 
-      if (effectiveSelected.length > 0) {
-        const allGenres = await genreQueries.getAllGenres(params.db);
-        const unselected = allGenres
-          .map((g) => g.id)
-          .filter((id) => !effectiveSelected.includes(id));
+      const allGenres = await genreQueries.getAllGenres(params.db);
+      if (!isCurrent()) return;
+      const unselected = allGenres
+        .map((g) => g.id)
+        .filter((id) => !effectiveSelected.includes(id));
 
-        const purgeResult = await genreSelection.purgeLocalCatalogForGenres(
-          params.db,
-          params.userId,
-          unselected
-        );
+      const purgeResult = await genreSelection.purgeLocalCatalogForGenres(
+        params.db,
+        params.userId,
+        unselected,
+        isCurrent
+      );
+      if (!isCurrent()) return;
 
-        if (!params.skipSync) {
-          if (selectionChanged && !params.isAnonymousUser) {
-            await forceSyncUp({ allowDeletes: true });
-          }
-          if (selectionChanged || purgeResult.tuneIds.length > 0) {
-            await forceSyncDown({ full: true });
-          }
+      if (!params.skipSync && purgeResult.tuneIds.length > 0)
+        pendingCatalogRefresh.add(params.userId);
+
+      if (!params.skipSync && pendingCatalogRefresh.has(params.userId)) {
+        if (!params.isAnonymousUser) {
+          await forceSyncUp({ allowDeletes: true }, isCurrent);
+          if (!isCurrent()) return;
         }
-
-        incrementCatalogListChanged();
+        await forceSyncDown({ full: true }, isCurrent);
+        if (!isCurrent()) return;
+        pendingCatalogRefresh.delete(params.userId);
       }
+
+      incrementCatalogListChanged();
     } catch (error) {
       console.warn(
         "[TTAuthProvider] Failed to reconcile catalog genre selection:",
         error
       );
+    } finally {
+      catalogReconciliations.delete(params.userId);
     }
   };
 
@@ -820,12 +925,16 @@ const TTInner: ParentComponent = (props) => {
     db: SqliteDatabase,
     authUserId: string,
     isAnonymousUser: boolean
-  ): Promise<{ stop: () => void; service: SyncService }> {
+  ): Promise<void> {
+    const ownsLifetime = captureLifetime(authUserId);
+    const isCurrentStartup = () => ownsLifetime() && localDb() === db;
+    if (!isCurrentStartup()) return;
     markSyncBaselineEvent("sync-worker:start", {
       userId: authUserId,
       isAnonymousUser,
     });
     await captureSyncBaselineSnapshot("before-sync-worker", db, authUserId);
+    if (!isCurrentStartup()) return;
 
     let firstSyncCompletionHandled = false;
     const signalAffectedChangeCategories = (affectedTables?: string[]) => {
@@ -863,7 +972,31 @@ const TTInner: ParentComponent = (props) => {
       }
     };
 
+    let userSyncService: SyncService | null = null;
+    let syncStopped = false;
+    const isCurrentSync = () =>
+      isCurrentStartup() &&
+      !syncStopped &&
+      ownsActiveSync(
+        { userId: authUserId, database: db, service: userSyncService },
+        {
+          userId: rhizome.user()?.id ?? null,
+          database: localDb(),
+          service: syncServiceInstance,
+        }
+      );
+    let completionPullMode: SyncPullMode = null;
+    let completionPullGeneration: string | null = null;
     const requestOverridesProvider = async () => {
+      // One service operation can upload/download and then download again.
+      // Retain the first full pull and its generation until onSyncComplete;
+      // the second engine call may already see the advanced cursor.
+      if (completionPullMode !== "full") {
+        completionPullGeneration = getUpgradeFullPullGeneration(authUserId);
+        completionPullMode = userSyncService?.getLastSyncDownTimestamp()
+          ? "incremental"
+          : "full";
+      }
       try {
         const { buildGenreFilterOverrides } = await import(
           "@/lib/sync/genre-filter"
@@ -905,6 +1038,9 @@ const TTInner: ParentComponent = (props) => {
               "tune_type",
               "instrument",
               "user_profile",
+              // Queue allocation needs definitions even for device-only users.
+              "goal",
+              "goal_user_settings",
               "user_genre_selection",
               "repertoire",
             ],
@@ -915,6 +1051,11 @@ const TTInner: ParentComponent = (props) => {
         if (isAnonymousUser && anonymousCatalogSyncRequested()) {
           const catalogTablesOverride = {
             pullTables: [
+              // Public notes/references require their authors as FK parents.
+              // The initial metadata pull precedes the selected catalog genres.
+              "user_profile",
+              "goal",
+              "goal_user_settings",
               "tune",
               "reference",
               "media_asset",
@@ -965,7 +1106,9 @@ const TTInner: ParentComponent = (props) => {
             error
           );
         }
-        return null;
+        // A missing filter is not a successful unfiltered sync. Propagate the
+        // failure so SyncService retries without advancing its initial cursor.
+        throw error;
       }
     };
 
@@ -977,8 +1120,11 @@ const TTInner: ParentComponent = (props) => {
         repairPendingMediaAssetSyncState,
         repairPendingSetlistSyncState,
       } = await import("@/lib/sync/genre-filter");
+      if (!isCurrentStartup()) return;
       const repairResult = await repairPendingMediaAssetSyncState();
+      if (!isCurrentStartup()) return;
       const setlistRepairResult = await repairPendingSetlistSyncState();
+      if (!isCurrentStartup()) return;
       markSyncBaselineEvent("startup-repair:success", {
         media: repairResult,
         setlists: setlistRepairResult,
@@ -1013,7 +1159,9 @@ const TTInner: ParentComponent = (props) => {
       );
     }
 
+    if (!isCurrentStartup()) return;
     const syncModule = await import("@oosync/sync");
+    if (!isCurrentStartup()) return;
     markSyncBaselineEvent("sync-module:loaded", {
       userId: authUserId,
     });
@@ -1022,6 +1170,39 @@ const TTInner: ParentComponent = (props) => {
       config: unknown
     ) => { service: SyncService; stop: () => void };
 
+    const recordSyncStatus = (result: {
+      success?: boolean;
+      errors?: unknown[];
+      timestamp?: string;
+    }) => {
+      setLastSyncSuccess(result?.success ?? null);
+      const errorCount = result?.errors?.length ?? 0;
+      setLastSyncErrorCount(errorCount);
+      if (errorCount > 0) {
+        const first = result?.errors?.[0];
+        let summary: string;
+        try {
+          summary =
+            typeof first === "string" ? first : (JSON.stringify(first) ?? "");
+        } catch {
+          summary = String(first);
+        }
+        setLastSyncErrorSummary(summary);
+      } else {
+        setLastSyncErrorSummary(null);
+      }
+
+      if (syncServiceInstance) {
+        const ts = syncServiceInstance.getLastSyncDownTimestamp();
+        if (ts) setLastSyncTimestamp(ts);
+        const mode = syncServiceInstance.getLastSyncMode();
+        if (mode) setLastSyncMode(mode);
+      } else if (result?.timestamp) {
+        setLastSyncTimestamp(result.timestamp);
+      }
+    };
+
+    stopSyncWorker?.();
     const syncWorker = startWorker(db, {
       supabase,
       userId: authUserId,
@@ -1045,43 +1226,51 @@ const TTInner: ParentComponent = (props) => {
         timestamp?: string;
         affectedTables?: string[];
       }) => {
+        // Teardown does not cancel in-flight oosync requests. Ignore their
+        // callbacks once the user, DB, service, or lifetime has changed.
+        if (!isCurrentSync()) return;
         markSyncBaselineEvent("sync-complete:callback:start", {
           success: result?.success ?? null,
           errorCount: result?.errors?.length ?? 0,
           affectedTables: result?.affectedTables ?? [],
           timestamp: result?.timestamp ?? null,
         });
+        // Publish transport completion before any asynchronous reconciliation. UI refresh
+        // callbacks can finish out of order and must not impersonate a newer sync result.
+        recordSyncStatus(result);
+        setSyncResultVersion((previous) => previous + 1);
+        const completedPullMode = completionPullMode;
+        const completedPullGeneration = completionPullGeneration;
+        completionPullMode = null;
+        completionPullGeneration = null;
+        if (
+          result.success &&
+          !result.errors?.length &&
+          completedPullMode === "full" &&
+          userSyncService?.getLastSyncDownTimestamp() &&
+          !catalogSyncPending()
+        ) {
+          try {
+            await finishUpgradeFullPull(
+              authUserId,
+              persistDb,
+              completedPullGeneration,
+              isCurrentSync
+            );
+          } catch (error) {
+            log.warn(
+              "Keeping upgrade recovery marker after persistence failure",
+              error
+            );
+          }
+        }
+        if (!isCurrentSync()) return;
         const isFirstSyncCompletion = !firstSyncCompletionHandled;
         if (isFirstSyncCompletion) firstSyncCompletionHandled = true;
 
-        setLastSyncSuccess(result?.success ?? null);
-        const errorCount = result?.errors?.length ?? 0;
-        setLastSyncErrorCount(errorCount);
-        if (errorCount > 0) {
-          const first = result?.errors?.[0];
-          let summary: string;
-          try {
-            summary =
-              typeof first === "string" ? first : (JSON.stringify(first) ?? "");
-          } catch {
-            summary = String(first);
-          }
-          setLastSyncErrorSummary(summary);
-        } else {
-          setLastSyncErrorSummary(null);
-        }
-
-        if (syncServiceInstance) {
-          const ts = syncServiceInstance.getLastSyncDownTimestamp();
-          if (ts) setLastSyncTimestamp(ts);
-          const mode = syncServiceInstance.getLastSyncMode();
-          if (mode) setLastSyncMode(mode);
-        } else if (result?.timestamp) {
-          setLastSyncTimestamp(result.timestamp);
-        }
-
         if (!initialSyncComplete()) {
           const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
+          if (!isCurrentSync()) return;
           if (internalId) {
             setUserIdInt(internalId);
             markSyncBaselineEvent("initial-sync:user-profile-found", {
@@ -1114,7 +1303,9 @@ const TTInner: ParentComponent = (props) => {
             userId: authUserId,
             isAnonymousUser,
             skipSync: true,
+            isCurrent: isCurrentSync,
           });
+          if (!isCurrentSync()) return;
           markSyncBaselineEvent("catalog-reconcile:first-sync:done", {
             userId: authUserId,
           });
@@ -1128,7 +1319,8 @@ const TTInner: ParentComponent = (props) => {
             db,
             authUserId
           );
-          void persistDbAfterSync();
+          if (!isCurrentSync()) return;
+          void persistDbAfterSync(isCurrentSync);
         }
 
         setRemoteSyncDownCompletionVersion((prev) => prev + 1);
@@ -1137,12 +1329,14 @@ const TTInner: ParentComponent = (props) => {
           userId: authUserId,
         });
 
-        if (!isFirstSyncCompletion) {
+        if (!isFirstSyncCompletion && result.success) {
           setTimeout(() => {
+            if (!isCurrentSync()) return;
             void reconcileCatalogSelection({
               db,
               userId: authUserId,
               isAnonymousUser,
+              isCurrent: isCurrentSync,
             });
           }, 0);
         }
@@ -1161,11 +1355,13 @@ const TTInner: ParentComponent = (props) => {
         ) {
           syncDiagnosticsRan = true;
           await runSyncDiagnostics(db);
+          if (!isCurrentSync()) return;
         }
 
         signalAffectedChangeCategories(result.affectedTables);
 
-        await runOfflineMediaMaintenance();
+        await runOfflineMediaMaintenance(isCurrentSync);
+        if (!isCurrentSync()) return;
         await captureSyncBaselineSnapshot(
           "after-sync-complete-callback",
           db,
@@ -1182,10 +1378,16 @@ const TTInner: ParentComponent = (props) => {
       isAnonymousUser,
     });
 
+    const stop = () => {
+      syncStopped = true;
+      syncWorker.stop();
+    };
+
     // E2E-only: expose sync control surface for Playwright
     if ((globalThis.window as any)?.__ttTestApi) {
       (globalThis.window as any).__ttSyncControl = {
         stop: async () => {
+          stop();
           try {
             await syncWorker.service.destroy();
           } catch (e) {
@@ -1206,7 +1408,10 @@ const TTInner: ParentComponent = (props) => {
       };
     }
 
-    return syncWorker;
+    userSyncService = syncWorker.service;
+    // Publish synchronously with creation, before any completion can resume.
+    stopSyncWorker = stop;
+    syncServiceInstance = syncWorker.service;
   }
 
   // ---------------------------------------------------------------------------
@@ -1239,7 +1444,8 @@ const TTInner: ParentComponent = (props) => {
 
   async function initializeSqliteDbWithRetry(
     userId: string,
-    context: "anonymous" | "authenticated"
+    context: "anonymous" | "authenticated",
+    isCurrent: () => boolean
   ): Promise<SqliteDatabase | null> {
     const maxAttempts = 4;
     let attempt = 0;
@@ -1247,10 +1453,21 @@ const TTInner: ParentComponent = (props) => {
       context === "anonymous" ? "Anonymous DB init" : "DB init";
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      if (!isCurrent()) return null;
       attempt += 1;
       try {
-        return await initializeSqliteDb(userId);
+        setUpgradeBlocked(null);
+        return await withUpgradeIdentity(
+          userId,
+          context === "authenticated",
+          () => initializeSqliteDb(userId)
+        );
       } catch (error) {
+        if (!isCurrent()) return null;
+        if (error instanceof BrowserSqliteMigrationBlockedError) {
+          setUpgradeBlocked(error.reason);
+          throw error;
+        }
         if (isE2eDbClearInProgress()) {
           console.warn(
             `[TTAuthProvider] ${contextLabel} aborted during E2E clear; not retrying`
@@ -1269,8 +1486,12 @@ const TTInner: ParentComponent = (props) => {
     }
   }
 
-  async function initializeAnonymousDatabase(anonymousUserId: string) {
-    if (isE2eDbClearInProgress()) return;
+  async function initializeAnonymousDatabase(
+    anonymousUserId: string,
+    testLifetime?: () => boolean
+  ) {
+    const isCurrent = testLifetime ?? captureLifetime(anonymousUserId);
+    if (!isCurrent() || isE2eDbClearInProgress()) return;
     if (isInitializing) return;
 
     const existingDb = localDb();
@@ -1291,9 +1512,10 @@ const TTInner: ParentComponent = (props) => {
       );
       const db = await initializeSqliteDbWithRetry(
         anonymousUserId,
-        "anonymous"
+        "anonymous",
+        isCurrent
       );
-      if (!db) return;
+      if (!db || !isCurrent()) return;
 
       setLocalDb(db);
       if (autoPersistCleanup) {
@@ -1313,8 +1535,10 @@ const TTInner: ParentComponent = (props) => {
           .where(eq(userProfile.id, anonymousUserId))
           .limit(1);
 
+        if (!isCurrent()) return;
         if (!existingLocal || existingLocal.length === 0) {
           const rawDb = await getSqliteInstance();
+          if (!isCurrent()) return;
           try {
             if (rawDb) suppressSyncTriggers(rawDb);
           } catch (e) {
@@ -1358,23 +1582,23 @@ const TTInner: ParentComponent = (props) => {
         throw localError;
       }
 
+      if (!isCurrent()) return;
       setCatalogSyncPending(true);
 
       // Offline-first: local SQLite is immediately usable
       setUserIdInt(anonymousUserId);
 
+      // An injected local identity has no authenticated session for sync.
+      if (testLifetime) {
+        setInitialSyncComplete(true);
+        return;
+      }
       const isSyncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
       if (isSyncDisabled) {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
         setInitialSyncComplete(true);
       } else {
-        const syncWorker = await startSyncWorkerForUser(
-          db,
-          anonymousUserId,
-          true
-        );
-        stopSyncWorker = syncWorker.stop;
-        syncServiceInstance = syncWorker.service;
+        await startSyncWorkerForUser(db, anonymousUserId, true);
       }
     } catch (error) {
       if (isTransientDbInitError(error)) {
@@ -1383,12 +1607,13 @@ const TTInner: ParentComponent = (props) => {
         log.error("Failed to initialize anonymous local database:", error);
       }
     } finally {
-      isInitializing = false;
+      if (isCurrent()) isInitializing = false;
     }
   }
 
   async function initializeLocalDatabase(user: User) {
-    if (isE2eDbClearInProgress()) return;
+    const isCurrent = captureLifetime(user.id);
+    if (!isCurrent() || isE2eDbClearInProgress()) return;
 
     const userId = user.id;
     const currentUserId = userIdInt();
@@ -1403,12 +1628,18 @@ const TTInner: ParentComponent = (props) => {
       setInitialSyncComplete(false);
       setUserIdInt(null);
 
-      const db = await initializeSqliteDbWithRetry(userId, "authenticated");
-      if (!db) return;
+      const db = await initializeSqliteDbWithRetry(
+        userId,
+        "authenticated",
+        isCurrent
+      );
+      if (!db || !isCurrent()) return;
       markSyncBaselineEvent("local-db:init:ready", { userId });
       await captureSyncBaselineSnapshot("after-local-db-init", db, userId);
+      if (!isCurrent()) return;
 
       const userProfileAnchor = await ensureLocalUserProfileAnchor(db, user);
+      if (!isCurrent()) return;
       setUserIdInt(userProfileAnchor.id);
       if (!userProfileAnchor.created) {
         setInitialSyncComplete(true);
@@ -1420,6 +1651,7 @@ const TTInner: ParentComponent = (props) => {
       });
 
       await clearOldOutboxItems(db);
+      if (!isCurrent()) return;
       markSyncBaselineEvent("local-db:old-outbox-cleared", { userId });
 
       setLocalDb(db);
@@ -1438,9 +1670,7 @@ const TTInner: ParentComponent = (props) => {
         setInitialSyncComplete(true);
         markSyncBaselineEvent("sync:disabled", { userId });
       } else {
-        const syncWorker = await startSyncWorkerForUser(db, userId, false);
-        stopSyncWorker = syncWorker.stop;
-        syncServiceInstance = syncWorker.service;
+        await startSyncWorkerForUser(db, userId, false);
         log.info("Sync worker started for authenticated user");
       }
     } catch (error) {
@@ -1454,35 +1684,36 @@ const TTInner: ParentComponent = (props) => {
         error: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      isInitializing = false;
+      if (isCurrent()) isInitializing = false;
       markSyncBaselineEvent("local-db:init:finally", { userId });
     }
   }
 
-  async function cleanupOnSignOut() {
+  function cleanupOnSignOut(): Promise<void> {
+    if (signOutCleanup) return signOutCleanup;
+    needsSignOutCleanup = true;
+    setUpgradeBlocked(null);
     catalogSelectionReconciledKey = null;
     reconcileRunCount = 0;
 
-    if (stopSyncWorker) {
-      stopSyncWorker();
-      stopSyncWorker = null;
-      syncServiceInstance = null;
-    }
-
-    try {
-      await closeSqliteDb();
-    } catch (closeError) {
-      console.warn("⚠️ Failed to close database:", closeError);
-    }
-
-    if (autoPersistCleanup) {
-      autoPersistCleanup();
-      autoPersistCleanup = null;
-    }
-
+    const drained = drainSync();
+    autoPersistCleanup?.();
+    autoPersistCleanup = null;
+    // Stop exposing this database while shutdown drains its outstanding work.
     setLocalDb(null);
     setUserIdInt(null);
     setInitialSyncComplete(false);
+
+    signOutCleanup = (async () => {
+      // A timer stop alone cannot protect SQLite: a request may already be
+      // applying remote rows or persisting. Do not close if draining fails.
+      await drained;
+      await closeSqliteDb();
+      needsSignOutCleanup = false;
+    })().finally(() => {
+      signOutCleanup = null;
+    });
+    return signOutCleanup;
   }
 
   // ---------------------------------------------------------------------------
@@ -1493,6 +1724,30 @@ const TTInner: ParentComponent = (props) => {
     on(rhizome.user, async (currentUser, prevUser) => {
       // User signed in (null → User)
       if (currentUser && !prevUser) {
+        if (needsSignOutCleanup) {
+          const isCurrent = captureLifetime(currentUser.id);
+          try {
+            await cleanupOnSignOut();
+          } catch (error) {
+            console.error(
+              "[TTAuthProvider] Previous database shutdown failed:",
+              error
+            );
+            return;
+          }
+          if (!isCurrent()) return;
+        }
+        const pendingInjection = injectedTestInitialization;
+        if (pendingInjection) {
+          invalidateSync();
+          const isCurrent = captureLifetime(currentUser.id);
+          // The runtime shares its pending initialization across users. Let it
+          // settle before asking it to persist/close and switch databases.
+          await pendingInjection.catch(() => {
+            // A failed test initialization must not prevent real sign-in.
+          });
+          if (!isCurrent()) return;
+        }
         markSyncBaselineEvent("auth:user-signed-in", {
           userId: currentUser.id,
           anonymous: isUserAnonymous(currentUser),
@@ -1511,7 +1766,11 @@ const TTInner: ParentComponent = (props) => {
         });
         // For anonymous users: the signOut path preserves their session in localStorage;
         // only clean up in-process state (DB close, sync stop).
-        await cleanupOnSignOut();
+        try {
+          await cleanupOnSignOut();
+        } catch (error) {
+          console.error("[TTAuthProvider] Database shutdown failed:", error);
+        }
       }
     })
   );
@@ -1585,7 +1844,31 @@ const TTInner: ParentComponent = (props) => {
    */
   const signInAnonymously = async (injectedUserId?: string) => {
     if (injectedUserId) {
-      await initializeAnonymousDatabase(injectedUserId);
+      const currentUser = rhizome.user();
+      if (currentUser?.id === injectedUserId) {
+        await initializeAnonymousDatabase(injectedUserId);
+        return { error: null };
+      }
+      if (currentUser) {
+        return {
+          error: new Error(
+            "Local test injection cannot replace an authenticated user"
+          ),
+        };
+      }
+      const version = lifecycleVersion;
+      const ownsTestLifetime = () =>
+        !disposed && version === lifecycleVersion && rhizome.user() === null;
+      const pending =
+        injectedTestInitialization ??
+        initializeAnonymousDatabase(injectedUserId, ownsTestLifetime);
+      injectedTestInitialization = pending;
+      try {
+        await pending;
+      } finally {
+        if (injectedTestInitialization === pending)
+          injectedTestInitialization = null;
+      }
       return { error: null };
     }
     // Session restoration + new anon sign-in is handled via overrideSignInAnonymously
@@ -1644,13 +1927,7 @@ const TTInner: ParentComponent = (props) => {
       const db = localDb();
       const currentUser = rhizome.user();
       if (db && currentUser && !stopSyncWorker) {
-        const syncWorker = await startSyncWorkerForUser(
-          db,
-          currentUser.id,
-          false
-        );
-        stopSyncWorker = syncWorker.stop;
-        syncServiceInstance = syncWorker.service;
+        await startSyncWorkerForUser(db, currentUser.id, false);
       }
 
       return { error: null };
@@ -1678,22 +1955,43 @@ const TTInner: ParentComponent = (props) => {
           })
         );
       }
-      // Close DB and clear in-process state (no supabase signOut)
+    }
+
+    // Drain while credentials are still valid. Revocation during an upload
+    // could otherwise turn an ordinary sign-out into a failed sync.
+    let cleanupError: unknown;
+    let cleanupFailed = false;
+    try {
       await cleanupOnSignOut();
-      // Manually clear rhizome's in-memory state by calling supabase signOut
-      // Note: this will also trigger cleanupOnSignOut via the createEffect, but
-      // cleanupOnSignOut is idempotent so double-calling is safe.
+    } catch (error) {
+      cleanupError = error;
+      cleanupFailed = true;
     }
 
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
 
-    if (isAnon) {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      if (error) throw error;
-    } else {
-      await rhizome.signOut();
+    try {
+      if (isAnon) {
+        const { error } = await supabase.auth.signOut({ scope: "local" });
+        if (error) throw error;
+      } else {
+        await rhizome.signOut();
+      }
+    } catch (error) {
+      // Rhizome retains the user when revocation fails. Restore its database
+      // only after successful cleanup; never replace an undrained connection.
+      const remainingUser = rhizome.user();
+      if (!needsSignOutCleanup && remainingUser) {
+        if (isUserAnonymous(remainingUser)) {
+          await initializeAnonymousDatabase(remainingUser.id);
+        } else {
+          await initializeLocalDatabase(remainingUser);
+        }
+      }
+      throw error;
     }
+    if (cleanupFailed) throw cleanupError;
 
     setLocalDb(null);
     setUserIdInt(null);
@@ -1723,33 +2021,44 @@ const TTInner: ParentComponent = (props) => {
     }
   };
 
-  const forceSyncDown = async (opts?: { full?: boolean }) => {
-    if (!syncServiceInstance) {
+  const forceSyncDown = async (
+    opts?: { full?: boolean },
+    isCurrent: () => boolean = () => true
+  ) => {
+    if (!isCurrent()) return;
+    const service = syncServiceInstance;
+    if (!service) {
       console.warn("⚠️ [ForceSyncDown] Sync service not available");
       return;
     }
     try {
+      let result: Awaited<ReturnType<SyncService["syncDown"]>>;
       try {
-        await (opts?.full
-          ? syncServiceInstance.forceFullSyncDown()
-          : syncServiceInstance.syncDown());
+        result = await (opts?.full
+          ? service.forceFullSyncDown()
+          : service.syncDown());
       } catch (error) {
         if (
           error instanceof SyncInProgressError ||
           (error instanceof Error && error.name === "SyncInProgressError")
         ) {
           await waitForSyncIdle();
-          await (opts?.full
-            ? syncServiceInstance.forceFullSyncDown()
-            : syncServiceInstance.syncDown());
+          if (!isCurrent() || syncServiceInstance !== service) return;
+          result = await (opts?.full
+            ? service.forceFullSyncDown()
+            : service.syncDown());
         } else {
           throw error;
         }
       }
+      if (!isCurrent() || syncServiceInstance !== service) return;
+      if (!result.success) {
+        throw new Error(result.errors.join("; ") || "Sync download failed");
+      }
       setRemoteSyncDownCompletionVersion((prev) => prev + 1);
-      const ts = syncServiceInstance.getLastSyncDownTimestamp();
+      const ts = service.getLastSyncDownTimestamp();
       if (ts) setLastSyncTimestamp(ts);
-      const mode = syncServiceInstance.getLastSyncMode();
+      const mode = service.getLastSyncMode();
       if (mode) setLastSyncMode(mode);
     } catch (error) {
       console.error("❌ [ForceSyncDown] Sync down failed:", error);
@@ -1757,24 +2066,38 @@ const TTInner: ParentComponent = (props) => {
     }
   };
 
-  const forceSyncUp = async (opts?: { allowDeletes?: boolean }) => {
-    if (!syncServiceInstance) {
+  const forceSyncUp = async (
+    opts?: { allowDeletes?: boolean },
+    isCurrent: () => boolean = () => true
+  ) => {
+    if (!isCurrent()) return;
+    // Device-only actions still save locally; never ask the pull-only service
+    // to upload or manufacture a successful sync completion for that no-op.
+    if (isUserAnonymous(rhizome.user())) return;
+    const service = syncServiceInstance;
+    if (!service) {
       console.warn("⚠️ [ForceSyncUp] Sync service not available");
       return;
     }
     try {
+      let result: Awaited<ReturnType<SyncService["syncUp"]>>;
       try {
-        await syncServiceInstance.syncUp(opts);
+        result = await service.syncUp(opts);
       } catch (error) {
         if (
           error instanceof SyncInProgressError ||
           (error instanceof Error && error.name === "SyncInProgressError")
         ) {
           await waitForSyncIdle();
-          await syncServiceInstance.syncUp(opts);
+          if (!isCurrent() || syncServiceInstance !== service) return;
+          result = await service.syncUp(opts);
         } else {
           throw error;
         }
+      }
+      if (!isCurrent() || syncServiceInstance !== service) return;
+      if (!result.success) {
+        throw new Error(result.errors.join("; ") || "Sync upload failed");
       }
       setRemoteSyncDownCompletionVersion((prev) => prev + 1);
     } catch (error) {
@@ -1793,24 +2116,16 @@ const TTInner: ParentComponent = (props) => {
       catalogSelectionReconciledKey = null;
       reconcileRunCount = 0;
 
-      const serviceWithDestroy = syncServiceInstance;
-      if (serviceWithDestroy?.destroy) {
-        try {
-          await serviceWithDestroy.destroy();
-        } catch (error) {
-          console.warn(
-            "[ForceCleanLocalReset] Failed to destroy sync service cleanly:",
-            error
-          );
-        }
-      }
+      // Invalidate completion ownership before asynchronous teardown starts.
+      const drained = drainSync();
+      const ownsReset = captureLifetime(currentUser.id);
+      await drained;
 
-      if (stopSyncWorker) {
-        stopSyncWorker();
-        stopSyncWorker = null;
+      if (!ownsReset()) {
+        throw new Error(
+          "Local reset did not run because the active session changed"
+        );
       }
-      syncServiceInstance = null;
-
       if (autoPersistCleanup) {
         autoPersistCleanup();
         autoPersistCleanup = null;
@@ -1825,7 +2140,16 @@ const TTInner: ParentComponent = (props) => {
       setLastSyncErrorCount(0);
       setLastSyncErrorSummary(null);
 
+      // A blocked switch may leave the runtime pointing at the previous account.
+      // Delete only the explicitly confirmed account, then reload the runtime.
+      if (upgradeBlocked()) {
+        await discardBlockedDatabase(currentUser.id);
+        if (ownsReset()) globalThis.location.reload();
+        return;
+      }
+
       await clearSqliteDb();
+      if (!ownsReset()) return;
 
       if (isUserAnonymous(currentUser)) {
         await initializeAnonymousDatabase(currentUser.id);
@@ -1964,6 +2288,7 @@ const TTInner: ParentComponent = (props) => {
       <div
         data-auth-initialized={!rhizome.loading()}
         data-sync-version={remoteSyncDownCompletionVersion()}
+        data-sync-result-version={syncResultVersion()}
         data-sync-success={
           lastSyncSuccess() === null ? "" : String(lastSyncSuccess())
         }
@@ -1972,7 +2297,16 @@ const TTInner: ParentComponent = (props) => {
         data-initial-sync-complete={String(initialSyncComplete())}
         style={{ display: "contents" }}
       >
-        {props.children}
+        <Show when={upgradeBlocked()} fallback={props.children}>
+          {(reason) => (
+            <DatabaseUpgradeBlocked
+              reason={reason()}
+              userId={rhizome.user()?.id}
+              account={rhizome.user()?.email ?? "Anonymous account"}
+              onDiscard={forceCleanLocalReset}
+            />
+          )}
+        </Show>
       </div>
     </TTAuthContext.Provider>
   );

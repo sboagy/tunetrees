@@ -101,22 +101,25 @@ test.describe("Practice Evaluation Interaction", () => {
   test("should enable Submit button with count when evaluation selected", async ({
     page,
   }) => {
-    const submitButton = page.locator('button:has-text("Submit")');
+    const submitButton = page.getByTestId("submit-evaluations-button");
 
-    // Pick a visible (Not Set) row and select "Good"
-    const ids = await getNotSetIds(page, 1);
-    const targetId = ids[0];
-    const trigger = page.getByTestId(`recall-eval-${targetId}`);
-    await trigger.scrollIntoViewIfNeeded();
-    await selectEvalFor(targetId, "good");
+    // Setup's final sync can refresh the grid after its readiness check. Target
+    // the seeded tune and await its control instead of sampling the DOM count.
+    const trigger = page.getByTestId(`recall-eval-${TEST_TUNE_MORRISON_ID}`);
+    await expect(trigger).toBeVisible({ timeout: 15000 });
+    await expect(trigger).toContainText("(Not Set)");
+    await expect(submitButton).toBeDisabled();
+    await selectEvalFor(TEST_TUNE_MORRISON_ID, "good");
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // Verify dropdown now shows Good and Submit is enabled
-    await expect(page.getByTestId(`recall-eval-${targetId}`)).toContainText(
-      "Good"
-    );
+    await expect(trigger).toContainText("Good");
     await expect(submitButton).toBeEnabled();
+    await expect(submitButton).toHaveText(/^Submit\s*1$/);
   });
 
+  // Skipped: legacy count assertions read asynchronous staging updates without
+  // waiting and allow a nonzero baseline. Re-enable after deterministic fixture
+  // setup and awaited count/disabled-state assertions replace those assumptions.
   test.skip("should disable Submit button when evaluation changed to (Not Set)", async ({
     page,
   }) => {
@@ -161,33 +164,38 @@ test.describe("Practice Evaluation Interaction", () => {
 
   test("should correctly track count with multiple evaluations", async ({
     page,
+    testUser,
   }) => {
-    // Using explicit row targets below for stability
-    const submitButton = page.locator('button:has-text("Submit")');
-    const baselineText = await submitButton.textContent();
-    const baselineMatch = baselineText?.match(/Submit(\d+)/);
-    const baseline = baselineMatch ? Number.parseInt(baselineMatch[1], 10) : 0;
+    const submitButton = page.getByTestId("submit-evaluations-button");
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
+    const firstTrigger = page.getByTestId(
+      `recall-eval-${TEST_TUNE_MORRISON_ID}`
+    );
+    const secondTrigger = page.getByTestId(`recall-eval-${privateTune1Id}`);
 
-    // Pick two (Not Set) rows to ensure count increases
-    const ids = Array.from(new Set(await getNotSetIds(page, 2)));
-    if (ids.length >= 1) {
-      await selectEvalFor(ids[0], "good");
-      await expect(page.getByTestId(`recall-eval-${ids[0]}`)).not.toContainText(
-        "(Not Set)"
-      );
-    }
-    if (ids.length >= 2) {
-      await selectEvalFor(ids[1], "easy");
-      await expect(page.getByTestId(`recall-eval-${ids[1]}`)).not.toContainText(
-        "(Not Set)"
-      );
-    }
-    const afterAll = await submitButton.textContent();
-    const matchAll = afterAll?.match(/Submit(\d+)/);
-    const total = matchAll ? Number.parseInt(matchAll[1], 10) : baseline;
-    expect(total).toBeGreaterThanOrEqual(baseline);
+    // Both seeded rows are required; a transient empty grid must not let this
+    // test skip its selections and pass with an unchanged count.
+    await expect(firstTrigger).toBeVisible({ timeout: 15000 });
+    await expect(secondTrigger).toBeVisible({ timeout: 15000 });
+    await expect(firstTrigger).toContainText("(Not Set)");
+    await expect(secondTrigger).toContainText("(Not Set)");
+    await expect(submitButton).toBeDisabled();
+
+    await selectEvalFor(TEST_TUNE_MORRISON_ID, "good");
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(firstTrigger).toContainText("Good");
+    await expect(submitButton).toHaveText(/^Submit\s*1$/);
+
+    await selectEvalFor(privateTune1Id, "easy");
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(secondTrigger).toContainText("Easy");
+    await expect(submitButton).toBeEnabled();
+    await expect(submitButton).toHaveText(/^Submit\s*2$/);
   });
 
+  // Skipped: this legacy test conditionally selects however many rows it finds
+  // and reads counts before staging settles. Re-enable with exactly two seeded
+  // targets and awaited count assertions for each clear operation.
   test.skip("should correctly decrement count when clearing evaluations", async ({
     page,
   }) => {
@@ -214,7 +222,7 @@ test.describe("Practice Evaluation Interaction", () => {
     const afterAdd = await parseCount();
     expect(afterAdd).toBe(baseline + numToAdd);
 
-    // Clear evaluations for the same two rows
+    // Clear Evaluations for the same two rows
     if (ids.length >= 1) {
       await selectEvalFor(ids[0], "not-set");
     }

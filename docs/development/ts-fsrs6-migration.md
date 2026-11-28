@@ -51,7 +51,8 @@ TuneTrees' custom scheduler interface and FSRS fallback remain unchanged.
 
 ## Regression coverage
 
-`tests/lib/fsrs-service.test.ts` captures all four ratings for new, learning,
+`tests/lib/fsrs-compatibility.test.ts` (renamed during #426 cleanup and now
+executing the active goal calculator) captures all four ratings for new, learning,
 review and relearning cards, persisted history, 17/19/21-element stored weights,
 custom learning/relearning steps, UTC elapsed-day behavior, and fuzz determinism
 and caps. The 19 snapshots were captured against 5.4.2 before the upgrade; only

@@ -302,6 +302,19 @@ async function cleanupRepertoire(userKey: string, repertoireId: string) {
     );
   }
 
+  // Visiting the temporary repertoire saves grid state referencing it. Remove
+  // that dependent state before deleting the repertoire (authenticated RLS
+  // keeps this cleanup scoped to the test user).
+  const { error: clearTableStateError } = await supabase
+    .from("table_state")
+    .delete()
+    .eq("repertoire_id", repertoireId);
+  if (clearTableStateError) {
+    throw new Error(
+      `Failed to clear table_state during cleanup: ${clearTableStateError.message}`
+    );
+  }
+
   const { error: deleteRepertoireError } = await supabase
     .from("repertoire")
     .delete()

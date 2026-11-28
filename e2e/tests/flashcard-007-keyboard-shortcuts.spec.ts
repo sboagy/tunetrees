@@ -35,6 +35,31 @@ test.describe
       });
     });
 
+    test("settings controls do not trigger background flashcard shortcuts", async ({
+      page,
+    }) => {
+      const app = new TuneTreesPage(page);
+      await app.enableFlashcardMode();
+      const total = await app.waitForCounterValue(100, 200, 2);
+      await app.userMenuButton.click();
+      await app.userSettingsButton.click();
+      const close = page.getByTestId("settings-close-button");
+      await expect(close).toBeVisible({ timeout: 10000 });
+      await close.focus();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("3");
+      await close.click();
+      await expect(page.getByTestId("settings-modal")).toHaveCount(0, {
+        timeout: 10000,
+      });
+      await expect(app.flashcardHeaderCounter).toHaveText(`1 of ${total}`, {
+        timeout: 10000,
+      });
+      await expect(
+        app.flashcardView.getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      ).toContainText("(Not Set)", { timeout: 10000 });
+    });
+
     test("01. Right arrow navigates to next card", async ({ page }) => {
       const app = new TuneTreesPage(page);
       await app.enableFlashcardMode();
@@ -210,6 +235,9 @@ test.describe
         .first();
       await expect(evalButton1).toContainText(/Good/i, { timeout: 10000 });
 
+      // The selected label updates before the asynchronous preview finishes.
+      // Wait until the picker accepts another evaluation before changing it.
+      await expect(evalButton1).toBeEnabled({ timeout: 10000 });
       // Change to Easy
       await page.keyboard.press("4");
 

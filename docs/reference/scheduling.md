@@ -1,330 +1,112 @@
-# Spaced Repetition Reference
-
-Technical reference for TuneTrees scheduling algorithms.
-
-## Overview
-
-TuneTrees uses the **FSRS algorithm** (Free Spaced Repetition Scheduler) for scheduling tune reviews, with SM2 as a fallback option.
-
-## FSRS Algorithm
-
-### Library
-
-Uses [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) for calculations.
-
-### Core Concepts
-
-| Term | Description |
-|------|-------------|
-| **Stability** | How well you remember the item (higher = better) |
-| **Difficulty** | Inherent item difficulty (0-10 scale) |
-| **State** | Learning stage: New, Learning, Review, Relearning |
-| **Interval** | Days until next review |
-
-### States
-
-```
-New → Learning → Review ←→ Relearning
-                    ↑___________|
-                    (on lapse)
-```
-
-1. **New (0)**: Never reviewed
-2. **Learning (1)**: Initial learning phase (short intervals)
-3. **Review (2)**: Graduated to regular reviews
-4. **Relearning (3)**: Failed review, back to learning
-
-### Rating Scale
-
-| Rating | Value | Effect |
-|--------|-------|--------|
-| Again | 1 | Forgot completely, reset to learning |
-| Hard | 2 | Struggled, shorter interval |
-| Good | 3 | Normal recall, scheduled interval |
-| Easy | 4 | Perfect recall, longer interval |
-
-### Calculation
-
-```typescript
-import { createEmptyCard, fsrs, Rating } from "ts-fsrs";
-
-const f = fsrs();
-const card = createEmptyCard();
-const now = new Date();
-
-// Calculate next state for each possible rating
-const schedulingCards = f.repeat(card, now);
-
-// Get result for "Good" rating
-const nextCard = schedulingCards[Rating.Good].card;
-console.log({
-  stability: nextCard.stability,
-  difficulty: nextCard.difficulty,
-  interval: nextCard.scheduled_days,
-  due: nextCard.due,
-});
-```
-
-## Implementation
-
-### Staging Service
-
-**File:** `src/lib/services/practice-staging.ts`
-
-```typescript
-export async function stagePracticeEvaluation(
-  db: SqliteDatabase,
-  userId: string,
-  repertoireId: string,
-  tuneId: string,
-  evaluation: string,  // "again" | "hard" | "good" | "easy"
-  goal: string,
-  technique: string
-): Promise<FSRSPreviewMetrics>
-```
-
-1. Get latest practice_record for this tune
-2. Convert to FSRS Card object
-3. Run FSRS calculation
-4. Store preview in `table_transient_data`
-5. Return preview metrics for UI
-
-### Commit Service
-
-**File:** `src/lib/services/practice-recording.ts`
-
-```typescript
-export async function commitStagedEvaluations(
-  db: SqliteDatabase,
-  userId: string,
-  repertoireId: string,
-  windowStartUtc?: string
-): Promise<{ success: boolean; count: number }>
-```
-
-1. Read staged evaluations from `table_transient_data`
-2. Create `practice_record` for each
-3. Update `repertoire_tune.current` (next due date)
-4. Mark queue items as completed
-5. Clear staging data
-
-## Database Schema
-
-### practice_record
-
-Immutable history of all practice events:
-
-```sql
-CREATE TABLE practice_record (
-  id TEXT PRIMARY KEY,
-  repertoire_ref TEXT NOT NULL,
-  tune_ref TEXT NOT NULL,
-  practiced TEXT NOT NULL,     -- ISO timestamp
-  quality INTEGER NOT NULL,    -- 1-4 rating
-  interval INTEGER,            -- days until next
-  repetitions INTEGER,         -- successful review count
-  due TEXT,                    -- next review date
-  stability REAL,              -- FSRS stability
-  difficulty REAL,             -- FSRS difficulty (0-10)
-  state INTEGER,               -- FSRS state
-  step INTEGER,                -- learning step
-  elapsed_days INTEGER,        -- days since last review
-  lapses INTEGER,              -- forget count
-  goal TEXT,                   -- "recall", "fluency"
-  technique TEXT,              -- practice technique
-  UNIQUE(tune_ref, repertoire_ref, practiced)
-);
-```
-
-### repertoire_tune
-
-Current scheduling state:
-
-```sql
-CREATE TABLE repertoire_tune (
-  repertoire_ref TEXT NOT NULL,
-  tune_ref TEXT NOT NULL,
-  scheduled TEXT,              -- next scheduled review
-  current TEXT,                -- calculated due date
-  learned TEXT,                -- when marked as learned
-  PRIMARY KEY (repertoire_ref, tune_ref)
-);
-```
-
-### daily_practice_queue
-
-Frozen daily snapshot:
-
-```sql
-CREATE TABLE daily_practice_queue (
-  id TEXT PRIMARY KEY,
-  user_ref TEXT NOT NULL,
-  repertoire_ref TEXT NOT NULL,
-  tune_ref TEXT NOT NULL,
-  bucket INTEGER NOT NULL,         -- 1=Due, 2=Lapsed, 3=Backfill
-  order_index INTEGER NOT NULL,    -- ordering within bucket
-  window_start_utc TEXT NOT NULL,  -- practice day start
-  completed_at TEXT,               -- when submitted (NULL if not done)
-  -- Snapshot fields (frozen at queue creation)
-  snapshot_coalesced_ts TEXT,
-  scheduled_snapshot TEXT,
-  latest_due_snapshot TEXT,
-  UNIQUE(user_ref, repertoire_ref, window_start_utc, tune_ref)
-);
-```
-
-## Practice Queue Generation
-
-**File:** `src/lib/services/practice-queue.ts`
-
-### Buckets
-
-| Bucket | Description | Priority |
-|--------|-------------|----------|
-| 1 | Due today (scheduled within window) | Highest |
-| 2 | Recently lapsed (within delinquency window) | High |
-| 3 | New/unscheduled tunes (backfill) | Medium |
-| 4 | Old lapsed (beyond delinquency) | Low |
-
-### Algorithm
-
-```typescript
-function generateQueue(userId, repertoireId, date):
-  1. Compute scheduling windows (startTs, endTs, windowFloorTs)
-  2. Check if queue exists for today → return if found
-  3. Query practice_list_staged VIEW for each bucket
-  4. Build queue rows with bucket + order_index
-  5. Insert into daily_practice_queue
-  6. Return frozen queue
-```
-
-### Queue Stability
-
-The queue is frozen for the entire day:
-- New practice events update `practice_record` and `repertoire_tune.scheduled`
-- But `daily_practice_queue` ordering doesn't change
-- Completed items marked with `completed_at`
-
-## UI Integration
-
-### Evaluation Flow
-
-```
-User selects "Good"
-       ↓
-handleRecallEvalChange()
-       ↓
-stagePracticeEvaluation()
-       ↓
-FSRS calculates preview
-       ↓
-Store in table_transient_data
-       ↓
-UI shows preview (next due, interval)
-       ↓
-User clicks "Submit"
-       ↓
-commitStagedEvaluations()
-       ↓
-Create practice_record
-       ↓
-Update repertoire_tune.current
-       ↓
-Mark queue item completed
-       ↓
-Clear staging data
-```
-
-### Practice List VIEW
-
-The `practice_list_staged` VIEW merges:
-- Tune metadata
-- Repertoire association
-- Latest practice_record
-- Staged evaluation (if any)
-
-This allows the UI to show real-time previews before commit.
-
-## SM2 Fallback
-
-SM2 algorithm available as alternative:
-
-```typescript
-// repertoire.sr_alg_type = "sm2"
-```
-
-Uses classic SuperMemo 2 algorithm with EF (easiness factor).
-
-## Scheduling Plugins (Goal-Based Extensions)
-
-TuneTrees supports goal-based scheduling via plugins. Scheduling plugins are
-executed in a QuickJS sandbox and can override the full schedule output.
-
-Plugins can be scoped to goals using the `plugin.goals` JSON array. If the list
-is empty, the plugin is treated as a match for any goal.
-
-### Plugin Contract
-
-Plugins must export a factory function:
-
-```typescript
-function createScheduler({ fsrsScheduler, queryDb }) {
-       return {
-              async processFirstReview(payload) {
-                     // payload = { input, prior, preferences, scheduling, fallback }
-                     return payload.fallback;
-              },
-              async processReview(payload) {
-                     return payload.fallback;
-              },
-       };
-}
-```
-
-**Payload:**
-- `input`: `{ repertoireRef, tuneRef, quality, practiced, goal, technique }`
-- `prior`: latest `practice_record` row or `null`
-- `preferences`: user FSRS preferences
-- `scheduling`: user scheduling options
-- `fallback`: serialized FSRS schedule (see below)
-
-**Return value:** an object shaped like `NextReviewSchedule` (strings are OK; the
-host normalizes). Partial objects retain the missing FSRS fields. Use
-`payload.fallback` as a template, or return it to explicitly select FSRS. Return
-`null` to decline an override and use the goal ladder (if available), then FSRS.
-An omitted return, array, or primitive other than `null` is a plugin error.
-Errors notify the user and allow staging/submission with default scheduling.
-
-The factory is synchronous. Review methods may be asynchronous. `queryDb`,
-`fsrsScheduler.processFirstReview`, `fsrsScheduler.processReview`, and `fetchUrl`
-return promises and must be awaited or returned. See the
-[plugin runtime and recovery contract](../development/extensibility.md).
-
-### Helpers
-
-- `fsrsScheduler`: full FSRS scheduler interface, callable from plugins for
-       fallback results.
-- `queryDb(sql)`: read-only SQL access with a 500-row limit and table allowlist.
-       Allowed tables: `practice_record`, `repertoire_tune`, `daily_practice_queue`,
-       `user_profile`, `prefs_scheduling_options`, `prefs_spaced_repetition`.
-
-### Serialized Schedule Shape
-
-```typescript
-{
-       nextDue: string;
-       lastReview: string;
-       state: number;
-       stability: number;
-       difficulty: number;
-       elapsedDays: number;
-       scheduledDays: number;
-       reps: number;
-       lapses: number;
-       interval: number;
-}
-```
-
----
-
-For practice flow details, see [practice_flow.md](../practice_flow.md).
+# Goals and Scheduling Reference
+
+Current #426 behavior. For the implementation flow, see [Practice Flow](../practice_flow.md).
+For deployment and existing-data conversion, see the [cutover runbook](../development/goals-cutover.md).
+
+## Goals and Evaluation Choices
+
+Each tune has one goal within its repertoire. Built-in display defaults are
+**Learn, Session, Polish, Recall, and Fluency**. Labels, descriptions, evaluation
+choices and scheduling options can be overridden by the user. Defaults live in
+[`builtins.ts`](../../src/lib/goals/builtins.ts); historical events retain the
+labels recorded when they were submitted.
+
+Open **Settings → Goals** to edit a goal. Each goal dialog has its own Save Changes
+and guarded Cancel/Close. Reset to Defaults changes that dialog's draft until saved.
+Evaluation choices have their own immediate Save Changes boundary: canceling the
+parent goal does not undo a saved choice. Saving a choice for a new goal also creates
+that goal; missing required goal details must be completed first.
+
+Shared calendar preferences are editable and saved, but do not yet control queue
+scheduling. That integration is tracked in [#959](https://github.com/sboagy/tunetrees/issues/959).
+
+## Schedulers
+
+| Scheduler | Evaluation effect | State |
+| --- | --- | --- |
+| Recall / FSRS-6 | Choices map to Again, Hard, Good or Easy; FSRS computes the next state and due time | Versioned FSRS JSON |
+| Interval ladder | Restart, step back, repeat, or advance through configured durations | Ladder index and interval-list hash in JSON |
+| Explicit custom plugin | Choices map to named actions declared by the selected plugin | Validated, versioned plugin JSON envelope |
+
+There is no SM2 fallback or implicit selection of a plugin by goal name. A plugin
+failure keeps the evaluation unsubmitted and offers recovery; it does not silently
+substitute FSRS or a ladder. See the [plugin contract](../development/extensibility.md).
+
+FSRS uses the supported `DefaultScheduler` API with the FSRS-6 model. Per-goal
+**Allow Reviews Later the Same Day** defaults off, preserving the next-day minimum;
+turning it on retains short learning intervals. Ladder/plugin fractional intervals
+remain supported independently. Same-day repeats use **Practice Again**, not
+automatic re-entry into the queue. FSRS-7 is separate work in #924.
+
+FSRS's effective maximum interval is the configured maximum, additionally capped
+when a finite daily maximum is set: `round(3 * clamp(goalTuneCount, 50, 400) /
+dailyMaximum)`, at least one day. Unlimited daily maximum removes this additional
+population cap. The implementation is [`fsrs.ts`](../../src/lib/goals/fsrs.ts).
+
+A fresh ladder starts at index zero. Restart, back and repeat therefore select the
+first duration; advance selects the second duration if present. Advancing at the
+last step repeats it. Changing the interval list starts fresh. A label edit does
+not reset state. See [`ladder.ts`](../../src/lib/goals/ladder.ts).
+
+Continuation considers only the latest submitted event for the tune/repertoire.
+It continues only when the goal and scheduler state are compatible; it does not
+search backward for an older matching goal. Switching goals and switching back
+without an intervening submitted practice can therefore retain the original state.
+Plugins may declare which earlier state versions they can read.
+
+## Daily Queue Allocation
+
+Settings belong to the user and apply separately in each repertoire. Each goal
+has its own minimum, maximum, automatic-new-tune option and delinquency window.
+There is one combined queue per repertoire and no configurable combined minimum
+or maximum. Sub-queues are intermediate selections, not additional persisted entities.
+
+Automatic allocation considers due-today, recently overdue, then older-overdue
+tunes up to that goal's maximum. If the selection is below its minimum, it can
+introduce unscheduled tunes when enabled, then the nearest future-due tunes.
+Minimum zero means no automatic top-up; maximum zero means Unlimited. Old overdue
+tunes precede new tunes even though their historical bucket number is larger.
+
+An explicit scheduled date takes precedence over the latest event's due date.
+Retained completed, staged and manual allocations count against the goal's budget.
+Refresh preserves completed/staged work. Add More and manual additions are explicit
+user requests handled by the same queue service, rather than silently increasing
+automatic minima. Changing a goal preserves history and due dates and does not
+add an absent tune to the queue; incompatible drafts are cleared.
+
+Sources: [`queue-allocation.ts`](../../src/lib/goals/queue-allocation.ts),
+[`queue.ts`](../../src/lib/goals/queue.ts), and
+[`assignment.ts`](../../src/lib/goals/assignment.ts).
+
+## Selecting, Submitting, and Practicing Again
+
+Selecting an evaluation stages a preview; it does not submit practice. The closed
+chooser displays the short label. Its menu shows scheduling effects/estimates,
+with Explain Choices for more detail and Clear Evaluation as a separate action.
+Submit validates that the predecessor and scheduling inputs still match the
+reviewed preview. Stale input requires review again; genuine conflicts preserve
+the draft rather than inventing a new practice timestamp.
+
+Submitted controls show a checkmark. Practice Again opens a new evaluation while
+preserving the previous event; submission appends a new event and updates the
+queue's displayed-event link. Canceling the repeat retains the earlier completion.
+The broader #931 interaction scope is not included.
+
+## History and Storage
+
+Practice History has an All Goals view and a goal filter. Goal-specific metrics
+and charts are scoped to compatible events. Add records a manual entry for the
+selected goal (or the tune's current goal from All Goals); adding older practice
+must not replace a newer schedule. General history editing and deletion-related
+schedule/sync repair are tracked in [#958](https://github.com/sboagy/tunetrees/issues/958).
+
+New events store goal/evaluation identity and snapshots, scheduler identity/version,
+and authoritative `scheduler_state` JSON. Common `practiced`, `due`, and fractional
+`interval_days` remain typed fields. Old FSRS columns are historical decoder inputs
+or compatibility projections, never an alternative authority for malformed new JSON.
+The shared reader is [`practice-state.ts`](../../src/lib/goals/practice-state.ts).
+
+Completed queue rows display their `displayed_practice_record_id`, not whichever
+practice event happens to be latest today. Historical conversions preserve existing
+links and use only the documented evidence rules; ambiguous old completions show
+Not Available. New Submit writes the event and queue link atomically.
