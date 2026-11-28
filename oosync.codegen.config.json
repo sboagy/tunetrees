@@ -352,6 +352,11 @@
           "table_transient_data": {
             "denyDelete": false
           },
+          "tag": {
+            "upsert": {
+              "mutableNaturalKeyProps": ["tagText"]
+            }
+          },
           "practice_record": {
             "denyDelete": true,
             "upsert": {

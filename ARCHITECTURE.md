@@ -148,6 +148,12 @@ Defining characteristics:
 - Worker behavior is defined by generated schema plus declarative config, not by scattering table-specific assumptions across app code.
 - The browser sync runtime is generic; TuneTrees-specific behavior is supplied through generated artifacts, runtime wiring, and config.
 
+Tag uploads explicitly allow `tagText` changes through the Worker upsert configuration.
+The tag identity stays fixed; `userRef` and `tuneRef` remain protected natural-key
+components. Renames that collide with another tag are rejected rather than merging
+identities. This uses the existing schema and requires the updated Worker; older
+Workers retain their previous behavior until deployed.
+
 How TuneTrees uses oosync:
 
 - `@oosync/sync` provides the generic sync runtime used by the browser.

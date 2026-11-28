@@ -875,6 +875,9 @@ export const WORKER_SYNC_CONFIG = {
             },
           ],
         },
+        upsert: {
+          mutableNaturalKeyProps: ["tagText"],
+        },
       },
       tune: {
         sanitize: {
