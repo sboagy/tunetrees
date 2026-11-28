@@ -56,6 +56,7 @@ import {
   prepareManualPractice,
   saveManualPractice,
 } from "./manual-practice";
+import { readHistoryEvent } from "./practice-history";
 import { readPracticeSession } from "./practice-session";
 import {
   practiceContextFingerprints,
@@ -1573,7 +1574,7 @@ describe("atomic goal practice submission", () => {
     ).toBe("Not available");
   });
 
-  it("does not interpret a legacy non-Recall quality as an FSRS evaluation", async () => {
+  it("displays a legacy non-Recall label without interpreting it as FSRS", async () => {
     await item();
     event("legacy-ladder");
     raw.run(
@@ -1584,9 +1585,18 @@ describe("atomic goal practice submission", () => {
       "UPDATE daily_practice_queue SET completed_at = ?, displayed_practice_record_id = 'legacy-ladder'",
       [stamp]
     );
-    expect(
-      readPracticeSession(db, "owner", "rep", stamp).get("tune")?.submittedLabel
-    ).toBe("Not available");
+    const session = readPracticeSession(db, "owner", "rep", stamp).get("tune");
+    expect(session?.submittedLabel).toBe("Good");
+    expect(session?.submittedColor).toBe("text-foreground");
+    const recorded = session?.event;
+    if (!recorded) throw new Error("Missing linked legacy event");
+    const historical = readHistoryEvent(
+      recorded,
+      db.select().from(goal).all(),
+      "owner"
+    );
+    expect(historical.rating).toBeNull();
+    expect(historical.state.kind).toBe("unavailable");
   });
 
   it("links the displayed event rather than a newer event and uses the current goal", async () => {
