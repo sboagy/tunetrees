@@ -123,6 +123,41 @@ try {
         1, 0, ${stamp}, '2020-01-01', ${stamp}, ${stamp})`;
     const plan = await planFixture(tx);
 
+    // Legacy completion used local noon, not the staged practice/creation time.
+    // Exercise both sides of the old invalid chronological bounds through SQL.
+    for (const practiced of ["2020-01-01 09:00:00", "2020-01-01 23:00:00"]) {
+      await rollbackCase(tx, async (sp) => {
+        await sp`UPDATE public.practice_record SET practiced = ${practiced},
+          last_modified_at = '2020-01-01 17:00:00' WHERE id = ${eventId}`;
+        await sp`UPDATE public.daily_practice_queue SET generated_at = '2020-01-01 21:00:00',
+          completed_at = '2020-01-01 17:00:00' WHERE id = ${queueId}`;
+        const [before] =
+          await sp`SELECT to_jsonb(q) AS row FROM public.daily_practice_queue q WHERE id = ${queueId}`;
+        const recovered = await planFixture(sp);
+        assert.equal(recovered.queueCompletions.updates.length, 1);
+        assert.equal(
+          (await applyGoalCutoverPlan(sp, recovered)).queueCompletionsUpdated,
+          1
+        );
+        const [after] =
+          await sp`SELECT to_jsonb(q) AS row FROM public.daily_practice_queue q WHERE id = ${queueId}`;
+        assert.deepEqual(after.row, {
+          ...before.row,
+          displayed_practice_record_id: eventId,
+        });
+        const [saved] =
+          await sp`SELECT practiced::text, last_modified_at::text FROM public.practice_record WHERE id = ${eventId}`;
+        assert.deepEqual(saved, {
+          practiced,
+          last_modified_at: "2020-01-01 17:00:00",
+        });
+        assert.equal(
+          (await applyGoalCutoverPlan(sp, recovered)).queueCompletionsUpdated,
+          0
+        );
+      });
+    }
+
     // Window recovery uses current rows, including retry validation under locks.
     await rollbackCase(tx, async (sp) => {
       const marker = "data-migration-2025-10-05";

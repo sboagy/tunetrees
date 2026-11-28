@@ -181,6 +181,28 @@ describe("mixed-goal history", () => {
     expect(event.evaluationLabel).toBe("Hard");
     expect(event.state.kind).toBe("unavailable");
   });
+  it("shows the original label for legacy Learn without inferring FSRS or ladder state", () => {
+    const learn = goals.find((goal) => goal.name === "initial_learn")!;
+    const events = read([
+      record({
+        goal: "initial_learn",
+        goalId: learn.id,
+        technique: "base_interval",
+        schedulerId: null,
+        schedulerVersion: null,
+        schedulerState: null,
+        evaluationId: null,
+        evaluationSnapshot: null,
+        quality: 3,
+      }),
+    ]);
+    expect(events[0]).toMatchObject({
+      evaluationLabel: "Good",
+      rating: null,
+      state: { kind: "unavailable" },
+    });
+    expect(summarizeHistoryEvents(events).successRate).toBeNull();
+  });
   it("excludes unknown intervals rather than substituting zero or compatibility values", () => {
     expect(
       summarizeHistoryEvents(

@@ -46,6 +46,84 @@ describe("legacy queue completion evidence", () => {
     expect({ queue, event }).toEqual(before);
   });
 
+  // Shapes observed in the staging rehearsal, expressed without personal IDs.
+  it.each([
+    [
+      "Carraroe",
+      "2026-11-17T21:03:22Z",
+      "2026-11-23T17:00:00Z",
+      "2026-11-24T00:40:18Z",
+    ],
+    [
+      "Woman",
+      "2026-11-17T21:03:36Z",
+      "2026-11-22T17:00:00Z",
+      "2026-11-17T20:53:45Z",
+    ],
+    [
+      "Blackbird",
+      "2026-11-17T21:03:50Z",
+      "2026-11-22T17:00:00Z",
+      "2026-11-17T20:25:13Z",
+    ],
+    [
+      "Tolka",
+      "2026-11-18T01:31:26Z",
+      "2026-11-19T17:00:00Z",
+      "2026-11-19T21:24:54Z",
+    ],
+    [
+      "Rolling",
+      "2026-11-22T23:08:02Z",
+      "2026-11-22T17:00:00Z",
+      "2026-11-23T02:39:58Z",
+    ],
+  ])(
+    "recovers %s despite noon completion and independent practice time",
+    (_name, generated, completed, practiced) => {
+      const source = {
+        ...queue,
+        row: { ...queue.row, generated_at: generated, completed_at: completed },
+      };
+      const candidate = {
+        ...event,
+        row: { ...event.row, practiced, last_modified_at: completed },
+      };
+      const result = prepareQueueCompletions([source], [candidate]);
+      expect(result.unresolved).toEqual([]);
+      expect(result.updates).toHaveLength(1);
+      expect(result.updates[0].event).toEqual(candidate);
+    }
+  );
+
+  it("does not disambiguate a shared noon stamp using practice order", () => {
+    const completed = "2026-11-22T17:00:00Z";
+    const source = {
+      ...queue,
+      row: {
+        ...queue.row,
+        generated_at: "2026-11-22T23:08:02Z",
+        completed_at: completed,
+      },
+    };
+    const first = {
+      ...event,
+      row: {
+        ...event.row,
+        practiced: "2026-11-22T18:00:00Z",
+        last_modified_at: completed,
+      },
+    };
+    const second = {
+      ...first,
+      key: "second",
+      row: { ...first.row, id: "second", practiced: "2026-11-23T02:39:58Z" },
+    };
+    const result = prepareQueueCompletions([source], [first, second]);
+    expect(result.updates).toEqual([]);
+    expect(result.unresolved).toHaveLength(1);
+  });
+
   it("does not choose between two matching events", () => {
     const second = {
       ...event,
@@ -64,8 +142,7 @@ describe("legacy queue completion evidence", () => {
     { row: { ...event.row, last_modified_at: "2020-01-03T10:00:00.123457Z" } },
     { row: { ...event.row, last_modified_at: "invalid" } },
     { row: { ...event.row, practiced: null } },
-    { row: { ...event.row, practiced: "2019-12-31T23:59:59Z" } },
-    { row: { ...event.row, practiced: "2020-01-04T00:00:00Z" } },
+    { row: { ...event.row, practiced: "invalid" } },
     { row: { ...event.row, scheduler_version: 0 } },
   ])(
     "leaves unavailable or inconsistent event evidence unlinked: %j",

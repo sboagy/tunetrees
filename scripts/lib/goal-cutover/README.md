@@ -55,8 +55,13 @@ unattributed; incomplete new-format events without a goal identity block preflig
 
 `queue-completions.ts` links active completed legacy queue rows only when there is
 no existing link and one same-owner/repertoire/tune event has a modification timestamp
-exactly matching completion, with practice between generation and completion.
-Timestamp normalization retains microseconds and permits delayed submission.
+exactly matching completion, and a valid practice timestamp.
+Legacy `commitStagedEvaluations` wrote `getPracticeDate()` (local noon) to both
+`completed_at` and event `last_modified_at`, independently of staged `practiced`.
+Neither queue generation nor practice is bounded by that noon value. Do not impose
+chronological bounds on those three fields or change their stored values.
+Timestamp normalization retains microseconds. Multiple events sharing the stamp
+remain ambiguous, including repeated submissions of one tune on the same day.
 When exact evidence is absent, any active historical window may
 recover an imported completion from exactly one same-owner/repertoire/tune practice
 inside `[window_start_utc, window_end_utc)`. Both rows must carry the historical

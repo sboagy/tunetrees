@@ -59,8 +59,11 @@ Implementation details and script contracts are in the
 
 In one locked transaction it converts supported custom definitions/stable keys,
 seeds missing personal Recall settings, attributes unambiguous legacy history and
-assignments, and links completed queue rows when exact submission evidence identifies one
-event, or an imported queue window has exactly one eligible in-window event.
+assignments, and links completed queue rows when a shared completion/modification
+stamp identifies one same-owner/repertoire/tune event, or an imported queue window
+has exactly one eligible in-window event. Legacy submission stamps were normalized
+to local noon, so they are not chronological bounds on practice or queue creation.
+Multiple matching events remain unresolved.
 The latter is an explicitly accepted best-effort historical display recovery;
 uncertain completions remain unlinked and display “Not available”. Existing overrides, history timestamps and raw historical
 goal names are preserved. A repeat application makes no additional writes.

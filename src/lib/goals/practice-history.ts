@@ -120,8 +120,14 @@ export function readHistoryEvent(
   ) {
     rating = validRating(snapshot.action.rating);
   }
+  // Before goal-specific choices, every scheduler recorded the same four
+  // evaluation labels. Recover that label independently of whether its state
+  // can be interpreted as FSRS; non-Recall events still have no FSRS rating.
+  const legacyQuality = legacy ? validRating(record.quality) : null;
   const legacyLabel =
-    rating === null ? null : ["Again", "Hard", "Good", "Easy"][rating - 1];
+    legacyQuality === null
+      ? null
+      : ["Again", "Hard", "Good", "Easy"][legacyQuality - 1];
   const action =
     typeof snapshot?.action.kind === "string" ? snapshot.action.kind : null;
   return {

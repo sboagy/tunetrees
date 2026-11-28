@@ -61,9 +61,6 @@ function matchingEvent(
   if (queue.ownerId !== row.user_ref)
     throw new Error("Queue repertoire ownership is unavailable");
   const completed = timestamp(row.completed_at);
-  const generated = timestamp(row.generated_at);
-  if (completed < generated)
-    throw new Error("Completion predates queue generation");
   const ownedHistory = history.filter(
     (event) =>
       event.kind === "history" &&
@@ -83,9 +80,12 @@ function matchingEvent(
   const event = candidates[0];
   if (hasNewEventMetadata(event))
     throw new Error("Completion evidence is not a legacy event");
-  const practiced = timestamp(event.row.practiced);
-  if (practiced < generated || practiced > completed)
-    throw new Error("Practice time is outside the queue lifetime");
+  // Legacy commitStagedEvaluations wrote getPracticeDate() (local noon) to
+  // both completion and modification, independently of the staged practice time.
+  // Queue generation can also follow that noon value or the staged practice.
+  // These are not chronological bounds. Require a valid practice timestamp and
+  // the unique shared write stamp above; never choose the latest of several hits.
+  timestamp(event.row.practiced);
   return event;
 }
 
